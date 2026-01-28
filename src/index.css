@@ -2,95 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Cosmic dark theme */
+    --background: 230 25% 7%;
+    --foreground: 200 20% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 230 30% 12%;
+    --card-foreground: 200 20% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 230 30% 10%;
+    --popover-foreground: 200 20% 95%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 185 100% 50%;
+    --primary-foreground: 230 25% 7%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 25 100% 60%;
+    --secondary-foreground: 230 25% 7%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 230 20% 18%;
+    --muted-foreground: 200 15% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 340 100% 60%;
+    --accent-foreground: 200 20% 95%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 85% 55%;
+    --destructive-foreground: 200 20% 95%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 230 30% 20%;
+    --input: 230 30% 15%;
+    --ring: 185 100% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Game-specific colors */
+    --neon-cyan: 185 100% 50%;
+    --neon-orange: 25 100% 60%;
+    --neon-red: 340 100% 60%;
+    --neon-green: 150 100% 45%;
+    --neon-purple: 280 100% 65%;
+    
+    --health: 0 85% 55%;
+    --energy: 185 100% 50%;
+    --shield: 45 100% 55%;
+    
+    /* Gradients */
+    --gradient-cosmic: linear-gradient(135deg, hsl(230 25% 7%) 0%, hsl(260 40% 15%) 50%, hsl(230 25% 7%) 100%);
+    --gradient-neon: linear-gradient(135deg, hsl(185 100% 50%) 0%, hsl(280 100% 65%) 100%);
+    --gradient-fire: linear-gradient(135deg, hsl(25 100% 60%) 0%, hsl(0 85% 55%) 100%);
+    --gradient-metallic: linear-gradient(180deg, hsl(230 20% 30%) 0%, hsl(230 25% 15%) 50%, hsl(230 30% 10%) 100%);
+    
+    /* Shadows */
+    --shadow-neon-cyan: 0 0 20px hsl(185 100% 50% / 0.5), 0 0 40px hsl(185 100% 50% / 0.3);
+    --shadow-neon-orange: 0 0 20px hsl(25 100% 60% / 0.5), 0 0 40px hsl(25 100% 60% / 0.3);
+    --shadow-neon-red: 0 0 20px hsl(340 100% 60% / 0.5), 0 0 40px hsl(340 100% 60% / 0.3);
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 230 30% 10%;
+    --sidebar-foreground: 200 20% 95%;
+    --sidebar-primary: 185 100% 50%;
+    --sidebar-primary-foreground: 230 25% 7%;
+    --sidebar-accent: 230 25% 18%;
+    --sidebar-accent-foreground: 200 20% 95%;
+    --sidebar-border: 230 30% 20%;
+    --sidebar-ring: 185 100% 50%;
   }
 }
 
@@ -100,6 +76,212 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-rajdhani;
+    background: var(--gradient-cosmic);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .font-orbitron {
+    font-family: 'Orbitron', monospace;
+  }
+
+  .font-rajdhani {
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  /* Neon glow effects */
+  .glow-cyan {
+    box-shadow: var(--shadow-neon-cyan);
+  }
+
+  .glow-orange {
+    box-shadow: var(--shadow-neon-orange);
+  }
+
+  .glow-red {
+    box-shadow: var(--shadow-neon-red);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 10px hsl(var(--neon-cyan) / 0.8), 0 0 20px hsl(var(--neon-cyan) / 0.5);
+  }
+
+  .text-glow-orange {
+    text-shadow: 0 0 10px hsl(var(--neon-orange) / 0.8), 0 0 20px hsl(var(--neon-orange) / 0.5);
+  }
+
+  /* Battle UI elements */
+  .health-bar {
+    background: linear-gradient(90deg, hsl(0 85% 55%) 0%, hsl(0 70% 45%) 100%);
+  }
+
+  .energy-bar {
+    background: linear-gradient(90deg, hsl(185 100% 50%) 0%, hsl(200 100% 45%) 100%);
+  }
+
+  .shield-bar {
+    background: linear-gradient(90deg, hsl(45 100% 55%) 0%, hsl(35 100% 45%) 100%);
+  }
+
+  /* Animated backgrounds */
+  .starfield {
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, hsl(185 100% 80%), transparent),
+      radial-gradient(2px 2px at 40px 70px, hsl(185 100% 60%), transparent),
+      radial-gradient(1px 1px at 90px 40px, hsl(200 100% 90%), transparent),
+      radial-gradient(2px 2px at 130px 80px, hsl(185 100% 70%), transparent),
+      radial-gradient(1px 1px at 160px 120px, hsl(200 100% 80%), transparent);
+    background-repeat: repeat;
+    background-size: 200px 150px;
+    animation: twinkle 4s ease-in-out infinite;
+  }
+
+  /* Card styles */
+  .game-card {
+    background: linear-gradient(145deg, hsl(230 30% 15%) 0%, hsl(230 35% 8%) 100%);
+    border: 1px solid hsl(230 30% 25%);
+    box-shadow: 
+      inset 0 1px 0 hsl(230 20% 25%),
+      0 10px 30px hsl(230 50% 5% / 0.5);
+  }
+
+  .game-card-hover:hover {
+    border-color: hsl(var(--primary));
+    box-shadow: 
+      inset 0 1px 0 hsl(230 20% 25%),
+      0 10px 30px hsl(230 50% 5% / 0.5),
+      var(--shadow-neon-cyan);
+  }
+
+  /* Button variants */
+  .btn-neon {
+    @apply relative overflow-hidden font-orbitron font-bold tracking-wider;
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(200 100% 40%) 100%);
+    box-shadow: var(--shadow-neon-cyan);
+    transition: all 0.3s ease;
+  }
+
+  .btn-neon:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 0 30px hsl(185 100% 50% / 0.6),
+      0 0 60px hsl(185 100% 50% / 0.4);
+  }
+
+  .btn-fire {
+    @apply relative overflow-hidden font-orbitron font-bold tracking-wider;
+    background: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(0 85% 50%) 100%);
+    box-shadow: var(--shadow-neon-orange);
+    transition: all 0.3s ease;
+  }
+
+  .btn-fire:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 0 30px hsl(25 100% 60% / 0.6),
+      0 0 60px hsl(25 100% 60% / 0.4);
+  }
+}
+
+@layer utilities {
+  /* Animations */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { 
+      opacity: 1;
+      filter: brightness(1);
+    }
+    50% { 
+      opacity: 0.8;
+      filter: brightness(1.2);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from { 
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to { 
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes attack-left {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(100px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes attack-right {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(-100px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes damage {
+    0%, 100% { filter: brightness(1); }
+    25%, 75% { filter: brightness(2) hue-rotate(180deg); }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.4s ease-out forwards;
+  }
+
+  .animate-attack-left {
+    animation: attack-left 0.5s ease-in-out;
+  }
+
+  .animate-attack-right {
+    animation: attack-right 0.5s ease-in-out;
+  }
+
+  .animate-damage {
+    animation: damage 0.3s ease-in-out;
   }
 }
