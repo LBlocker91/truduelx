@@ -284,4 +284,50 @@
   .animate-damage {
     animation: damage 0.3s ease-in-out;
   }
+
+  /* Battle character idle bobbing */
+  @keyframes battle-idle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .animate-battle-idle {
+    animation: battle-idle 2.2s ease-in-out infinite;
+  }
+
+  /* Battle character hit shake */
+  @keyframes battle-hit {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-8px) rotate(-2deg); }
+    30% { transform: translateX(8px) rotate(2deg); }
+    45% { transform: translateX(-6px) rotate(-1deg); }
+    60% { transform: translateX(6px) rotate(1deg); }
+    75% { transform: translateX(-3px); }
+    90% { transform: translateX(3px); }
+  }
+
+  .animate-battle-hit {
+    animation: battle-hit 0.4s ease-in-out;
+  }
+
+  /* Damage number float up and fade */
+  @keyframes damage-float {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(0.5); }
+    20% { opacity: 1; transform: translateX(-50%) translateY(-15px) scale(1.3); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-50px) scale(0.8); }
+  }
+
+  .animate-damage-float {
+    animation: damage-float 1s ease-out forwards;
+  }
+
+  /* Ground shadow pulse */
+  @keyframes shadow-pulse {
+    0%, 100% { transform: scaleX(1); opacity: 0.7; }
+    50% { transform: scaleX(0.85); opacity: 0.5; }
+  }
+
+  .animate-shadow-pulse {
+    animation: shadow-pulse 2.2s ease-in-out infinite;
+  }
 }
