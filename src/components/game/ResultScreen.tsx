@@ -1,22 +1,21 @@
 import { Button } from '@/components/ui/button';
-import { Trophy, Skull, RotateCcw, Home, Star, Coins } from 'lucide-react';
+import { Trophy, Skull, RotateCcw, Home, Star, Coins, ArrowRight } from 'lucide-react';
 import battleArenaBg from '@/assets/battle-arena-bg.jpg';
 
 interface ResultScreenProps {
   isVictory: boolean;
   playerName: string;
+  xpGained: number;
   onPlayAgain: () => void;
   onMainMenu: () => void;
+  onContinue: () => void;
 }
 
-export const ResultScreen = ({ isVictory, playerName, onPlayAgain, onMainMenu }: ResultScreenProps) => {
-  const rewards = isVictory ? {
-    xp: Math.floor(Math.random() * 50) + 100,
-    credits: Math.floor(Math.random() * 100) + 50,
-  } : null;
+export const ResultScreen = ({ isVictory, playerName, xpGained, onPlayAgain, onMainMenu, onContinue }: ResultScreenProps) => {
+  const credits = isVictory ? Math.floor(Math.random() * 100) + 50 : 0;
 
   return (
-    <div 
+    <div
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
       style={{
         backgroundImage: `url(${battleArenaBg})`,
@@ -29,11 +28,11 @@ export const ResultScreen = ({ isVictory, playerName, onPlayAgain, onMainMenu }:
       <div className="relative z-10 text-center space-y-8 animate-scale-in max-w-lg mx-4">
         {/* Result Icon */}
         <div className={`mx-auto w-32 h-32 rounded-full flex items-center justify-center ${
-          isVictory 
-            ? 'bg-gradient-to-br from-primary to-neon-green glow-cyan' 
+          isVictory
+            ? 'bg-gradient-to-br from-primary to-neon-green glow-cyan'
             : 'bg-gradient-to-br from-accent to-destructive glow-red'
         }`}>
-          {isVictory 
+          {isVictory
             ? <Trophy className="w-16 h-16 text-primary-foreground" />
             : <Skull className="w-16 h-16 text-foreground" />
           }
@@ -47,47 +46,55 @@ export const ResultScreen = ({ isVictory, playerName, onPlayAgain, onMainMenu }:
             {isVictory ? 'VICTORY!' : 'DEFEAT'}
           </h1>
           <p className="text-muted-foreground text-lg font-rajdhani">
-            {isVictory 
-              ? `Congratulations, ${playerName}! You dominated the arena!` 
+            {isVictory
+              ? `Congratulations, ${playerName}! You dominated the arena!`
               : `${playerName}, you fought bravely but fell in battle.`
             }
           </p>
         </div>
 
-        {/* Rewards (Victory only) */}
-        {rewards && (
-          <div className="game-card rounded-xl p-6 space-y-4">
-            <h3 className="font-orbitron text-lg font-bold text-secondary">
-              BATTLE REWARDS
-            </h3>
-            <div className="flex justify-center gap-8">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <Star className="w-5 h-5 text-primary animate-pulse-glow" />
-                  <span className="font-orbitron text-2xl font-bold text-primary">
-                    +{rewards.xp}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">EXPERIENCE</p>
+        {/* Rewards */}
+        <div className="game-card rounded-xl p-6 space-y-4">
+          <h3 className="font-orbitron text-lg font-bold text-secondary">
+            BATTLE REWARDS
+          </h3>
+          <div className="flex justify-center gap-8">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <Star className="w-5 h-5 text-primary animate-pulse-glow" />
+                <span className="font-orbitron text-2xl font-bold text-primary">
+                  +{xpGained}
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground">EXPERIENCE</p>
+            </div>
+            {credits > 0 && (
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Coins className="w-5 h-5 text-shield animate-pulse-glow" />
                   <span className="font-orbitron text-2xl font-bold text-shield">
-                    +{rewards.credits}
+                    +{credits}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">CREDITS</p>
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
           <Button
-            onClick={onPlayAgain}
+            onClick={onContinue}
             className="btn-neon text-lg px-8 py-5 rounded-lg text-primary-foreground"
+          >
+            <ArrowRight className="w-5 h-5 mr-2" />
+            COLLECT XP
+          </Button>
+          <Button
+            onClick={onPlayAgain}
+            variant="outline"
+            className="text-lg px-8 py-5 rounded-lg border-border hover:bg-muted"
           >
             <RotateCcw className="w-5 h-5 mr-2" />
             BATTLE AGAIN
@@ -101,11 +108,6 @@ export const ResultScreen = ({ isVictory, playerName, onPlayAgain, onMainMenu }:
             MAIN MENU
           </Button>
         </div>
-
-        {/* Stats teaser */}
-        <p className="text-muted-foreground/60 text-sm">
-          Win more battles to unlock new abilities and gear!
-        </p>
       </div>
     </div>
   );

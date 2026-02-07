@@ -153,6 +153,9 @@ export const characterTemplates: Record<CharacterClass, Omit<Character, 'id' | '
   warrior: {
     class: 'warrior',
     level: 1,
+    xp: 0,
+    xpToNext: 100,
+    statPoints: 0,
     stats: {
       health: 120,
       maxHealth: 120,
@@ -173,6 +176,9 @@ export const characterTemplates: Record<CharacterClass, Omit<Character, 'id' | '
   mage: {
     class: 'mage',
     level: 1,
+    xp: 0,
+    xpToNext: 100,
+    statPoints: 0,
     stats: {
       health: 85,
       maxHealth: 85,
@@ -193,6 +199,9 @@ export const characterTemplates: Record<CharacterClass, Omit<Character, 'id' | '
   hunter: {
     class: 'hunter',
     level: 1,
+    xp: 0,
+    xpToNext: 100,
+    statPoints: 0,
     stats: {
       health: 100,
       maxHealth: 100,
@@ -228,15 +237,23 @@ export const createCharacter = (
   };
 };
 
-export const createEnemy = (): Character => {
+export const createEnemy = (playerLevel: number = 1): Character => {
   const classes: CharacterClass[] = ['warrior', 'mage', 'hunter'];
   const randomClass = classes[Math.floor(Math.random() * classes.length)];
   const enemyNames = ['Shadow Reaper', 'Void Walker', 'Dark Sentinel', 'Chaos Agent', 'Nebula Hunter'];
   const randomName = enemyNames[Math.floor(Math.random() * enemyNames.length)];
   
   const enemy = createCharacter(randomClass, randomName, 'enemy');
-  enemy.stats.health = Math.floor(enemy.stats.health * 0.9);
+  
+  // Scale enemy to player level
+  const levelBonus = Math.max(0, playerLevel - 1);
+  enemy.level = Math.max(1, playerLevel + Math.floor(Math.random() * 3) - 1);
+  enemy.stats.health = Math.floor(enemy.stats.health * (0.9 + levelBonus * 0.1));
   enemy.stats.maxHealth = enemy.stats.health;
+  enemy.stats.strength += levelBonus;
+  enemy.stats.dexterity += levelBonus;
+  enemy.stats.technology += levelBonus;
+  enemy.stats.support += levelBonus;
   
   return enemy;
 };

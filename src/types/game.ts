@@ -31,6 +31,9 @@ export interface Character {
   name: string;
   class: CharacterClass;
   level: number;
+  xp: number;
+  xpToNext: number;
+  statPoints: number;
   stats: CharacterStats;
   abilities: Ability[];
   image: string;
@@ -67,8 +70,9 @@ export interface BattleState {
 }
 
 export interface GameState {
-  screen: 'title' | 'character-select' | 'battle' | 'victory' | 'defeat';
+  screen: 'title' | 'character-select' | 'battle' | 'victory' | 'defeat' | 'level-up';
   player: Character | null;
   enemy: Character | null;
   battleState: BattleState | null;
+  pendingXp: number;
 }
