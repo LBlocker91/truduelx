@@ -5,9 +5,10 @@ export interface CharacterStats {
   maxHealth: number;
   energy: number;
   maxEnergy: number;
-  attack: number;
-  defense: number;
-  speed: number;
+  strength: number;
+  dexterity: number;
+  technology: number;
+  support: number;
 }
 
 export interface Ability {
@@ -15,11 +16,15 @@ export interface Ability {
   name: string;
   description: string;
   energyCost: number;
-  damage: number;
+  baseDamage: number;
   type: 'physical' | 'magical' | 'special';
+  scaleStat: 'strength' | 'technology' | 'support';
   cooldown: number;
   currentCooldown: number;
+  effect?: 'stun' | 'dot' | 'energy_drain' | 'buff_attack' | 'debuff_defense';
 }
+
+export type BattleAction = 'attack' | 'skill' | 'defend' | 'item';
 
 export interface Character {
   id: string;
@@ -29,6 +34,24 @@ export interface Character {
   stats: CharacterStats;
   abilities: Ability[];
   image: string;
+  rage: number;
+  maxRage: number;
+  isDefending: boolean;
+  statusEffects: StatusEffect[];
+}
+
+export interface StatusEffect {
+  type: 'stun' | 'dot' | 'buff_attack' | 'debuff_defense';
+  turnsRemaining: number;
+  value: number;
+}
+
+export interface HitResult {
+  damage: number;
+  blocked: boolean;
+  deflected: boolean;
+  critical: boolean;
+  rawDamage: number;
 }
 
 export interface BattleState {
@@ -39,6 +62,8 @@ export interface BattleState {
   isAnimating: boolean;
   battleOver: boolean;
   winner: 'player' | 'enemy' | null;
+  turnTimer: number;
+  turnNumber: number;
 }
 
 export interface GameState {

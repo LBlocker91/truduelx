@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CharacterClass } from '@/types/game';
 import { characterTemplates } from '@/data/characters';
-import { ArrowLeft, Shield, Wand2, Crosshair, Heart, Zap, Sword, Target } from 'lucide-react';
+import { ArrowLeft, Shield, Wand2, Crosshair, Heart, Zap, Sword, Brain, Cpu, Users } from 'lucide-react';
 import battleArenaBg from '@/assets/battle-arena-bg.jpg';
 
 interface CharacterSelectProps {
@@ -127,37 +127,44 @@ export const CharacterSelect = ({ onSelect, onBack }: CharacterSelectProps) => {
                 <div className="space-y-2">
                   <StatBar 
                     icon={<Heart className="w-4 h-4 text-health" />}
-                    label="HEALTH"
+                    label="HP"
                     value={template.stats.health}
                     max={120}
                     color="health-bar"
                   />
                   <StatBar 
                     icon={<Zap className="w-4 h-4 text-energy" />}
-                    label="ENERGY"
+                    label="EP"
                     value={template.stats.energy}
                     max={120}
                     color="energy-bar"
                   />
                   <StatBar 
                     icon={<Sword className="w-4 h-4 text-secondary" />}
-                    label="ATTACK"
-                    value={template.stats.attack}
-                    max={25}
+                    label="STR"
+                    value={template.stats.strength}
+                    max={15}
                     color="bg-secondary"
                   />
                   <StatBar 
-                    icon={<Shield className="w-4 h-4 text-primary" />}
-                    label="DEFENSE"
-                    value={template.stats.defense}
-                    max={20}
+                    icon={<Brain className="w-4 h-4 text-primary" />}
+                    label="DEX"
+                    value={template.stats.dexterity}
+                    max={15}
                     color="bg-primary"
                   />
                   <StatBar 
-                    icon={<Target className="w-4 h-4 text-neon-green" />}
-                    label="SPEED"
-                    value={template.stats.speed}
-                    max={20}
+                    icon={<Cpu className="w-4 h-4 text-neon-purple" />}
+                    label="TECH"
+                    value={template.stats.technology}
+                    max={15}
+                    color="bg-neon-purple"
+                  />
+                  <StatBar 
+                    icon={<Users className="w-4 h-4 text-neon-green" />}
+                    label="SUP"
+                    value={template.stats.support}
+                    max={15}
                     color="bg-neon-green"
                   />
                 </div>
@@ -196,7 +203,7 @@ const StatBar = ({ icon, label, value, max, color }: StatBarProps) => {
   return (
     <div className="flex items-center gap-2">
       {icon}
-      <span className="font-orbitron text-xs text-muted-foreground w-16">{label}</span>
+      <span className="font-orbitron text-xs text-muted-foreground w-12">{label}</span>
       <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
         <div 
           className={`h-full ${color} rounded-full transition-all duration-500`}
