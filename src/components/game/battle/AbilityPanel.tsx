@@ -1,4 +1,5 @@
 import { Ability } from '@/types/game';
+import { Swords, Zap, Clock, Sparkles, Target, Shield } from 'lucide-react';
 
 interface AbilityPanelProps {
   abilities: Ability[];
@@ -10,119 +11,115 @@ interface AbilityPanelProps {
   onRageAttack: () => void;
 }
 
-const abilityIcon = (ability: Ability) => {
-  if (ability.effect === 'stun') return '💫';
-  if (ability.effect === 'dot') return '🔥';
-  if (ability.effect === 'energy_drain') return '⚡';
-  if (ability.effect === 'buff_attack') return '⚔️';
-  if (ability.effect === 'debuff_defense') return '🔻';
-  switch (ability.type) {
-    case 'physical': return '⚔️';
-    case 'magical': return '✨';
-    case 'special': return '🎯';
+const abilityTypeIcon = (type: Ability['type']) => {
+  switch (type) {
+    case 'physical': return <Swords className="w-4 h-4" />;
+    case 'magical': return <Sparkles className="w-4 h-4" />;
+    case 'special': return <Target className="w-4 h-4" />;
   }
 };
 
-/**
- * EpicDuel-style skill icon row:
- * Small square buttons with icons, arranged horizontally
- */
 export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, onDefend, rageReady, onRageAttack }: AbilityPanelProps) => {
   return (
-    <div className="flex items-center gap-[3px]">
+    <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 flex-wrap">
       {/* Defend button */}
-      <SkillIcon
-        icon="🛡️"
-        tooltip="Defend (-50% damage)"
-        canUse={canAct}
+      <button
         onClick={() => canAct && onDefend()}
-      />
+        disabled={!canAct}
+        className={`
+          relative group flex flex-col items-center gap-0.5 p-2 sm:p-2.5 rounded-lg border transition-all
+          min-w-[60px] sm:min-w-[70px]
+          ${canAct
+            ? 'border-primary/50 bg-card/80 hover:border-primary hover:bg-primary/10 hover:scale-110 cursor-pointer'
+            : 'border-border/30 bg-card/40 opacity-50 cursor-not-allowed'
+          }
+        `}
+        title="Defend: Reduce incoming damage by 50%"
+      >
+        <div className={`${canAct ? 'text-primary' : 'text-muted-foreground'}`}>
+          <Shield className="w-4 h-4" />
+        </div>
+        <span className="font-orbitron text-[9px] sm:text-[10px] font-bold text-foreground leading-tight text-center">
+          Defend
+        </span>
+        <span className="text-[9px] text-muted-foreground">-50% DMG</span>
+      </button>
 
       {/* Ability buttons */}
       {abilities.map((ability) => {
-        const canUse = ability.currentCooldown === 0 && playerEnergy >= ability.energyCost && canAct;
+        const canUse =
+          ability.currentCooldown === 0 &&
+          playerEnergy >= ability.energyCost &&
+          canAct;
+
         const isOnCooldown = ability.currentCooldown > 0;
+        const notEnoughEnergy = !isOnCooldown && playerEnergy < ability.energyCost;
 
         return (
-          <SkillIcon
+          <button
             key={ability.id}
-            icon={abilityIcon(ability)}
-            tooltip={`${ability.name} (${ability.baseDamage} dmg, ${ability.energyCost} EP)${ability.effect ? ` [${ability.effect}]` : ''}`}
-            canUse={canUse}
             onClick={() => canUse && onUseAbility(ability)}
-            cooldown={isOnCooldown ? ability.currentCooldown : undefined}
-          />
+            disabled={!canUse}
+            className={`
+              relative group flex flex-col items-center gap-0.5 p-2 sm:p-2.5 rounded-lg border transition-all
+              min-w-[60px] sm:min-w-[70px]
+              ${canUse
+                ? 'border-primary/50 bg-card/80 hover:border-primary hover:bg-primary/10 hover:scale-110 cursor-pointer'
+                : 'border-border/30 bg-card/40 opacity-50 cursor-not-allowed'
+              }
+            `}
+            title={`${ability.name}: ${ability.description}\nDamage: ${ability.baseDamage} | Energy: ${ability.energyCost}${ability.effect ? ` | Effect: ${ability.effect}` : ''}`}
+          >
+            {isOnCooldown && (
+              <div className="absolute inset-0 bg-background/60 rounded-lg flex items-center justify-center">
+                <span className="flex items-center gap-0.5 text-accent font-orbitron text-xs font-bold">
+                  <Clock className="w-3 h-3" />
+                  {ability.currentCooldown}
+                </span>
+              </div>
+            )}
+
+            <div className={`${canUse ? 'text-primary' : 'text-muted-foreground'}`}>
+              {abilityTypeIcon(ability.type)}
+            </div>
+
+            <span className="font-orbitron text-[9px] sm:text-[10px] font-bold text-foreground leading-tight text-center">
+              {ability.name}
+            </span>
+
+            <div className="flex items-center gap-1.5 text-[9px]">
+              <span className="flex items-center gap-0.5 text-secondary">
+                <Swords className="w-2.5 h-2.5" />
+                {ability.baseDamage}
+              </span>
+              <span className={`flex items-center gap-0.5 ${notEnoughEnergy ? 'text-accent' : 'text-energy'}`}>
+                <Zap className="w-2.5 h-2.5" />
+                {ability.energyCost}
+              </span>
+            </div>
+          </button>
         );
       })}
 
-      {/* Rage button */}
-      <SkillIcon
-        icon="🔥"
-        tooltip="Rage Attack (requires 100% rage)"
-        canUse={rageReady && canAct}
+      {/* Rage attack button */}
+      <button
         onClick={() => rageReady && canAct && onRageAttack()}
-        isRage
-        rageReady={rageReady}
-      />
+        disabled={!rageReady || !canAct}
+        className={`
+          relative group flex flex-col items-center gap-0.5 p-2 sm:p-2.5 rounded-lg border transition-all
+          min-w-[60px] sm:min-w-[70px]
+          ${rageReady && canAct
+            ? 'border-accent bg-accent/20 hover:bg-accent/30 hover:scale-110 cursor-pointer animate-pulse-glow'
+            : 'border-border/30 bg-card/40 opacity-40 cursor-not-allowed'
+          }
+        `}
+        title="Rage Attack: Unleash devastating damage when rage is full!"
+      >
+        <span className="text-accent text-lg">🔥</span>
+        <span className="font-orbitron text-[9px] sm:text-[10px] font-bold text-accent leading-tight text-center">
+          RAGE
+        </span>
+      </button>
     </div>
   );
 };
-
-interface SkillIconProps {
-  icon: string;
-  tooltip: string;
-  canUse: boolean;
-  onClick: () => void;
-  cooldown?: number;
-  isRage?: boolean;
-  rageReady?: boolean;
-}
-
-const SkillIcon = ({ icon, tooltip, canUse, onClick, cooldown, isRage, rageReady }: SkillIconProps) => (
-  <button
-    onClick={onClick}
-    disabled={!canUse}
-    className="relative flex items-center justify-center transition-all"
-    style={{
-      width: '36px',
-      height: '36px',
-      background: isRage && rageReady
-        ? 'linear-gradient(135deg, #442200 0%, #331100 100%)'
-        : canUse
-          ? 'linear-gradient(135deg, #1e1e35 0%, #14142a 100%)'
-          : '#0c0c18',
-      border: `1.5px solid ${
-        isRage && rageReady ? '#ff6633' :
-        canUse ? '#3a3a60' : '#1a1a30'
-      }`,
-      borderRadius: '3px',
-      cursor: canUse ? 'pointer' : 'not-allowed',
-      opacity: canUse ? 1 : 0.4,
-      fontSize: '16px',
-    }}
-    onMouseEnter={(e) => {
-      if (canUse) {
-        e.currentTarget.style.borderColor = isRage ? '#ff8844' : '#5588cc';
-        e.currentTarget.style.boxShadow = isRage ? '0 0 6px #ff440066' : '0 0 6px #4488cc44';
-      }
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.borderColor = isRage && rageReady ? '#ff6633' : canUse ? '#3a3a60' : '#1a1a30';
-      e.currentTarget.style.boxShadow = 'none';
-    }}
-    title={tooltip}
-  >
-    {/* Cooldown overlay */}
-    {cooldown !== undefined && (
-      <div
-        className="absolute inset-0 flex items-center justify-center rounded-sm"
-        style={{ background: 'rgba(0,0,0,0.7)' }}
-      >
-        <span className="font-orbitron text-[10px] font-bold" style={{ color: '#ff6644' }}>
-          {cooldown}
-        </span>
-      </div>
-    )}
-    <span className="leading-none select-none">{icon}</span>
-  </button>
-);
