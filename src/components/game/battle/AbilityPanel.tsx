@@ -1,5 +1,4 @@
 import { Ability } from '@/types/game';
-import { Clock } from 'lucide-react';
 
 interface AbilityPanelProps {
   abilities: Ability[];
@@ -11,97 +10,57 @@ interface AbilityPanelProps {
   onRageAttack: () => void;
 }
 
-const abilityIcon = (type: Ability['type']) => {
-  switch (type) {
+const abilityIcon = (ability: Ability) => {
+  if (ability.effect === 'stun') return '💫';
+  if (ability.effect === 'dot') return '🔥';
+  if (ability.effect === 'energy_drain') return '⚡';
+  if (ability.effect === 'buff_attack') return '⚔️';
+  if (ability.effect === 'debuff_defense') return '🔻';
+  switch (ability.type) {
     case 'physical': return '⚔️';
     case 'magical': return '✨';
     case 'special': return '🎯';
   }
 };
 
+/**
+ * EpicDuel-style skill icon row:
+ * Small square buttons with icons, arranged horizontally
+ */
 export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, onDefend, rageReady, onRageAttack }: AbilityPanelProps) => {
   return (
-    <div className="flex items-stretch justify-center gap-1 px-1 flex-wrap">
-      {/* Defend */}
-      <SkillButton
+    <div className="flex items-center gap-[3px]">
+      {/* Defend button */}
+      <SkillIcon
         icon="🛡️"
-        label="Defend"
-        sublabel="-50%"
+        tooltip="Defend (-50% damage)"
         canUse={canAct}
         onClick={() => canAct && onDefend()}
-        tooltip="Reduce incoming damage by 50%"
       />
 
-      {/* Abilities */}
+      {/* Ability buttons */}
       {abilities.map((ability) => {
         const canUse = ability.currentCooldown === 0 && playerEnergy >= ability.energyCost && canAct;
         const isOnCooldown = ability.currentCooldown > 0;
-        const notEnoughEnergy = !isOnCooldown && playerEnergy < ability.energyCost;
 
         return (
-          <button
+          <SkillIcon
             key={ability.id}
+            icon={abilityIcon(ability)}
+            tooltip={`${ability.name} (${ability.baseDamage} dmg, ${ability.energyCost} EP)${ability.effect ? ` [${ability.effect}]` : ''}`}
+            canUse={canUse}
             onClick={() => canUse && onUseAbility(ability)}
-            disabled={!canUse}
-            className="relative flex flex-col items-center justify-center transition-all"
-            style={{
-              width: '62px',
-              height: '58px',
-              background: canUse
-                ? 'linear-gradient(180deg, hsl(230 20% 22%) 0%, hsl(230 25% 14%) 100%)'
-                : 'linear-gradient(180deg, hsl(230 20% 15%) 0%, hsl(230 25% 10%) 100%)',
-              border: `1.5px solid ${canUse ? 'hsl(185 60% 40%)' : 'hsl(230 20% 20%)'}`,
-              borderRadius: '4px',
-              cursor: canUse ? 'pointer' : 'not-allowed',
-              opacity: canUse ? 1 : 0.5,
-            }}
-            onMouseEnter={(e) => {
-              if (canUse) {
-                e.currentTarget.style.borderColor = 'hsl(185 100% 50%)';
-                e.currentTarget.style.boxShadow = '0 0 8px hsl(185 100% 50% / 0.4)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = canUse ? 'hsl(185 60% 40%)' : 'hsl(230 20% 20%)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            title={`${ability.name}: ${ability.description}\nDMG: ${ability.baseDamage} | EP: ${ability.energyCost}${ability.effect ? ` | ${ability.effect}` : ''}`}
-          >
-            {/* Cooldown overlay */}
-            {isOnCooldown && (
-              <div className="absolute inset-0 flex items-center justify-center rounded z-10"
-                style={{ background: 'hsl(0 0% 0% / 0.6)' }}>
-                <span className="flex items-center gap-0.5 font-orbitron text-xs font-bold" style={{ color: 'hsl(var(--accent))' }}>
-                  <Clock className="w-3 h-3" />
-                  {ability.currentCooldown}
-                </span>
-              </div>
-            )}
-
-            <span className="text-base leading-none">{abilityIcon(ability.type)}</span>
-            <span className="font-orbitron text-[7px] font-bold leading-tight text-center mt-0.5 px-0.5"
-              style={{ color: 'hsl(var(--foreground))' }}>
-              {ability.name}
-            </span>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span className="font-orbitron text-[7px]" style={{ color: 'hsl(var(--secondary))' }}>
-                {ability.baseDamage}
-              </span>
-              <span className="font-orbitron text-[7px]" style={{ color: notEnoughEnergy ? 'hsl(var(--accent))' : 'hsl(var(--energy))' }}>
-                {ability.energyCost}e
-              </span>
-            </div>
-          </button>
+            cooldown={isOnCooldown ? ability.currentCooldown : undefined}
+          />
         );
       })}
 
-      {/* Rage */}
-      <SkillButton
+      {/* Rage button */}
+      <SkillIcon
         icon="🔥"
-        label="RAGE"
+        tooltip="Rage Attack (requires 100% rage)"
         canUse={rageReady && canAct}
         onClick={() => rageReady && canAct && onRageAttack()}
-        tooltip="Unleash devastating rage attack!"
         isRage
         rageReady={rageReady}
       />
@@ -109,55 +68,61 @@ export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, on
   );
 };
 
-interface SkillButtonProps {
+interface SkillIconProps {
   icon: string;
-  label: string;
-  sublabel?: string;
+  tooltip: string;
   canUse: boolean;
   onClick: () => void;
-  tooltip: string;
+  cooldown?: number;
   isRage?: boolean;
   rageReady?: boolean;
 }
 
-const SkillButton = ({ icon, label, sublabel, canUse, onClick, tooltip, isRage, rageReady }: SkillButtonProps) => (
+const SkillIcon = ({ icon, tooltip, canUse, onClick, cooldown, isRage, rageReady }: SkillIconProps) => (
   <button
     onClick={onClick}
     disabled={!canUse}
-    className={`relative flex flex-col items-center justify-center transition-all ${isRage && rageReady ? 'animate-pulse-glow' : ''}`}
+    className="relative flex items-center justify-center transition-all"
     style={{
-      width: '62px',
-      height: '58px',
+      width: '36px',
+      height: '36px',
       background: isRage && rageReady
-        ? 'linear-gradient(180deg, hsl(25 80% 25%) 0%, hsl(340 70% 20%) 100%)'
+        ? 'linear-gradient(135deg, #442200 0%, #331100 100%)'
         : canUse
-          ? 'linear-gradient(180deg, hsl(230 20% 22%) 0%, hsl(230 25% 14%) 100%)'
-          : 'linear-gradient(180deg, hsl(230 20% 15%) 0%, hsl(230 25% 10%) 100%)',
-      border: `1.5px solid ${isRage && rageReady ? 'hsl(var(--accent))' : canUse ? 'hsl(185 60% 40%)' : 'hsl(230 20% 20%)'}`,
-      borderRadius: '4px',
+          ? 'linear-gradient(135deg, #1e1e35 0%, #14142a 100%)'
+          : '#0c0c18',
+      border: `1.5px solid ${
+        isRage && rageReady ? '#ff6633' :
+        canUse ? '#3a3a60' : '#1a1a30'
+      }`,
+      borderRadius: '3px',
       cursor: canUse ? 'pointer' : 'not-allowed',
-      opacity: canUse ? 1 : (isRage ? 0.35 : 0.5),
+      opacity: canUse ? 1 : 0.4,
+      fontSize: '16px',
     }}
     onMouseEnter={(e) => {
       if (canUse) {
-        e.currentTarget.style.boxShadow = isRage
-          ? '0 0 10px hsl(var(--accent) / 0.5)'
-          : '0 0 8px hsl(185 100% 50% / 0.4)';
+        e.currentTarget.style.borderColor = isRage ? '#ff8844' : '#5588cc';
+        e.currentTarget.style.boxShadow = isRage ? '0 0 6px #ff440066' : '0 0 6px #4488cc44';
       }
     }}
-    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.borderColor = isRage && rageReady ? '#ff6633' : canUse ? '#3a3a60' : '#1a1a30';
+      e.currentTarget.style.boxShadow = 'none';
+    }}
     title={tooltip}
   >
-    <span className="text-lg leading-none">{icon}</span>
-    <span className="font-orbitron text-[7px] font-bold mt-0.5" style={{
-      color: isRage ? 'hsl(var(--accent))' : 'hsl(var(--foreground))',
-    }}>
-      {label}
-    </span>
-    {sublabel && (
-      <span className="font-orbitron text-[7px]" style={{ color: 'hsl(var(--muted-foreground))' }}>
-        {sublabel}
-      </span>
+    {/* Cooldown overlay */}
+    {cooldown !== undefined && (
+      <div
+        className="absolute inset-0 flex items-center justify-center rounded-sm"
+        style={{ background: 'rgba(0,0,0,0.7)' }}
+      >
+        <span className="font-orbitron text-[10px] font-bold" style={{ color: '#ff6644' }}>
+          {cooldown}
+        </span>
+      </div>
     )}
+    <span className="leading-none select-none">{icon}</span>
   </button>
 );
