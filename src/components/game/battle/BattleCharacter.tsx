@@ -14,73 +14,74 @@ export const BattleCharacter = ({ character, isPlayer, attackPhase, isBeingHit, 
   const getTransform = () => {
     const flip = isPlayer ? '' : 'scaleX(-1)';
     if (attackPhase === 'lunging') {
-      const move = isPlayer ? 'translateX(140px)' : 'translateX(-140px)';
+      const move = isPlayer ? 'translateX(120px)' : 'translateX(-120px)';
       return `${flip} ${move}`;
     }
     if (attackPhase === 'striking') {
-      const move = isPlayer ? 'translateX(160px) scale(1.08)' : 'translateX(-160px) scale(1.08)';
+      const move = isPlayer ? 'translateX(140px) scale(1.05)' : 'translateX(-140px) scale(1.05)';
       return `${flip} ${move}`;
     }
     return flip;
   };
 
   const getTransitionDuration = () => {
-    if (attackPhase === 'lunging') return '250ms';
-    if (attackPhase === 'striking') return '80ms';
-    if (attackPhase === 'returning') return '350ms';
-    return '250ms';
+    if (attackPhase === 'lunging') return '200ms';
+    if (attackPhase === 'striking') return '60ms';
+    if (attackPhase === 'returning') return '300ms';
+    return '200ms';
   };
 
-  // Idle bobbing animation style
-  const idleAnimation = attackPhase === 'idle' && !isBeingHit
-    ? 'animate-battle-idle'
-    : '';
-
-  // Hit shake animation
-  const hitAnimation = isBeingHit ? 'animate-battle-hit' : '';
+  const idleAnim = attackPhase === 'idle' && !isBeingHit ? 'animate-battle-idle' : '';
+  const hitAnim = isBeingHit ? 'animate-battle-hit' : '';
 
   return (
     <div className="relative flex flex-col items-center">
-      {/* Damage number floating up */}
+      {/* Floating damage number */}
       {damageNumber !== null && (
         <div
-          className="absolute -top-8 left-1/2 -translate-x-1/2 z-30 font-orbitron text-2xl sm:text-3xl font-black animate-damage-float pointer-events-none"
+          className="absolute -top-10 left-1/2 z-30 font-orbitron text-3xl sm:text-4xl font-black animate-damage-float pointer-events-none select-none"
           style={{
-            color: 'hsl(var(--accent))',
-            textShadow: '0 0 12px hsl(var(--accent) / 0.9), 2px 2px 0 hsl(0 0% 0% / 0.7)',
+            color: '#ff4444',
+            textShadow: '0 0 10px rgba(255,0,0,0.8), 2px 2px 0 rgba(0,0,0,0.8), -1px -1px 0 rgba(0,0,0,0.5)',
+            WebkitTextStroke: '1px rgba(0,0,0,0.3)',
           }}
         >
           -{damageNumber}
         </div>
       )}
 
-      {/* Character container with idle + hit animations */}
+      {/* Character sprite with animations */}
       <div
-        className={`${idleAnimation} ${hitAnimation}`}
+        className={`${idleAnim} ${hitAnim}`}
         style={{
           transform: getTransform(),
-          transition: `transform ${getTransitionDuration()} cubic-bezier(0.25, 0.1, 0.25, 1)`,
+          transition: `transform ${getTransitionDuration()} cubic-bezier(0.4, 0, 0.2, 1)`,
           filter: isBeingHit
-            ? 'brightness(4) saturate(0.2) drop-shadow(0 0 18px hsl(var(--accent)))'
-            : 'drop-shadow(2px 4px 8px hsl(0 0% 0% / 0.6))',
+            ? 'brightness(3) saturate(0.3) drop-shadow(0 0 15px rgba(255,0,0,0.8))'
+            : 'drop-shadow(3px 5px 8px rgba(0,0,0,0.7))',
           transformOrigin: 'bottom center',
         }}
       >
         <img
           src={character.image}
           alt={character.name}
-          className="h-40 sm:h-52 md:h-64 object-contain select-none"
+          className="h-44 sm:h-56 md:h-64 object-contain select-none"
           draggable={false}
+          style={{
+            imageRendering: 'auto',
+          }}
         />
       </div>
 
-      {/* Ground shadow - pulsates with idle */}
+      {/* Ground shadow - elliptical like EpicDuel */}
       <div
-        className="mt-1 rounded-full blur-sm animate-shadow-pulse"
+        className="animate-shadow-pulse"
         style={{
-          width: '90px',
-          height: '10px',
-          background: 'radial-gradient(ellipse, hsl(0 0% 0% / 0.45) 0%, transparent 70%)',
+          width: '100px',
+          height: '12px',
+          marginTop: '2px',
+          background: 'radial-gradient(ellipse, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 50%, transparent 70%)',
+          borderRadius: '50%',
         }}
       />
     </div>

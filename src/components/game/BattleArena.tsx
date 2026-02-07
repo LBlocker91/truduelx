@@ -22,7 +22,7 @@ interface BattleArenaProps {
   onBattleEnd: (winner: 'player' | 'enemy') => void;
 }
 
-const TURN_TIME = 15; // seconds per turn
+const TURN_TIME = 15;
 
 export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBattleEnd }: BattleArenaProps) => {
   const firstTurn = calcFirstStrike(initialPlayer, initialEnemy);
@@ -53,17 +53,13 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
     if (battleState.isAnimating || battleState.battleOver) return;
     const interval = setInterval(() => {
       setBattleState(prev => {
-        if (prev.turnTimer <= 1) {
-          // Time's up — auto-defend for player, auto-attack for enemy
-          return prev; // handled below
-        }
+        if (prev.turnTimer <= 1) return prev;
         return { ...prev, turnTimer: prev.turnTimer - 1 };
       });
     }, 1000);
     return () => clearInterval(interval);
   }, [battleState.isAnimating, battleState.battleOver, battleState.turn]);
 
-  // Auto-defend when player timer runs out
   useEffect(() => {
     if (battleState.turn === 'player' && battleState.turnTimer <= 0 && !battleState.isAnimating && !battleState.battleOver) {
       handleDefend();
@@ -72,7 +68,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
 
   const showTurnBanner = useCallback((text: string) => {
     setTurnBanner(text);
-    setTimeout(() => setTurnBanner(null), 1500);
+    setTimeout(() => setTurnBanner(null), 1200);
   }, []);
 
   const prevTurn = useRef(battleState.turn);
@@ -96,7 +92,6 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
     return state;
   }, []);
 
-  // --- Core attack with full hit resolution ---
   const performAttack = useCallback((
     attacker: 'player' | 'enemy',
     ability: Ability,
@@ -116,10 +111,8 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
       setBattleState(prev => {
         const attackerChar = isPlayer ? prev.player : prev.enemy;
         const defenderChar = isPlayer ? prev.enemy : prev.player;
-
         const result = resolveAttack(attackerChar, defenderChar, ability);
 
-        // Show hit label
         let label = '';
         if (result.critical) label = 'CRITICAL!';
         if (result.blocked) label = 'BLOCKED!';
@@ -130,7 +123,6 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         setTargetHit(true);
         setTargetDamage(result.damage);
 
-        // Build log
         const emoji = isPlayer ? '🗡️' : '💀';
         let logMsg = `${emoji} ${attackerChar.name} uses ${ability.name} for ${result.damage} damage!`;
         if (result.critical) logMsg += ' 💥 CRITICAL!';
@@ -140,27 +132,23 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         const targetKey = isPlayer ? 'enemy' : 'player';
         const attackerKey = isPlayer ? 'player' : 'enemy';
 
-        // Apply damage
         const newDefender = {
           ...defenderChar,
           stats: { ...defenderChar.stats, health: Math.max(0, defenderChar.stats.health - result.damage) },
         };
 
-        // Energy drain
         const drainAmount = applyEnergyDrain(ability, defenderChar);
         if (drainAmount > 0) {
           newDefender.stats.energy = Math.max(0, newDefender.stats.energy - drainAmount);
           logMsg += ` ⚡ Drained ${drainAmount} energy!`;
         }
 
-        // Apply status effect to defender
         const effect = applyAbilityEffect(ability, defenderChar);
         if (effect) {
           newDefender.statusEffects = [...newDefender.statusEffects, effect];
           logMsg += ` [${effect.type}]`;
         }
 
-        // Rage gain
         const rageGain = calcRageGain(result.damage);
         const newAttacker = {
           ...attackerChar,
@@ -190,42 +178,31 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         setTargetHit(false);
         setTargetDamage(null);
         setAttackPhase('returning');
-
         setTimeout(() => {
           setAttackPhase('idle');
           setBattleState(prev => ({ ...prev, isAnimating: false }));
           onComplete();
-        }, 350);
-      }, 300);
-    }, 300);
+        }, 300);
+      }, 250);
+    }, 250);
   }, [checkBattleEnd]);
 
-  // --- Switch turn helper ---
   const switchTurn = useCallback(() => {
     setBattleState(prev => {
       if (prev.battleOver) return prev;
-
       const nextTurn = prev.turn === 'player' ? 'enemy' : 'player';
-
-      // Tick status effects & DOT at turn end
       const { char: tickedPlayer, dotDamage: playerDot } = tickStatusEffects(prev.player);
       const { char: tickedEnemy, dotDamage: enemyDot } = tickStatusEffects(prev.enemy);
-
       const logs = [...prev.combatLog];
       if (playerDot > 0) logs.push(`🔥 ${prev.player.name} takes ${playerDot} burn damage!`);
       if (enemyDot > 0) logs.push(`🔥 ${prev.enemy.name} takes ${enemyDot} burn damage!`);
-
-      // Energy regen at turn start
       const regenAmount = 8;
       const nextChar = nextTurn === 'player' ? tickedPlayer : tickedEnemy;
       nextChar.stats.energy = Math.min(nextChar.stats.maxEnergy, nextChar.stats.energy + regenAmount);
-
-      // Cooldown reduction for next turn's character
       nextChar.abilities = nextChar.abilities.map(a => ({
         ...a,
         currentCooldown: Math.max(0, a.currentCooldown - 1),
       }));
-
       const newState: BattleState = {
         ...prev,
         player: nextTurn === 'player' ? nextChar : tickedPlayer,
@@ -235,12 +212,10 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         turnTimer: TURN_TIME,
         turnNumber: prev.turnNumber + 1,
       };
-
       return checkBattleEnd(newState);
     });
   }, [checkBattleEnd]);
 
-  // --- Player actions ---
   const useAbility = useCallback((ability: Ability) => {
     if (battleState.isAnimating || battleState.turn !== 'player' || battleState.battleOver) return;
     if (ability.currentCooldown > 0 || battleState.player.stats.energy < ability.energyCost) return;
@@ -249,108 +224,65 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
       switchTurn();
       return;
     }
-
     performAttack('player', ability, switchTurn);
   }, [battleState, performAttack, switchTurn, addLog]);
 
   const handleDefend = useCallback(() => {
     if (battleState.isAnimating || battleState.turn !== 'player' || battleState.battleOver) return;
-
     setBattleState(prev => ({
       ...prev,
       player: { ...prev.player, isDefending: true },
       combatLog: [...prev.combatLog.slice(-4), '🛡️ You take a defensive stance! (-50% damage)'],
     }));
-
     setTimeout(() => switchTurn(), 500);
   }, [battleState, switchTurn]);
 
   const handleRageAttack = useCallback(() => {
     if (battleState.isAnimating || battleState.turn !== 'player' || battleState.battleOver) return;
     if (battleState.player.rage < RAGE_THRESHOLD) return;
-
-    // Create a special rage ability
     const rageAbility: Ability = {
-      id: 'rage-attack',
-      name: 'Rage Unleashed',
-      description: 'Devastating rage attack',
-      energyCost: 0,
-      baseDamage: 50,
-      type: 'physical',
-      scaleStat: 'strength',
-      cooldown: 0,
-      currentCooldown: 0,
+      id: 'rage-attack', name: 'Rage Unleashed', description: 'Devastating rage attack',
+      energyCost: 0, baseDamage: 50, type: 'physical', scaleStat: 'strength', cooldown: 0, currentCooldown: 0,
     };
-
-    // Reset rage after use
-    setBattleState(prev => ({
-      ...prev,
-      player: { ...prev.player, rage: 0 },
-    }));
-
+    setBattleState(prev => ({ ...prev, player: { ...prev.player, rage: 0 } }));
     performAttack('player', rageAbility, switchTurn);
   }, [battleState, performAttack, switchTurn]);
 
-  // --- Enemy AI ---
+  // Enemy AI
   useEffect(() => {
     if (battleState.turn !== 'enemy' || battleState.isAnimating || battleState.battleOver) return;
-
     const timer = setTimeout(() => {
-      // Check stun
       if (isStunned(battleState.enemy)) {
         addLog(`💫 ${battleState.enemy.name} is stunned!`);
         switchTurn();
         return;
       }
-
-      // Enemy rage check
       if (battleState.enemy.rage >= RAGE_THRESHOLD) {
         const rageAbility: Ability = {
-          id: 'enemy-rage',
-          name: 'Rage Unleashed',
-          description: 'Devastating rage attack',
-          energyCost: 0,
-          baseDamage: 50,
-          type: 'physical',
-          scaleStat: 'strength',
-          cooldown: 0,
-          currentCooldown: 0,
+          id: 'enemy-rage', name: 'Rage Unleashed', description: 'Devastating rage attack',
+          energyCost: 0, baseDamage: 50, type: 'physical', scaleStat: 'strength', cooldown: 0, currentCooldown: 0,
         };
-        setBattleState(prev => ({
-          ...prev,
-          enemy: { ...prev.enemy, rage: 0 },
-        }));
+        setBattleState(prev => ({ ...prev, enemy: { ...prev.enemy, rage: 0 } }));
         performAttack('enemy', rageAbility, switchTurn);
         return;
       }
-
-      // AI: pick best available ability or defend
       const available = battleState.enemy.abilities.filter(
         a => a.currentCooldown === 0 && battleState.enemy.stats.energy >= a.energyCost
       );
-
       if (available.length === 0) {
-        // Defend if no energy
         addLog(`🛡️ ${battleState.enemy.name} defends!`);
-        setBattleState(prev => ({
-          ...prev,
-          enemy: { ...prev.enemy, isDefending: true },
-        }));
+        setBattleState(prev => ({ ...prev, enemy: { ...prev.enemy, isDefending: true } }));
         setTimeout(() => switchTurn(), 500);
         return;
       }
-
-      // Pick strongest available ability with some randomness
       const sorted = [...available].sort((a, b) => b.baseDamage - a.baseDamage);
       const pick = Math.random() < 0.6 ? sorted[0] : sorted[Math.floor(Math.random() * sorted.length)];
-
       performAttack('enemy', pick, switchTurn);
     }, 800);
-
     return () => clearTimeout(timer);
   }, [battleState.turn, battleState.isAnimating, battleState.battleOver, battleState.enemy, performAttack, switchTurn, addLog]);
 
-  // --- Battle end ---
+  // Battle end
   useEffect(() => {
     if (battleState.battleOver && battleState.winner) {
       const timer = setTimeout(() => onBattleEnd(battleState.winner!), 2500);
@@ -361,16 +293,20 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
   const canAct = battleState.turn === 'player' && !battleState.isAnimating && !battleState.battleOver;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-2 sm:p-4" style={{ background: 'hsl(var(--background))' }}>
+    <div className="min-h-screen flex items-center justify-center p-2 sm:p-4" style={{ background: '#0a0a12' }}>
+      {/* EpicDuel-style game window with metallic border */}
       <div
-        className="relative w-full max-w-4xl overflow-hidden rounded-lg border-2 border-border/60"
+        className="relative w-full max-w-4xl overflow-hidden"
         style={{
           aspectRatio: '16 / 10',
           maxHeight: 'calc(100vh - 32px)',
-          boxShadow: '0 0 40px hsl(var(--primary) / 0.1), 0 20px 60px hsl(0 0% 0% / 0.5)',
+          border: '3px solid hsl(230 20% 28%)',
+          borderRadius: '6px',
+          boxShadow: '0 0 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.3)',
+          background: '#0d0d1a',
         }}
       >
-        {/* Background */}
+        {/* Background arena */}
         <div
           className="absolute inset-0"
           style={{
@@ -379,29 +315,48 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
             backgroundPosition: 'center 40%',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
+        {/* Slight vignette overlay */}
+        <div className="absolute inset-0" style={{
+          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 100%)',
+        }} />
 
-        {/* Turn banner + timer */}
-        <div className="absolute top-0 left-0 right-0 z-20 flex justify-center">
-          <div
-            className="px-6 py-1.5 font-orbitron text-xs sm:text-sm font-bold tracking-widest rounded-b-lg flex items-center gap-3"
-            style={{
-              background: battleState.turn === 'player'
-                ? 'linear-gradient(180deg, hsl(var(--primary) / 0.9), hsl(var(--primary) / 0.6))'
-                : 'linear-gradient(180deg, hsl(var(--accent) / 0.9), hsl(var(--accent) / 0.6))',
-              color: battleState.turn === 'player'
-                ? 'hsl(var(--primary-foreground))'
-                : 'hsl(var(--accent-foreground))',
-              boxShadow: battleState.turn === 'player'
-                ? '0 4px 15px hsl(var(--primary) / 0.4)'
-                : '0 4px 15px hsl(var(--accent) / 0.4)',
-            }}
-          >
-            {battleState.turn === 'player' ? "YOUR TURN" : "ENEMY TURN"}
-            <span className={`ml-1 font-mono text-sm ${battleState.turnTimer <= 5 ? 'text-accent animate-pulse' : ''}`}>
-              {battleState.turnTimer}s
+        {/* Top HUD bar - metallic dark strip */}
+        <div
+          className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between px-3 pt-2"
+          style={{
+            background: 'linear-gradient(180deg, rgba(10,10,20,0.85) 0%, rgba(10,10,20,0.4) 80%, transparent 100%)',
+            paddingBottom: '12px',
+          }}
+        >
+          <CharacterStatus character={battleState.player} isPlayer />
+
+          {/* Center: Turn indicator + timer */}
+          <div className="flex flex-col items-center gap-1 pt-1">
+            <div
+              className="px-4 py-1 font-orbitron text-[10px] sm:text-xs font-bold tracking-widest"
+              style={{
+                background: battleState.turn === 'player'
+                  ? 'linear-gradient(180deg, hsl(185 80% 30%) 0%, hsl(185 60% 20%) 100%)'
+                  : 'linear-gradient(180deg, hsl(340 80% 30%) 0%, hsl(340 60% 20%) 100%)',
+                border: `1.5px solid ${battleState.turn === 'player' ? 'hsl(185 60% 50%)' : 'hsl(340 60% 50%)'}`,
+                borderRadius: '3px',
+                color: 'white',
+              }}
+            >
+              {battleState.turn === 'player' ? "YOUR TURN" : "ENEMY TURN"}
+            </div>
+            <span
+              className={`font-orbitron text-sm font-bold ${battleState.turnTimer <= 5 ? 'animate-pulse' : ''}`}
+              style={{
+                color: battleState.turnTimer <= 5 ? 'hsl(var(--accent))' : 'hsl(var(--foreground))',
+                textShadow: '0 0 6px rgba(0,0,0,0.8)',
+              }}
+            >
+              {battleState.turnTimer}
             </span>
           </div>
+
+          <CharacterStatus character={battleState.enemy} isPlayer={false} />
         </div>
 
         {/* Turn change flash */}
@@ -411,7 +366,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
               className="font-orbitron text-4xl sm:text-5xl md:text-6xl font-black tracking-wider animate-scale-in"
               style={{
                 color: battleState.turn === 'player' ? 'hsl(var(--primary))' : 'hsl(var(--accent))',
-                textShadow: `0 0 30px ${battleState.turn === 'player' ? 'hsl(var(--primary) / 0.8)' : 'hsl(var(--accent) / 0.8)'}`,
+                textShadow: `0 0 30px ${battleState.turn === 'player' ? 'hsl(185 100% 50% / 0.8)' : 'hsl(340 100% 60% / 0.8)'}`,
               }}
             >
               {turnBanner}
@@ -419,14 +374,14 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
           </div>
         )}
 
-        {/* Hit label (CRITICAL/BLOCKED/DEFLECTED) */}
+        {/* Hit label */}
         {hitLabel && (
           <div className="absolute inset-0 z-25 flex items-center justify-center pointer-events-none">
             <div
               className="font-orbitron text-2xl sm:text-3xl font-black animate-scale-in"
               style={{
-                color: hitLabel.text === 'CRITICAL!' ? 'hsl(var(--secondary))' : 'hsl(var(--primary))',
-                textShadow: '0 0 20px currentColor',
+                color: hitLabel.text === 'CRITICAL!' ? '#ff6b00' : '#00e5ff',
+                textShadow: '0 0 20px currentColor, 0 0 40px currentColor',
               }}
             >
               {hitLabel.text}
@@ -434,15 +389,9 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
           </div>
         )}
 
-        {/* HUD */}
-        <div className="absolute top-8 left-3 right-3 z-10 flex justify-between items-start">
-          <CharacterStatus character={battleState.player} isPlayer />
-          <CharacterStatus character={battleState.enemy} isPlayer={false} />
-        </div>
-
-        {/* Characters */}
-        <div className="absolute inset-0 flex items-end justify-center z-10 pb-[25%]">
-          <div className="flex items-end justify-between w-full px-[10%] sm:px-[12%]">
+        {/* Characters on the battlefield - positioned like EpicDuel side-view */}
+        <div className="absolute inset-0 flex items-end justify-center z-10" style={{ paddingBottom: '22%' }}>
+          <div className="flex items-end justify-between w-full px-[8%] sm:px-[10%]">
             <BattleCharacter
               character={battleState.player}
               isPlayer
@@ -460,16 +409,19 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
           </div>
         </div>
 
-        {/* Bottom panel */}
+        {/* Bottom panel - EpicDuel style dark panel with combat log + skills */}
         <div className="absolute bottom-0 left-0 right-0 z-20">
-          <div className="px-3 py-1">
+          {/* Combat log strip */}
+          <div className="px-2 pb-1">
             <CombatLog logs={battleState.combatLog} />
           </div>
+
+          {/* Skill bar - dark metallic panel */}
           <div
-            className="px-2 py-2.5 sm:py-3"
+            className="px-2 py-2"
             style={{
-              background: 'linear-gradient(180deg, hsl(var(--card) / 0.95) 0%, hsl(var(--background) / 0.98) 100%)',
-              borderTop: '2px solid hsl(var(--border) / 0.6)',
+              background: 'linear-gradient(180deg, hsl(230 30% 10%) 0%, hsl(230 35% 6%) 100%)',
+              borderTop: '2px solid hsl(230 20% 22%)',
             }}
           >
             <AbilityPanel
@@ -486,21 +438,21 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
 
         {/* Battle over overlay */}
         {battleState.battleOver && (
-          <div className="absolute inset-0 bg-background/85 flex items-center justify-center z-50 animate-fade-in">
+          <div className="absolute inset-0 flex items-center justify-center z-50 animate-fade-in"
+            style={{ background: 'rgba(5,5,15,0.88)' }}>
             <div className="text-center">
               <h2
-                className={`font-orbitron text-5xl md:text-7xl font-black mb-3 ${
-                  battleState.winner === 'player' ? 'text-primary' : 'text-accent'
-                }`}
+                className="font-orbitron text-5xl md:text-7xl font-black mb-3"
                 style={{
+                  color: battleState.winner === 'player' ? '#00e5ff' : '#ff4444',
                   textShadow: battleState.winner === 'player'
-                    ? '0 0 30px hsl(var(--primary) / 0.8), 0 0 60px hsl(var(--primary) / 0.4)'
-                    : '0 0 30px hsl(var(--accent) / 0.8), 0 0 60px hsl(var(--accent) / 0.4)',
+                    ? '0 0 30px rgba(0,229,255,0.8), 0 0 60px rgba(0,229,255,0.4)'
+                    : '0 0 30px rgba(255,68,68,0.8), 0 0 60px rgba(255,68,68,0.4)',
                 }}
               >
                 {battleState.winner === 'player' ? 'VICTORY!' : 'DEFEAT!'}
               </h2>
-              <p className="text-muted-foreground text-lg font-rajdhani">
+              <p className="font-rajdhani text-lg" style={{ color: 'hsl(var(--muted-foreground))' }}>
                 {battleState.winner === 'player' ? 'You have defeated your opponent!' : 'You have been defeated...'}
               </p>
             </div>
