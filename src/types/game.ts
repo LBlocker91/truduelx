@@ -103,6 +103,8 @@ export interface BattleState {
   winner: 'player' | 'enemy' | null;
   turnTimer: number;
   turnNumber: number;
+  playerRageUsed: boolean;
+  enemyRageUsed: boolean;
 }
 
 export interface GameState {

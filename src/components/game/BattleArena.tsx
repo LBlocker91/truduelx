@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Character, Ability, BattleState } from '@/types/game';
 import {
   resolveAttack,
-  calcRageGain,
+  calcRageGains,
   RAGE_THRESHOLD,
+  MAX_RAGE,
+  RAGE_PER_TURN,
+  applyRageDamageCap,
   applyAbilityEffect,
   applyInlineEffect,
   applyEnergyDrain,
@@ -39,6 +42,8 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
     winner: null,
     turnTimer: TURN_TIME,
     turnNumber: 1,
+    playerRageUsed: false,
+    enemyRageUsed: false,
   });
 
   const [playerAttackPhase, setPlayerAttackPhase] = useState<AttackPhase>('idle');
@@ -142,10 +147,10 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         const targetKey = isPlayer ? 'enemy' : 'player';
         const attackerKey = isPlayer ? 'player' : 'enemy';
 
-        // Apply damage
+        // Build defender (damage applied later after rage cap check)
         const newDefender = {
           ...defenderChar,
-          stats: { ...defenderChar.stats, health: Math.max(0, defenderChar.stats.health - result.damage) },
+          stats: { ...defenderChar.stats },
         };
 
         // Inline effects (heal, energy recovery, drain, cooldown increase)
@@ -176,8 +181,31 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
           })) || [];
         }
 
-        // Rage gain
-        const rageGain = calcRageGain(result.damage);
+        // Rage gain (new EpicDuel formulas)
+        const isRageSkill = ability.id === 'rage-attack' || ability.id === 'enemy-rage';
+        let finalDamage = result.damage;
+
+        // Apply rage damage cap for rage skills
+        if (isRageSkill) {
+          finalDamage = applyRageDamageCap(result.damage, defenderChar.stats.health, defenderChar.stats.maxHealth);
+        }
+
+        // No rage from rage skills, DOT, self-damage, or pets
+        const grantRage = !isRageSkill && ability.effect !== 'dot';
+        const { attackerRage, defenderRage } = grantRage
+          ? calcRageGains(
+              finalDamage,
+              attackerChar.stats.maxHealth,
+              defenderChar.stats.maxHealth,
+              attackerChar.stats.support,
+              defenderChar.stats.support,
+              result.blocked
+            )
+          : { attackerRage: 0, defenderRage: 0 };
+
+        // Apply damage (use finalDamage for rage-capped)
+        const newDefenderHP = Math.max(0, defenderChar.stats.health - finalDamage);
+
         const newAttacker = {
           ...attackerChar,
           stats: {
@@ -186,7 +214,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
             ...(inlineResult.attackerUpdate || {}),
           },
           abilities: attackerChar.abilities.map(a => a.id === ability.id ? { ...a, currentCooldown: a.cooldown } : a),
-          rage: Math.min(attackerChar.maxRage, attackerChar.rage + rageGain),
+          rage: Math.min(MAX_RAGE, attackerChar.rage + attackerRage),
           isDefending: false,
           statusEffects: effect && ['buff_attack', 'defense_buff', 'crit_buff', 'damage_absorb', 'dodge', 'stat_buff_all', 'reflect'].includes(effect.type)
             ? [...attackerChar.statusEffects, effect]
@@ -195,7 +223,8 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
 
         const newDefenderWithRage = {
           ...newDefender,
-          rage: Math.min(newDefender.maxRage, newDefender.rage + Math.floor(rageGain * 0.5)),
+          stats: { ...newDefender.stats, health: newDefenderHP },
+          rage: Math.min(MAX_RAGE, newDefender.rage + defenderRage),
         };
 
         const newState: BattleState = {
@@ -242,6 +271,10 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
       const regenAmount = 8;
       const nextChar = nextTurn === 'player' ? tickedPlayer : tickedEnemy;
       nextChar.stats.energy = Math.min(nextChar.stats.maxEnergy, nextChar.stats.energy + regenAmount);
+
+      // Passive rage per turn (both players get +3)
+      tickedPlayer.rage = Math.min(MAX_RAGE, tickedPlayer.rage + RAGE_PER_TURN);
+      tickedEnemy.rage = Math.min(MAX_RAGE, tickedEnemy.rage + RAGE_PER_TURN);
 
       // Cooldown reduction for next turn's character
       nextChar.abilities = nextChar.abilities.map(a => ({
@@ -290,13 +323,12 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
 
   const handleRageAttack = useCallback(() => {
     if (battleState.isAnimating || battleState.turn !== 'player' || battleState.battleOver) return;
-    if (battleState.player.rage < RAGE_THRESHOLD) return;
+    if (battleState.player.rage < RAGE_THRESHOLD || battleState.playerRageUsed) return;
 
-    // Create a special rage ability
     const rageAbility: Ability = {
       id: 'rage-attack',
       name: 'Rage Unleashed',
-      description: 'Devastating rage attack',
+      description: 'Devastating rage attack (ignores partial defense, cannot crit)',
       energyCost: 0,
       baseDamage: 50,
       type: 'physical',
@@ -305,10 +337,10 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
       currentCooldown: 0,
     };
 
-    // Reset rage after use
     setBattleState(prev => ({
       ...prev,
       player: { ...prev.player, rage: 0 },
+      playerRageUsed: true,
     }));
 
     performAttack('player', rageAbility, switchTurn);
@@ -319,15 +351,14 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
     if (battleState.turn !== 'enemy' || battleState.isAnimating || battleState.battleOver) return;
 
     const timer = setTimeout(() => {
-      // Check stun
       if (isStunned(battleState.enemy)) {
         addLog(`💫 ${battleState.enemy.name} is stunned!`);
         switchTurn();
         return;
       }
 
-      // Enemy rage check
-      if (battleState.enemy.rage >= RAGE_THRESHOLD) {
+      // Enemy rage check (once per battle)
+      if (battleState.enemy.rage >= RAGE_THRESHOLD && !battleState.enemyRageUsed) {
         const rageAbility: Ability = {
           id: 'enemy-rage',
           name: 'Rage Unleashed',
@@ -342,6 +373,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         setBattleState(prev => ({
           ...prev,
           enemy: { ...prev.enemy, rage: 0 },
+          enemyRageUsed: true,
         }));
         performAttack('enemy', rageAbility, switchTurn);
         return;
@@ -501,7 +533,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
               canAct={canAct}
               onUseAbility={useAbility}
               onDefend={handleDefend}
-              rageReady={battleState.player.rage >= RAGE_THRESHOLD}
+              rageReady={battleState.player.rage >= RAGE_THRESHOLD && !battleState.playerRageUsed}
               onRageAttack={handleRageAttack}
             />
           </div>

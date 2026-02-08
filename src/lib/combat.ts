@@ -137,8 +137,9 @@ export function resolveAttack(
     return { damage: 0, blocked: false, deflected: true, critical: false, rawDamage: 0 };
   }
 
-  // Step 4: crit check
-  if (Math.random() < calcCritChance(attacker)) {
+  // Step 4: crit check (rage skills cannot crit)
+  const isRageSkill = ability.id === 'rage-attack' || ability.id === 'enemy-rage';
+  if (!isRageSkill && Math.random() < calcCritChance(attacker)) {
     critical = true;
     damage = Math.floor(damage * critDamageMultiplier(attacker.stats.support));
   }
@@ -178,11 +179,69 @@ export function resolveAttack(
 
 // --- Rage ---
 
+export const RAGE_THRESHOLD = 100;
+export const MAX_RAGE = 100;
+export const RAGE_PER_TURN = 3;
+const MIN_RAGE_PER_HIT = 2;
+const MAX_RAGE_PER_HIT = 18;
+
+/** Rage gained from DEALING damage: (dmg / defenderMaxHP) × 35, clamped [2, 18] */
+export function rageFromDealing(damage: number, defenderMaxHP: number): number {
+  if (damage <= 0 || defenderMaxHP <= 0) return 0;
+  return Math.min(MAX_RAGE_PER_HIT, Math.max(MIN_RAGE_PER_HIT, (damage / defenderMaxHP) * 35));
+}
+
+/** Rage gained from TAKING damage: (dmg / yourMaxHP) × 45, clamped [2, 18] */
+export function rageFromTaking(damage: number, yourMaxHP: number): number {
+  if (damage <= 0 || yourMaxHP <= 0) return 0;
+  return Math.min(MAX_RAGE_PER_HIT, Math.max(MIN_RAGE_PER_HIT, (damage / yourMaxHP) * 45));
+}
+
+/** SUP rage gain multiplier: 1 + min(SUP × 0.003, 0.3) */
+export function rageSupMultiplier(sup: number): number {
+  return 1 + Math.min(sup * 0.003, 0.3);
+}
+
+/** Compute both attacker and defender rage gains from a hit. Blocked hits × 0.6. Fully negated = 0. */
+export function calcRageGains(
+  damage: number,
+  attackerMaxHP: number,
+  defenderMaxHP: number,
+  attackerSup: number,
+  defenderSup: number,
+  blocked: boolean
+): { attackerRage: number; defenderRage: number } {
+  if (damage <= 0) return { attackerRage: 0, defenderRage: 0 };
+
+  let attackerRage = rageFromDealing(damage, defenderMaxHP) * rageSupMultiplier(attackerSup);
+  let defenderRage = rageFromTaking(damage, attackerMaxHP) * rageSupMultiplier(defenderSup);
+
+  if (blocked) {
+    attackerRage *= 0.6;
+    defenderRage *= 0.6;
+  }
+
+  return {
+    attackerRage: Math.floor(attackerRage),
+    defenderRage: Math.floor(defenderRage),
+  };
+}
+
+/** Rage skill damage cap: cannot exceed 35% of defender max HP, cannot kill from >40% HP */
+export function applyRageDamageCap(damage: number, defenderHP: number, defenderMaxHP: number): number {
+  const cap = Math.floor(defenderMaxHP * 0.35);
+  let capped = Math.min(damage, cap);
+  // Cannot kill from above 40% HP
+  if (defenderHP / defenderMaxHP > 0.4) {
+    capped = Math.min(capped, defenderHP - 1);
+  }
+  return Math.max(1, capped);
+}
+
+// Legacy compat
 export function calcRageGain(damage: number): number {
   return Math.floor(damage * 0.3);
 }
-
-export const RAGE_THRESHOLD = 100;
 
 // --- Status effects ---
 
