@@ -2,6 +2,12 @@ import { Character, CharacterClass } from '@/types/game';
 import { calcMaxHealth, xpForLevel } from '@/lib/leveling';
 import { BASE_STATS, CLASS_ABILITIES, CLASS_IMAGES, ALL_CLASSES } from './class-definitions';
 
+// Row 1 abilities (unlockLevel 1 or undefined) are free at character creation
+const getStarterAbilityIds = (classType: CharacterClass): string[] =>
+  CLASS_ABILITIES[classType]
+    .filter(a => (a.unlockLevel || 1) <= 1)
+    .map(a => a.id);
+
 // --- Character factory ---
 
 export const createCharacter = (
@@ -21,6 +27,8 @@ export const createCharacter = (
     xp: 0,
     xpToNext: xpForLevel(1),
     statPoints: 0,
+    skillPoints: 0,
+    unlockedAbilityIds: getStarterAbilityIds(classType),
     stats: {
       health: hp,
       maxHealth: hp,
@@ -53,6 +61,8 @@ export const characterTemplates: Record<CharacterClass, Omit<Character, 'id' | '
       xp: 0,
       xpToNext: xpForLevel(1),
       statPoints: 0,
+      skillPoints: 0,
+      unlockedAbilityIds: getStarterAbilityIds(cls),
       stats: {
         health: hp, maxHealth: hp,
         energy: base.energy, maxEnergy: base.maxEnergy,
@@ -94,6 +104,11 @@ export const createEnemy = (playerLevel: number = 1): Character => {
   enemy.stats.energy = enemy.stats.maxEnergy;
 
   enemy.xpToNext = xpForLevel(enemyLevel);
+
+  // Enemies auto-unlock all abilities available at their level
+  enemy.unlockedAbilityIds = enemy.abilities
+    .filter(a => (a.unlockLevel || 1) <= enemyLevel)
+    .map(a => a.id);
 
   return enemy;
 };

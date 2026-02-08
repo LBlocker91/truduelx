@@ -71,6 +71,8 @@ export interface Character {
   xp: number;
   xpToNext: number;
   statPoints: number;
+  skillPoints: number;
+  unlockedAbilityIds: string[];
   stats: CharacterStats;
   abilities: Ability[];
   image: string;

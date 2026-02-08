@@ -5,6 +5,7 @@ interface AbilityPanelProps {
   abilities: Ability[];
   playerEnergy: number;
   playerLevel: number;
+  unlockedAbilityIds?: string[];
   canAct: boolean;
   onUseAbility: (ability: Ability) => void;
   onDefend: () => void;
@@ -21,9 +22,12 @@ const abilityTypeIcon = (type: Ability['type']) => {
   }
 };
 
-export const AbilityPanel = ({ abilities, playerEnergy, playerLevel, canAct, onUseAbility, onDefend, rageReady, onRageAttack, rageSkillName }: AbilityPanelProps) => {
-  // Filter abilities by player level
-  const unlockedAbilities = abilities.filter(a => (a.unlockLevel || 1) <= playerLevel);
+export const AbilityPanel = ({ abilities, playerEnergy, playerLevel, unlockedAbilityIds, canAct, onUseAbility, onDefend, rageReady, onRageAttack, rageSkillName }: AbilityPanelProps) => {
+  // Filter abilities by level AND unlock status
+  const unlockedAbilities = abilities.filter(a =>
+    (a.unlockLevel || 1) <= playerLevel &&
+    (!unlockedAbilityIds || unlockedAbilityIds.includes(a.id))
+  );
 
   return (
     <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 flex-wrap">
