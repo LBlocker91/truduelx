@@ -376,7 +376,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         a => a.currentCooldown === 0 &&
              battleState.enemy.stats.energy >= a.energyCost &&
              (a.unlockLevel || 1) <= battleState.enemy.level &&
-             battleState.enemy.unlockedAbilityIds.includes(a.id)
+             (battleState.enemy.abilityLevels[a.id] || 0) > 0
       );
 
       if (available.length === 0) {
@@ -521,7 +521,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
               abilities={battleState.player.abilities}
               playerEnergy={battleState.player.stats.energy}
               playerLevel={battleState.player.level}
-              unlockedAbilityIds={battleState.player.unlockedAbilityIds}
+              abilityLevels={battleState.player.abilityLevels}
               canAct={canAct}
               onUseAbility={useAbility}
               onDefend={handleDefend}

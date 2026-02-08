@@ -24,7 +24,7 @@ export const createCharacter = (
     xpToNext: xpForLevel(1),
     statPoints: 0,
     skillPoints: 0,
-    unlockedAbilityIds: [],
+    abilityLevels: {},
     stats: {
       health: hp,
       maxHealth: hp,
@@ -58,7 +58,7 @@ export const characterTemplates: Record<CharacterClass, Omit<Character, 'id' | '
       xpToNext: xpForLevel(1),
       statPoints: 0,
       skillPoints: 0,
-      unlockedAbilityIds: [],
+      abilityLevels: {},
       stats: {
         health: hp, maxHealth: hp,
         energy: base.energy, maxEnergy: base.maxEnergy,
@@ -101,10 +101,15 @@ export const createEnemy = (playerLevel: number = 1): Character => {
 
   enemy.xpToNext = xpForLevel(enemyLevel);
 
-  // Enemies auto-unlock all abilities available at their level
-  enemy.unlockedAbilityIds = enemy.abilities
-    .filter(a => (a.unlockLevel || 1) <= enemyLevel)
-    .map(a => a.id);
+  // Enemies auto-unlock all abilities available at their level (at ability level scaled to enemy level)
+  const autoLevel = Math.min(20, Math.max(1, Math.floor(enemyLevel / 5) + 1));
+  const abilityLevels: Record<string, number> = {};
+  for (const a of enemy.abilities) {
+    if ((a.unlockLevel || 1) <= enemyLevel) {
+      abilityLevels[a.id] = autoLevel;
+    }
+  }
+  enemy.abilityLevels = abilityLevels;
 
   return enemy;
 };

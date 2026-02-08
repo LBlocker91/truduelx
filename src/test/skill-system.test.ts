@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { createCharacter, createEnemy } from '@/data/characters';
-import { applyXp, unlockAbility } from '@/lib/leveling';
-import { BASIC_ATTACK } from '@/types/game';
+import { applyXp, upgradeAbility } from '@/lib/leveling';
+import { BASIC_ATTACK, MAX_ABILITY_LEVEL } from '@/types/game';
 
 describe('Skill System', () => {
-  it('new characters start with zero unlocked abilities', () => {
+  it('new characters start with empty abilityLevels', () => {
     const player = createCharacter('mercenary', 'Test', 'p1');
-    expect(player.unlockedAbilityIds).toEqual([]);
+    expect(player.abilityLevels).toEqual({});
   });
 
   it('BASIC_ATTACK is always available (0 energy, 0 cooldown)', () => {
@@ -17,12 +17,12 @@ describe('Skill System', () => {
 
   it('leveling up grants skill points', () => {
     const player = createCharacter('mercenary', 'Test', 'p1');
-    const leveled = applyXp(player, 10000); // enough to level up
+    const leveled = applyXp(player, 10000);
     expect(leveled.level).toBeGreaterThan(1);
     expect(leveled.skillPoints).toBeGreaterThan(0);
   });
 
-  it('can unlock a Row 1 ability with skill points', () => {
+  it('can upgrade an ability with skill points (up to 20)', () => {
     const player = createCharacter('mercenary', 'Test', 'p1');
     const leveled = applyXp(player, 10000);
     expect(leveled.skillPoints).toBeGreaterThan(0);
@@ -30,25 +30,28 @@ describe('Skill System', () => {
     const ability = leveled.abilities.find(a => (a.unlockLevel || 1) <= leveled.level);
     expect(ability).toBeDefined();
 
-    const afterUnlock = unlockAbility(leveled, ability!.id);
-    expect(afterUnlock.unlockedAbilityIds).toContain(ability!.id);
-    expect(afterUnlock.skillPoints).toBe(leveled.skillPoints - 1);
+    const after1 = upgradeAbility(leveled, ability!.id);
+    expect(after1.abilityLevels[ability!.id]).toBe(1);
+    expect(after1.skillPoints).toBe(leveled.skillPoints - 1);
+
+    // Can upgrade again
+    const after2 = upgradeAbility({ ...after1, skillPoints: 5 }, ability!.id);
+    expect(after2.abilityLevels[ability!.id]).toBe(2);
   });
 
-  it('cannot unlock abilities above character level', () => {
+  it('cannot upgrade abilities above character level', () => {
     const player = createCharacter('mercenary', 'Test', 'p1');
     const leveled = applyXp(player, 1000);
-    // Find a high-level ability
     const highLvlAbility = leveled.abilities.find(a => (a.unlockLevel || 1) > leveled.level);
     if (highLvlAbility) {
-      const result = unlockAbility(leveled, highLvlAbility.id);
-      expect(result.unlockedAbilityIds).not.toContain(highLvlAbility.id);
+      const result = upgradeAbility(leveled, highLvlAbility.id);
+      expect(result.abilityLevels[highLvlAbility.id]).toBeUndefined();
     }
   });
 
-  it('enemies auto-unlock abilities at their level', () => {
+  it('enemies auto-set ability levels at their level', () => {
     const enemy = createEnemy(5);
-    // Enemies should have some unlocked abilities
-    expect(enemy.unlockedAbilityIds.length).toBeGreaterThan(0);
+    const unlockedCount = Object.keys(enemy.abilityLevels).length;
+    expect(unlockedCount).toBeGreaterThan(0);
   });
 });

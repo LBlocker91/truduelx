@@ -80,6 +80,8 @@ export const BASIC_ATTACK: Ability = {
   currentCooldown: 0,
 };
 
+export const MAX_ABILITY_LEVEL = 20;
+
 export interface Character {
   id: string;
   name: string;
@@ -89,7 +91,7 @@ export interface Character {
   xpToNext: number;
   statPoints: number;
   skillPoints: number;
-  unlockedAbilityIds: string[];
+  abilityLevels: Record<string, number>; // ability id -> level (1-20), missing = locked
   stats: CharacterStats;
   abilities: Ability[];
   image: string;

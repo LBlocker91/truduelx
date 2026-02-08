@@ -148,12 +148,16 @@ function resolveRawHit(
   const statValue = attacker.stats[ability.scaleStat];
   const multiplier = skillPowerMultiplier(statValue, attacker.level);
 
+  // Ability level scaling: +5% per level beyond 1
+  const abilityLevel = attacker.abilityLevels?.[ability.id] || 1;
+  const abilityLevelMult = 1 + (abilityLevel - 1) * 0.05;
+
   let extraMultiplier = 1;
   if (ability.scaleStat === 'support' && ability.type === 'physical') {
     extraMultiplier = gunDamageMultiplier(attacker.stats.support);
   }
 
-  let raw = Math.floor(ability.baseDamage * multiplier * extraMultiplier) + Math.floor(Math.random() * 4);
+  let raw = Math.floor(ability.baseDamage * multiplier * extraMultiplier * abilityLevelMult) + Math.floor(Math.random() * 4);
 
   // Bonus low HP damage
   if (ability.effect === 'bonus_low_hp' && defender.stats.health / defender.stats.maxHealth < 0.3) {
