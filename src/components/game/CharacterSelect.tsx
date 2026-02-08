@@ -37,7 +37,7 @@ export const CharacterSelect = ({ onSelect, onBack, playerLevel, unlockedPremium
     const meta = CLASS_META[cls];
     if (meta.unlockType === 'free') return true;
     if (meta.unlockType === 'level') return playerLevel >= (meta.unlockLevel ?? 30);
-    if (meta.unlockType === 'premium') return unlockedPremiumClasses.includes(cls);
+    if (meta.unlockType === 'premium') return (unlockedPremiumClasses ?? []).includes(cls);
     return false;
   };
 
