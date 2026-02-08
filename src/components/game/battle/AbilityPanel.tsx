@@ -1,14 +1,16 @@
 import { Ability } from '@/types/game';
-import { Swords, Zap, Clock, Sparkles, Target, Shield } from 'lucide-react';
+import { Swords, Zap, Clock, Sparkles, Target, Shield, Lock } from 'lucide-react';
 
 interface AbilityPanelProps {
   abilities: Ability[];
   playerEnergy: number;
+  playerLevel: number;
   canAct: boolean;
   onUseAbility: (ability: Ability) => void;
   onDefend: () => void;
   rageReady: boolean;
   onRageAttack: () => void;
+  rageSkillName?: string;
 }
 
 const abilityTypeIcon = (type: Ability['type']) => {
@@ -19,7 +21,10 @@ const abilityTypeIcon = (type: Ability['type']) => {
   }
 };
 
-export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, onDefend, rageReady, onRageAttack }: AbilityPanelProps) => {
+export const AbilityPanel = ({ abilities, playerEnergy, playerLevel, canAct, onUseAbility, onDefend, rageReady, onRageAttack, rageSkillName }: AbilityPanelProps) => {
+  // Filter abilities by player level
+  const unlockedAbilities = abilities.filter(a => (a.unlockLevel || 1) <= playerLevel);
+
   return (
     <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 flex-wrap">
       {/* Defend button */}
@@ -46,7 +51,7 @@ export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, on
       </button>
 
       {/* Ability buttons */}
-      {abilities.map((ability) => {
+      {unlockedAbilities.map((ability) => {
         const canUse =
           ability.currentCooldown === 0 &&
           playerEnergy >= ability.energyCost &&
@@ -54,6 +59,7 @@ export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, on
 
         const isOnCooldown = ability.currentCooldown > 0;
         const notEnoughEnergy = !isOnCooldown && playerEnergy < ability.energyCost;
+        const hits = ability.hits || 1;
 
         return (
           <button
@@ -68,7 +74,7 @@ export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, on
                 : 'border-border/30 bg-card/40 opacity-50 cursor-not-allowed'
               }
             `}
-            title={`${ability.name}: ${ability.description}\nDamage: ${ability.baseDamage} | Energy: ${ability.energyCost}${ability.effect ? ` | Effect: ${ability.effect}` : ''}`}
+            title={`${ability.name}: ${ability.description}\n${hits > 1 ? `Hits: ${hits} | ` : ''}Damage: ${ability.baseDamage}${hits > 1 ? ` × ${hits}` : ''} | Energy: ${ability.energyCost}${ability.effect ? ` | Effect: ${ability.effect}` : ''}`}
           >
             {isOnCooldown && (
               <div className="absolute inset-0 bg-background/60 rounded-lg flex items-center justify-center">
@@ -90,7 +96,7 @@ export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, on
             <div className="flex items-center gap-1.5 text-[9px]">
               <span className="flex items-center gap-0.5 text-secondary">
                 <Swords className="w-2.5 h-2.5" />
-                {ability.baseDamage}
+                {hits > 1 ? `${ability.baseDamage}×${hits}` : ability.baseDamage}
               </span>
               <span className={`flex items-center gap-0.5 ${notEnoughEnergy ? 'text-accent' : 'text-energy'}`}>
                 <Zap className="w-2.5 h-2.5" />
@@ -113,11 +119,11 @@ export const AbilityPanel = ({ abilities, playerEnergy, canAct, onUseAbility, on
             : 'border-border/30 bg-card/40 opacity-40 cursor-not-allowed'
           }
         `}
-        title="Rage Attack: Unleash devastating damage when rage is full!"
+        title={rageSkillName ? `${rageSkillName}: Class-specific rage attack!` : 'Rage Attack: Unleash devastating damage when rage is full!'}
       >
         <span className="text-accent text-lg">🔥</span>
         <span className="font-orbitron text-[9px] sm:text-[10px] font-bold text-accent leading-tight text-center">
-          RAGE
+          {rageSkillName || 'RAGE'}
         </span>
       </button>
     </div>

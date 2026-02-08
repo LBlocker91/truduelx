@@ -15,6 +15,7 @@ import {
   isSkillDisabled,
   calcFirstStrike,
 } from '@/lib/combat';
+import { RAGE_SKILLS } from '@/data/class-definitions';
 import battleArenaBg from '@/assets/battle-arena-bg.jpg';
 import { CharacterStatus } from './battle/CharacterStatus';
 import { AbilityPanel } from './battle/AbilityPanel';
@@ -325,15 +326,11 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
     if (battleState.isAnimating || battleState.turn !== 'player' || battleState.battleOver) return;
     if (battleState.player.rage < RAGE_THRESHOLD || battleState.playerRageUsed) return;
 
+    // Use class-specific rage skill
+    const classRageSkill = RAGE_SKILLS[battleState.player.class];
     const rageAbility: Ability = {
+      ...classRageSkill,
       id: 'rage-attack',
-      name: 'Rage Unleashed',
-      description: 'Devastating rage attack (ignores partial defense, cannot crit)',
-      energyCost: 0,
-      baseDamage: 50,
-      type: 'physical',
-      scaleStat: 'strength',
-      cooldown: 0,
       currentCooldown: 0,
     };
 
@@ -359,15 +356,10 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
 
       // Enemy rage check (once per battle)
       if (battleState.enemy.rage >= RAGE_THRESHOLD && !battleState.enemyRageUsed) {
+        const classRageSkill = RAGE_SKILLS[battleState.enemy.class];
         const rageAbility: Ability = {
+          ...classRageSkill,
           id: 'enemy-rage',
-          name: 'Rage Unleashed',
-          description: 'Devastating rage attack',
-          energyCost: 0,
-          baseDamage: 50,
-          type: 'physical',
-          scaleStat: 'strength',
-          cooldown: 0,
           currentCooldown: 0,
         };
         setBattleState(prev => ({
@@ -379,9 +371,11 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         return;
       }
 
-      // AI: pick best available ability or defend
+      // AI: pick best available ability (filtered by level) or defend
       const available = battleState.enemy.abilities.filter(
-        a => a.currentCooldown === 0 && battleState.enemy.stats.energy >= a.energyCost
+        a => a.currentCooldown === 0 &&
+             battleState.enemy.stats.energy >= a.energyCost &&
+             (a.unlockLevel || 1) <= battleState.enemy.level
       );
 
       if (available.length === 0) {
@@ -530,11 +524,13 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
             <AbilityPanel
               abilities={battleState.player.abilities}
               playerEnergy={battleState.player.stats.energy}
+              playerLevel={battleState.player.level}
               canAct={canAct}
               onUseAbility={useAbility}
               onDefend={handleDefend}
               rageReady={battleState.player.rage >= RAGE_THRESHOLD && !battleState.playerRageUsed}
               onRageAttack={handleRageAttack}
+              rageSkillName={RAGE_SKILLS[battleState.player.class]?.name}
             />
           </div>
         </div>

@@ -62,71 +62,89 @@ export function calcFirstStrike(a: Character, b: Character): 'player' | 'enemy' 
 }
 
 // ============================================================
+// PvP damage caps
+// ============================================================
+const MAX_TOTAL_DAMAGE_PERCENT = 0.30;  // 30% of defender max HP per skill use
+const MAX_PER_HIT_DAMAGE_PERCENT = 0.10; // 10% per hit (multi-hit)
+
+// ============================================================
 // Damage resolution (EpicDuel final formula + skill scaling)
 // ============================================================
+
+/** Resolve a single hit's raw damage (before caps) */
+function resolveRawHit(
+  attacker: Character,
+  defender: Character,
+  ability: Ability
+): number {
+  const statValue = attacker.stats[ability.scaleStat];
+  const multiplier = skillPowerMultiplier(statValue, attacker.level);
+
+  let extraMultiplier = 1;
+  if (ability.scaleStat === 'support' && ability.type === 'physical') {
+    extraMultiplier = gunDamageMultiplier(attacker.stats.support);
+  }
+
+  let raw = Math.floor(ability.baseDamage * multiplier * extraMultiplier) + Math.floor(Math.random() * 4);
+
+  // Bonus low HP damage
+  if (ability.effect === 'bonus_low_hp' && defender.stats.health / defender.stats.maxHealth < 0.3) {
+    raw = Math.floor(raw * 1.5);
+  }
+
+  // Attack buff
+  const atkBuff = attacker.statusEffects.filter(e => e.type === 'buff_attack').reduce((s, e) => s + e.value, 0);
+  raw += atkBuff;
+
+  // Stat buff all
+  const statBuff = attacker.statusEffects.filter(e => e.type === 'stat_buff_all').reduce((s, e) => s + e.value, 0);
+  if (statBuff > 0) raw = Math.floor(raw * (1 + statBuff * 0.01));
+
+  // Flat defense (DEX)
+  raw -= Math.floor(dexFlatDefense(defender.stats.dexterity));
+
+  // Defense buff on defender
+  const defBuff = defender.statusEffects.filter(e => e.type === 'defense_buff').reduce((s, e) => s + e.value, 0);
+  if (defBuff > 0) raw = Math.floor(raw * Math.max(0.3, 1 - defBuff * 0.01));
+
+  // Damage taken increase debuff on defender
+  const dmgIncrease = defender.statusEffects.filter(e => e.type === 'damage_taken_increase').reduce((s, e) => s + e.value, 0);
+  if (dmgIncrease > 0) raw = Math.floor(raw * (1 + dmgIncrease * 0.01));
+
+  // Tech defense reduction
+  if (ability.type === 'magical' || ability.scaleStat === 'technology') {
+    raw = Math.floor(raw * (1 - techDefenseReduction(defender.stats.technology)));
+  }
+
+  // Damage absorb shield
+  const absorb = defender.statusEffects.filter(e => e.type === 'damage_absorb').reduce((s, e) => s + e.value, 0);
+  if (absorb > 0) raw = Math.max(0, raw - absorb);
+
+  return Math.max(1, raw);
+}
 
 export function resolveAttack(
   attacker: Character,
   defender: Character,
   ability: Ability
 ): HitResult {
-  const statValue = attacker.stats[ability.scaleStat];
+  const hits = ability.hits || 1;
+  const perHitCap = Math.floor(defender.stats.maxHealth * MAX_PER_HIT_DAMAGE_PERCENT);
+  const totalCap = Math.floor(defender.stats.maxHealth * MAX_TOTAL_DAMAGE_PERCENT);
+  const isRageSkill = ability.id.startsWith('rage-') || ability.id === 'enemy-rage';
 
-  // Step 1: Skill Power = baseDamage × (1 + RelevantStat × 0.015) × (1 + Level × 0.01)
-  const multiplier = skillPowerMultiplier(statValue, attacker.level);
-
-  // Apply gun/rocket scaling for support-based physical abilities
-  let extraMultiplier = 1;
-  if (ability.scaleStat === 'support' && ability.type === 'physical') {
-    extraMultiplier = gunDamageMultiplier(attacker.stats.support);
+  let totalRaw = 0;
+  for (let i = 0; i < hits; i++) {
+    let hitDmg = resolveRawHit(attacker, defender, ability);
+    // Per-hit cap for multi-hit abilities
+    if (hits > 1) hitDmg = Math.min(hitDmg, perHitCap);
+    totalRaw += hitDmg;
   }
 
-  let rawDamage = Math.floor(ability.baseDamage * multiplier * extraMultiplier) + Math.floor(Math.random() * 4);
+  // Total damage cap (30% of defender max HP)
+  totalRaw = Math.min(totalRaw, totalCap);
 
-  // Bonus low HP damage (Execution Protocol)
-  if (ability.effect === 'bonus_low_hp' && defender.stats.health / defender.stats.maxHealth < 0.3) {
-    rawDamage = Math.floor(rawDamage * 1.5);
-  }
-
-  // Attack buff from status effects
-  const atkBuff = attacker.statusEffects
-    .filter(e => e.type === 'buff_attack')
-    .reduce((sum, e) => sum + e.value, 0);
-  rawDamage += atkBuff;
-
-  // Stat buff all bonus
-  const statBuff = attacker.statusEffects
-    .filter(e => e.type === 'stat_buff_all')
-    .reduce((sum, e) => sum + e.value, 0);
-  if (statBuff > 0) rawDamage = Math.floor(rawDamage * (1 + statBuff * 0.01));
-
-  // Step 2: subtract flat defense (DEX)
-  rawDamage -= Math.floor(dexFlatDefense(defender.stats.dexterity));
-
-  // Defense buff on defender reduces damage
-  const defBuff = defender.statusEffects
-    .filter(e => e.type === 'defense_buff')
-    .reduce((sum, e) => sum + e.value, 0);
-  if (defBuff > 0) rawDamage = Math.floor(rawDamage * Math.max(0.3, 1 - defBuff * 0.01));
-
-  // Damage taken increase debuff on defender
-  const dmgIncrease = defender.statusEffects
-    .filter(e => e.type === 'damage_taken_increase')
-    .reduce((sum, e) => sum + e.value, 0);
-  if (dmgIncrease > 0) rawDamage = Math.floor(rawDamage * (1 + dmgIncrease * 0.01));
-
-  // Step 3: tech defense reduction for tech/magical abilities
-  if (ability.type === 'magical' || ability.scaleStat === 'technology') {
-    rawDamage = Math.floor(rawDamage * (1 - techDefenseReduction(defender.stats.technology)));
-  }
-
-  // Damage absorb shield
-  const absorb = defender.statusEffects
-    .filter(e => e.type === 'damage_absorb')
-    .reduce((sum, e) => sum + e.value, 0);
-  if (absorb > 0) rawDamage = Math.max(0, rawDamage - absorb);
-
-  let damage = rawDamage;
+  let damage = totalRaw;
   let blocked = false;
   let deflected = false;
   let critical = false;
@@ -137,14 +155,15 @@ export function resolveAttack(
     return { damage: 0, blocked: false, deflected: true, critical: false, rawDamage: 0 };
   }
 
-  // Step 4: crit check (rage skills cannot crit)
-  const isRageSkill = ability.id === 'rage-attack' || ability.id === 'enemy-rage';
+  // Crit check (rage skills cannot crit)
   if (!isRageSkill && Math.random() < calcCritChance(attacker)) {
     critical = true;
     damage = Math.floor(damage * critDamageMultiplier(attacker.stats.support));
+    // Re-apply total cap after crit
+    damage = Math.min(damage, totalCap);
   }
 
-  // Step 5: block (physical/basic only)
+  // Block (physical/basic only)
   if (ability.type === 'physical' && Math.random() < calcBlockChance(defender)) {
     blocked = true;
     damage = Math.floor(damage * 0.5);
@@ -162,19 +181,12 @@ export function resolveAttack(
   }
 
   // Defense debuff on defender
-  const defDebuff = defender.statusEffects
-    .filter(e => e.type === 'debuff_defense')
-    .reduce((sum, e) => sum + e.value, 0);
+  const defDebuff = defender.statusEffects.filter(e => e.type === 'debuff_defense').reduce((s, e) => s + e.value, 0);
   damage += defDebuff;
 
-  // Reflect damage back
-  const reflectBuff = defender.statusEffects.filter(e => e.type === 'reflect').reduce((s, e) => s + e.value, 0);
-  // Reflect is handled in BattleArena (apply damage back to attacker)
-
-  // Floor at 1 (unless dodged)
   damage = Math.max(1, damage);
 
-  return { damage, blocked, deflected, critical, rawDamage: Math.max(1, rawDamage) };
+  return { damage, blocked, deflected, critical, rawDamage: Math.max(1, totalRaw) };
 }
 
 // --- Rage ---
@@ -299,7 +311,9 @@ export function applyInlineEffect(
 
   switch (ability.effect) {
     case 'heal': {
-      const healAmount = Math.floor((20 + attacker.stats.technology * 2) * buffMult);
+      const healPercent = ability.healPercent || 10;
+      const supBonus = attacker.stats.support * (healPercent <= 10 ? 2 : healPercent <= 20 ? 3 : 4);
+      const healAmount = Math.floor(attacker.stats.maxHealth * (healPercent / 100) + supBonus);
       const newHp = Math.min(attacker.stats.maxHealth, attacker.stats.health + healAmount);
       result.attackerUpdate = { health: newHp };
       result.log = `💚 Healed for ${healAmount} HP!`;

@@ -56,6 +56,9 @@ export interface Ability {
   cooldown: number;
   currentCooldown: number;
   effect?: AbilityEffect;
+  unlockLevel?: number;   // level required to use this ability (default 1)
+  hits?: number;          // number of hits for multi-hit abilities (default 1)
+  healPercent?: number;   // for percentage-based heals (e.g., 10 = 10% max HP)
 }
 
 export type BattleAction = 'attack' | 'skill' | 'defend' | 'item';
