@@ -64,12 +64,16 @@ export interface Ability {
 export type BattleAction = 'attack' | 'skill' | 'defend' | 'item';
 
 // Basic weapon attack — always available, no skill point required
+// Weapon damage range used by the basic attack formula
+export const WEAPON_MIN_DAMAGE = 80;
+export const WEAPON_MAX_DAMAGE = 100;
+
 export const BASIC_ATTACK: Ability = {
   id: 'basic-attack',
   name: 'Basic Attack',
-  description: 'A simple weapon strike. Always available.',
+  description: 'A weapon strike scaled by Strength. Always available.',
   energyCost: 0,
-  baseDamage: 50,
+  baseDamage: 0, // damage computed by resolveBasicAttack, not baseDamage
   type: 'physical',
   scaleStat: 'strength',
   cooldown: 0,
