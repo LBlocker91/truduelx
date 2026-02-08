@@ -1,41 +1,79 @@
 import { Character } from '@/types/game';
 
+// --- Max level ---
+export const MAX_LEVEL = 100;
+
+// --- XP required per level: 100 × Level² + 500 × Level ---
 export function xpForLevel(level: number): number {
-  return Math.floor(100 * Math.pow(1.3, level - 1));
+  return 100 * level * level + 500 * level;
 }
 
-export function calcBattleXp(enemyLevel: number, won: boolean): number {
-  const base = won ? 80 : 20;
-  return base + enemyLevel * 15 + Math.floor(Math.random() * 30);
+// --- Stat points per level ---
+export function statPointsForLevel(level: number): number {
+  if (level <= 50) return 5;
+  if (level <= 80) return 4;
+  return 3;
 }
 
+// --- Health formula: Base 100 + STR×12 + Level×6 ---
+export function calcMaxHealth(strength: number, level: number): number {
+  return 100 + strength * 12 + level * 6;
+}
+
+// --- PvP XP: Base 250 + OpponentLevel×20, scaled by level diff ---
+export function calcBattleXp(
+  playerLevel: number,
+  enemyLevel: number,
+  won: boolean
+): number {
+  const base = 250 + enemyLevel * 20;
+  const levelDiff = enemyLevel - playerLevel;
+  const diffMultiplier = Math.max(0.5, Math.min(3.5, 1 + levelDiff * 0.08));
+
+  // Soft XP penalty after level 85
+  let softPenalty = 1;
+  if (playerLevel > 85) {
+    softPenalty = Math.max(0.5, 1 - (playerLevel - 85) * 0.015);
+  }
+
+  const xp = Math.floor(base * diffMultiplier * softPenalty);
+  return won ? xp : Math.floor(xp * 0.25);
+}
+
+// --- Apply XP and level up ---
 export function applyXp(character: Character, xpGained: number): Character {
+  if (character.level >= MAX_LEVEL) return character;
+
   let { xp, xpToNext, level, statPoints } = character;
+  let stats = { ...character.stats };
   xp += xpGained;
 
-  while (xp >= xpToNext) {
+  while (xp >= xpToNext && level < MAX_LEVEL) {
     xp -= xpToNext;
     level += 1;
-    statPoints += 3;
+    statPoints += statPointsForLevel(level);
     xpToNext = xpForLevel(level);
   }
 
-  return {
-    ...character,
-    xp,
-    xpToNext,
-    level,
-    statPoints,
-  };
+  if (level >= MAX_LEVEL) {
+    xp = 0;
+  }
+
+  // Recalc max health based on current STR and new level
+  stats.maxHealth = calcMaxHealth(stats.strength, level);
+  stats.health = Math.min(stats.health, stats.maxHealth);
+
+  return { ...character, xp, xpToNext, level, statPoints, stats };
 }
 
+// --- Stat allocation ---
 export type StatKey = 'strength' | 'dexterity' | 'technology' | 'support';
 
 export const STAT_LABELS: Record<StatKey, { label: string; description: string; icon: string }> = {
-  strength: { label: 'Strength', description: '+1.5 damage per point', icon: '⚔️' },
-  dexterity: { label: 'Dexterity', description: '+2% block chance', icon: '🛡️' },
-  technology: { label: 'Technology', description: '+2% deflection', icon: '🔧' },
-  support: { label: 'Support', description: '+1.5% crit chance', icon: '✨' },
+  strength: { label: 'Strength', description: '+12 HP per point', icon: '❤️' },
+  dexterity: { label: 'Dexterity', description: '+1.2% skill dmg, +0.3 def, +0.15% block', icon: '🗡️' },
+  technology: { label: 'Technology', description: '+1.5% tech dmg, +0.25% tech def', icon: '🔧' },
+  support: { label: 'Support', description: '+1% crit dmg, +2% gun/pet dmg', icon: '🎯' },
 };
 
 export function allocateStat(character: Character, stat: StatKey): Character {
@@ -43,14 +81,17 @@ export function allocateStat(character: Character, stat: StatKey): Character {
 
   const newStats = { ...character.stats, [stat]: character.stats[stat] + 1 };
 
-  // Health/energy bonuses for certain stats
+  // Recalc HP when STR changes
   if (stat === 'strength') {
-    newStats.maxHealth += 5;
-    newStats.health += 5;
+    newStats.maxHealth = calcMaxHealth(newStats.strength, character.level);
+    newStats.health += 12; // immediate HP gain
+    newStats.health = Math.min(newStats.health, newStats.maxHealth);
   }
+
+  // Tech gives a small energy bonus
   if (stat === 'technology') {
-    newStats.maxEnergy += 3;
-    newStats.energy += 3;
+    newStats.maxEnergy += 2;
+    newStats.energy += 2;
   }
 
   return {
