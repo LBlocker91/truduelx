@@ -525,6 +525,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
               abilities={battleState.player.abilities}
               playerEnergy={battleState.player.stats.energy}
               playerLevel={battleState.player.level}
+              unlockedAbilityIds={battleState.player.unlockedAbilityIds}
               canAct={canAct}
               onUseAbility={useAbility}
               onDefend={handleDefend}

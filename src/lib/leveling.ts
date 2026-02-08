@@ -48,10 +48,13 @@ export function applyXp(character: Character, xpGained: number): Character {
   let stats = { ...character.stats };
   xp += xpGained;
 
+  let skillPoints = character.skillPoints ?? 0;
+
   while (xp >= xpToNext && level < MAX_LEVEL) {
     xp -= xpToNext;
     level += 1;
     statPoints += statPointsForLevel(level);
+    skillPoints += 1; // 1 skill point per level
     xpToNext = xpForLevel(level);
   }
 
@@ -63,7 +66,7 @@ export function applyXp(character: Character, xpGained: number): Character {
   stats.maxHealth = calcMaxHealth(stats.strength, level);
   stats.health = Math.min(stats.health, stats.maxHealth);
 
-  return { ...character, xp, xpToNext, level, statPoints, stats };
+  return { ...character, xp, xpToNext, level, statPoints, skillPoints, stats };
 }
 
 // --- Stat allocation ---
@@ -81,14 +84,12 @@ export function allocateStat(character: Character, stat: StatKey): Character {
 
   const newStats = { ...character.stats, [stat]: character.stats[stat] + 1 };
 
-  // Recalc HP when STR changes
   if (stat === 'strength') {
     newStats.maxHealth = calcMaxHealth(newStats.strength, character.level);
-    newStats.health += 12; // immediate HP gain
+    newStats.health += 12;
     newStats.health = Math.min(newStats.health, newStats.maxHealth);
   }
 
-  // Tech gives a small energy bonus
   if (stat === 'technology') {
     newStats.maxEnergy += 2;
     newStats.energy += 2;
@@ -98,5 +99,21 @@ export function allocateStat(character: Character, stat: StatKey): Character {
     ...character,
     stats: newStats,
     statPoints: character.statPoints - 1,
+  };
+}
+
+// --- Skill point allocation ---
+export function unlockAbility(character: Character, abilityId: string): Character {
+  if (character.skillPoints <= 0) return character;
+  if (character.unlockedAbilityIds.includes(abilityId)) return character;
+
+  const ability = character.abilities.find(a => a.id === abilityId);
+  if (!ability) return character;
+  if ((ability.unlockLevel || 1) > character.level) return character;
+
+  return {
+    ...character,
+    skillPoints: character.skillPoints - 1,
+    unlockedAbilityIds: [...character.unlockedAbilityIds, abilityId],
   };
 }
