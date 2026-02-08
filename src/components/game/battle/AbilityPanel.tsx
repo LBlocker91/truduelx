@@ -1,11 +1,11 @@
 import { Ability, BASIC_ATTACK } from '@/types/game';
-import { Swords, Zap, Clock, Sparkles, Target, Shield, Lock } from 'lucide-react';
+import { Swords, Zap, Clock, Sparkles, Target, Shield } from 'lucide-react';
 
 interface AbilityPanelProps {
   abilities: Ability[];
   playerEnergy: number;
   playerLevel: number;
-  unlockedAbilityIds?: string[];
+  abilityLevels?: Record<string, number>;
   canAct: boolean;
   onUseAbility: (ability: Ability) => void;
   onDefend: () => void;
@@ -22,11 +22,11 @@ const abilityTypeIcon = (type: Ability['type']) => {
   }
 };
 
-export const AbilityPanel = ({ abilities, playerEnergy, playerLevel, unlockedAbilityIds, canAct, onUseAbility, onDefend, rageReady, onRageAttack, rageSkillName }: AbilityPanelProps) => {
+export const AbilityPanel = ({ abilities, playerEnergy, playerLevel, abilityLevels, canAct, onUseAbility, onDefend, rageReady, onRageAttack, rageSkillName }: AbilityPanelProps) => {
   // Filter abilities by level AND unlock status
   const unlockedAbilities = abilities.filter(a =>
     (a.unlockLevel || 1) <= playerLevel &&
-    (!unlockedAbilityIds || unlockedAbilityIds.includes(a.id))
+    (!abilityLevels || (abilityLevels[a.id] || 0) > 0)
   );
 
   // Always include basic attack at the front

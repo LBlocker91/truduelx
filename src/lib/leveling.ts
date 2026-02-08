@@ -102,10 +102,14 @@ export function allocateStat(character: Character, stat: StatKey): Character {
   };
 }
 
-// --- Skill point allocation ---
-export function unlockAbility(character: Character, abilityId: string): Character {
+// --- Skill point allocation (abilities level 1-20) ---
+import { MAX_ABILITY_LEVEL } from '@/types/game';
+
+export function upgradeAbility(character: Character, abilityId: string): Character {
   if (character.skillPoints <= 0) return character;
-  if (character.unlockedAbilityIds.includes(abilityId)) return character;
+
+  const currentLevel = character.abilityLevels[abilityId] || 0;
+  if (currentLevel >= MAX_ABILITY_LEVEL) return character;
 
   const ability = character.abilities.find(a => a.id === abilityId);
   if (!ability) return character;
@@ -114,6 +118,6 @@ export function unlockAbility(character: Character, abilityId: string): Characte
   return {
     ...character,
     skillPoints: character.skillPoints - 1,
-    unlockedAbilityIds: [...character.unlockedAbilityIds, abilityId],
+    abilityLevels: { ...character.abilityLevels, [abilityId]: currentLevel + 1 },
   };
 }

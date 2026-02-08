@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Character } from '@/types/game';
-import { StatKey, STAT_LABELS, allocateStat, unlockAbility } from '@/lib/leveling';
+import { Character, MAX_ABILITY_LEVEL } from '@/types/game';
+import { StatKey, STAT_LABELS, allocateStat, upgradeAbility } from '@/lib/leveling';
 import { Button } from '@/components/ui/button';
 import { Plus, Check, Star, Lock, Unlock } from 'lucide-react';
 import battleArenaBg from '@/assets/battle-arena-bg.jpg';
@@ -26,8 +26,8 @@ export const LevelUpScreen = ({ player, xpGained, onComplete }: LevelUpScreenPro
     setCharacter(prev => allocateStat(prev, stat));
   };
 
-  const handleUnlockSkill = (abilityId: string) => {
-    setCharacter(prev => unlockAbility(prev, abilityId));
+  const handleUpgradeSkill = (abilityId: string) => {
+    setCharacter(prev => upgradeAbility(prev, abilityId));
   };
 
   return (
@@ -122,29 +122,37 @@ export const LevelUpScreen = ({ player, xpGained, onComplete }: LevelUpScreenPro
                 </div>
                 <div className="space-y-1">
                   {rowAbilities.map(ability => {
-                    const isUnlocked = character.unlockedAbilityIds.includes(ability.id);
-                    const canUnlock = !isUnlocked && !rowLocked && character.skillPoints > 0;
+                    const abilityLevel = character.abilityLevels[ability.id] || 0;
+                    const isMaxed = abilityLevel >= MAX_ABILITY_LEVEL;
+                    const canUpgrade = !rowLocked && !isMaxed && character.skillPoints > 0;
 
                     return (
                       <div
                         key={ability.id}
                         className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs ${
-                          isUnlocked ? 'bg-primary/10 border border-primary/30' : rowLocked ? 'opacity-40' : ''
+                          abilityLevel > 0 ? 'bg-primary/10 border border-primary/30' : rowLocked ? 'opacity-40' : ''
                         }`}
-                        style={{ background: isUnlocked ? undefined : 'hsl(var(--muted) / 0.3)' }}
+                        style={{ background: abilityLevel > 0 ? undefined : 'hsl(var(--muted) / 0.3)' }}
                       >
                         <div className="flex-1 min-w-0">
-                          <span className="font-orbitron text-[10px] font-bold text-foreground">{ability.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-orbitron text-[10px] font-bold text-foreground">{ability.name}</span>
+                            {abilityLevel > 0 && (
+                              <span className="font-orbitron text-[9px] font-bold text-primary">
+                                Lv {abilityLevel}{isMaxed ? ' MAX' : `/${MAX_ABILITY_LEVEL}`}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[9px] text-muted-foreground truncate">{ability.description}</p>
                         </div>
-                        {isUnlocked ? (
+                        {isMaxed ? (
                           <Unlock className="w-3.5 h-3.5 text-primary shrink-0" />
                         ) : (
                           <Button
                             size="icon"
                             className="h-6 w-6 rounded-full btn-neon shrink-0"
-                            disabled={!canUnlock}
-                            onClick={() => handleUnlockSkill(ability.id)}
+                            disabled={!canUpgrade}
+                            onClick={() => handleUpgradeSkill(ability.id)}
                           >
                             <Plus className="w-3 h-3" />
                           </Button>
