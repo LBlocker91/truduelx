@@ -458,13 +458,13 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         )}
 
         {/* HUD */}
-        <div className="absolute top-8 left-3 right-3 z-10 flex justify-between items-start">
-          <CharacterStatus character={battleState.player} isPlayer />
-          <CharacterStatus character={battleState.enemy} isPlayer={false} />
+        <div className="absolute top-8 left-3 right-3 z-30 flex justify-between items-start pointer-events-none">
+          <div className="pointer-events-auto"><CharacterStatus character={battleState.player} isPlayer /></div>
+          <div className="pointer-events-auto"><CharacterStatus character={battleState.enemy} isPlayer={false} /></div>
         </div>
 
         {/* Characters */}
-        <div className="absolute inset-0 flex items-end justify-center z-10 pb-[25%]">
+        <div className="absolute inset-x-0 top-[30%] bottom-[30%] flex items-end justify-center z-10">
           <div className="flex items-end justify-between w-full px-[10%] sm:px-[12%]">
             <BattleCharacter
               character={battleState.player}
