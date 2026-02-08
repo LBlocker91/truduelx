@@ -78,21 +78,28 @@ const Index = () => {
 
   const handlePlayAgain = useCallback(() => {
     if (!gameState.player) return;
+    // Apply pending XP before starting a new battle
+    const updated = applyXp(gameState.player, gameState.pendingXp);
     const resetPlayer: Character = {
-      ...gameState.player,
+      ...updated,
       stats: {
-        ...gameState.player.stats,
-        health: gameState.player.stats.maxHealth,
-        energy: gameState.player.stats.maxEnergy,
+        ...updated.stats,
+        health: updated.stats.maxHealth,
+        energy: updated.stats.maxEnergy,
       },
-      abilities: gameState.player.abilities.map(a => ({ ...a, currentCooldown: 0 })),
+      abilities: updated.abilities.map(a => ({ ...a, currentCooldown: 0 })),
       rage: 0,
       isDefending: false,
       statusEffects: [],
     };
-    const newEnemy = createEnemy(gameState.player.level);
-    setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));
-  }, [gameState.player]);
+    const newEnemy = createEnemy(resetPlayer.level);
+    // If leveled up with stat points, go to level-up screen first
+    if (updated.statPoints > 0 && updated.level > gameState.player.level) {
+      setGameState(prev => ({ ...prev, screen: 'level-up', player: updated, pendingXp: gameState.pendingXp }));
+    } else {
+      setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));
+    }
+  }, [gameState.player, gameState.pendingXp]);
 
   const playerLevel = gameState.player?.level ?? 0;
 
