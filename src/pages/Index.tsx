@@ -51,7 +51,7 @@ const Index = () => {
     if (!gameState.player) return;
     const updated = applyXp(gameState.player, gameState.pendingXp);
 
-    if ((updated.statPoints > 0 || updated.skillPoints > 0) && updated.level > gameState.player.level) {
+    if (updated.statPoints > 0 || updated.skillPoints > 0) {
       // Leveled up with stat points to allocate
       setGameState(prev => ({ ...prev, screen: 'level-up', player: updated }));
     } else {
@@ -109,7 +109,7 @@ const Index = () => {
     };
     const newEnemy = createEnemy(resetPlayer.level);
     // If leveled up with stat points, go to level-up screen first
-    if ((updated.statPoints > 0 || updated.skillPoints > 0) && updated.level > gameState.player.level) {
+    if (updated.statPoints > 0 || updated.skillPoints > 0) {
       setGameState(prev => ({ ...prev, screen: 'level-up', player: updated, pendingXp: gameState.pendingXp }));
     } else {
       setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));

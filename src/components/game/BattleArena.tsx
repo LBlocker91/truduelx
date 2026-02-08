@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Character, Ability, BattleState } from '@/types/game';
+import { Character, Ability, BattleState, BASIC_ATTACK } from '@/types/game';
 import {
   resolveAttack,
   calcRageGains,
@@ -371,21 +371,17 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
         return;
       }
 
-      // AI: pick best available ability (filtered by level) or defend
+      // AI: pick best available ability (filtered by level and unlock) or basic attack
       const available = battleState.enemy.abilities.filter(
         a => a.currentCooldown === 0 &&
              battleState.enemy.stats.energy >= a.energyCost &&
-             (a.unlockLevel || 1) <= battleState.enemy.level
+             (a.unlockLevel || 1) <= battleState.enemy.level &&
+             battleState.enemy.unlockedAbilityIds.includes(a.id)
       );
 
       if (available.length === 0) {
-        // Defend if no energy
-        addLog(`🛡️ ${battleState.enemy.name} defends!`);
-        setBattleState(prev => ({
-          ...prev,
-          enemy: { ...prev.enemy, isDefending: true },
-        }));
-        setTimeout(() => switchTurn(), 500);
+        // Use basic attack
+        performAttack('enemy', { ...BASIC_ATTACK, currentCooldown: 0 }, switchTurn);
         return;
       }
 
