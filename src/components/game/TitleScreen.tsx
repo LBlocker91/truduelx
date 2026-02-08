@@ -1,12 +1,15 @@
 import { Button } from '@/components/ui/button';
-import { Swords, Zap } from 'lucide-react';
+import { Swords, Zap, Save } from 'lucide-react';
 import battleArenaBg from '@/assets/battle-arena-bg.jpg';
+import { SaveData } from '@/lib/save-game';
 
 interface TitleScreenProps {
   onStart: () => void;
+  onContinue?: () => void;
+  saveData?: SaveData | null;
 }
 
-export const TitleScreen = ({ onStart }: TitleScreenProps) => {
+export const TitleScreen = ({ onStart, onContinue, saveData }: TitleScreenProps) => {
   return (
     <div 
       className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
@@ -42,14 +45,30 @@ export const TitleScreen = ({ onStart }: TitleScreenProps) => {
           </p>
         </div>
 
-        {/* Play Button */}
-        <div className="space-y-4 pt-8">
+        {/* Buttons */}
+        <div className="space-y-3 pt-8">
+          {saveData && onContinue && (
+            <div>
+              <Button
+                onClick={onContinue}
+                className="btn-neon text-xl px-12 py-6 rounded-lg text-primary-foreground w-full max-w-xs"
+                size="lg"
+              >
+                <Save className="w-5 h-5 mr-2" />
+                CONTINUE
+              </Button>
+              <p className="text-muted-foreground text-xs mt-1 font-rajdhani">
+                {saveData.player.name} — Lv {saveData.player.level} {saveData.player.class}
+              </p>
+            </div>
+          )}
           <Button
             onClick={onStart}
-            className="btn-neon text-xl px-12 py-6 rounded-lg text-primary-foreground"
+            className={`text-xl px-12 py-6 rounded-lg ${saveData ? 'bg-muted/60 hover:bg-muted text-foreground' : 'btn-neon text-primary-foreground'}`}
             size="lg"
+            variant={saveData ? 'outline' : 'default'}
           >
-            PLAY NOW
+            {saveData ? 'NEW GAME' : 'PLAY NOW'}
           </Button>
           
           <p className="text-muted-foreground text-sm">
