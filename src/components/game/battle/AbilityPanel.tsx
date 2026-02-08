@@ -1,4 +1,4 @@
-import { Ability } from '@/types/game';
+import { Ability, BASIC_ATTACK } from '@/types/game';
 import { Swords, Zap, Clock, Sparkles, Target, Shield, Lock } from 'lucide-react';
 
 interface AbilityPanelProps {
@@ -29,6 +29,9 @@ export const AbilityPanel = ({ abilities, playerEnergy, playerLevel, unlockedAbi
     (!unlockedAbilityIds || unlockedAbilityIds.includes(a.id))
   );
 
+  // Always include basic attack at the front
+  const allAbilities = [BASIC_ATTACK, ...unlockedAbilities];
+
   return (
     <div className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 flex-wrap">
       {/* Defend button */}
@@ -55,7 +58,7 @@ export const AbilityPanel = ({ abilities, playerEnergy, playerLevel, unlockedAbi
       </button>
 
       {/* Ability buttons */}
-      {unlockedAbilities.map((ability) => {
+      {allAbilities.map((ability) => {
         const canUse =
           ability.currentCooldown === 0 &&
           playerEnergy >= ability.energyCost &&

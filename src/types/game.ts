@@ -63,6 +63,19 @@ export interface Ability {
 
 export type BattleAction = 'attack' | 'skill' | 'defend' | 'item';
 
+// Basic weapon attack — always available, no skill point required
+export const BASIC_ATTACK: Ability = {
+  id: 'basic-attack',
+  name: 'Basic Attack',
+  description: 'A simple weapon strike. Always available.',
+  energyCost: 0,
+  baseDamage: 50,
+  type: 'physical',
+  scaleStat: 'strength',
+  cooldown: 0,
+  currentCooldown: 0,
+};
+
 export interface Character {
   id: string;
   name: string;
