@@ -1,4 +1,4 @@
-import { Character, Ability, HitResult, StatusEffect } from '@/types/game';
+import { Character, Ability, HitResult, StatusEffect, WEAPON_MIN_DAMAGE, WEAPON_MAX_DAMAGE } from '@/types/game';
 
 // ============================================================
 // EpicDuel-style stat multipliers
@@ -62,7 +62,75 @@ export function calcFirstStrike(a: Character, b: Character): 'player' | 'enemy' 
 }
 
 // ============================================================
-// PvP damage caps
+// Basic Attack formula (weapon-based, STR-scaled)
+// ============================================================
+
+/** STR soft cap: full scaling up to 60, halved after */
+function effectiveSTR(str: number): number {
+  if (str <= 60) return str;
+  return 60 + (str - 60) * 0.5;
+}
+
+/** Resolve a basic weapon attack with the new formula */
+export function resolveBasicAttack(
+  attacker: Character,
+  defender: Character
+): HitResult {
+  const weaponBase = (WEAPON_MIN_DAMAGE + WEAPON_MAX_DAMAGE) / 2;
+  const strMult = 1 + effectiveSTR(attacker.stats.strength) * 0.02;
+  const levelMult = 1 + attacker.level * 0.01;
+
+  let rawDamage = Math.floor(weaponBase * strMult * levelMult);
+
+  // Flat defense (DEX)
+  rawDamage -= Math.floor(dexFlatDefense(defender.stats.dexterity));
+
+  // Defense buff on defender
+  const defBuff = defender.statusEffects.filter(e => e.type === 'defense_buff').reduce((s, e) => s + e.value, 0);
+  if (defBuff > 0) rawDamage = Math.floor(rawDamage * Math.max(0.3, 1 - defBuff * 0.01));
+
+  // Damage absorb shield
+  const absorb = defender.statusEffects.filter(e => e.type === 'damage_absorb').reduce((s, e) => s + e.value, 0);
+  if (absorb > 0) rawDamage = Math.max(0, rawDamage - absorb);
+
+  let damage = Math.max(1, rawDamage);
+  let blocked = false;
+  let critical = false;
+
+  // Dodge check
+  const dodgeBuff = defender.statusEffects.filter(e => e.type === 'dodge').reduce((s, e) => s + e.value, 0);
+  if (dodgeBuff > 0 && Math.random() < dodgeBuff * 0.01) {
+    return { damage: 0, blocked: false, deflected: true, critical: false, rawDamage: 0 };
+  }
+
+  // Crit check
+  if (Math.random() < calcCritChance(attacker)) {
+    critical = true;
+    damage = Math.floor(damage * critDamageMultiplier(attacker.stats.support));
+  }
+
+  // Block (physical)
+  if (Math.random() < calcBlockChance(defender)) {
+    blocked = true;
+    damage = Math.floor(damage * 0.5);
+  }
+
+  // Defending stance
+  if (defender.isDefending) {
+    damage = Math.floor(damage * 0.5);
+  }
+
+  // PvP cap: 25% of defender max HP
+  const pvpCap = Math.floor(defender.stats.maxHealth * 0.25);
+  damage = Math.min(damage, pvpCap);
+
+  damage = Math.max(1, damage);
+
+  return { damage, blocked, deflected: false, critical, rawDamage: Math.max(1, rawDamage) };
+}
+
+// ============================================================
+// PvP damage caps (skills)
 // ============================================================
 const MAX_TOTAL_DAMAGE_PERCENT = 0.30;  // 30% of defender max HP per skill use
 const MAX_PER_HIT_DAMAGE_PERCENT = 0.10; // 10% per hit (multi-hit)
@@ -128,6 +196,11 @@ export function resolveAttack(
   defender: Character,
   ability: Ability
 ): HitResult {
+  // Delegate basic attacks to the weapon-based formula
+  if (ability.id === 'basic-attack') {
+    return resolveBasicAttack(attacker, defender);
+  }
+
   const hits = ability.hits || 1;
   const perHitCap = Math.floor(defender.stats.maxHealth * MAX_PER_HIT_DAMAGE_PERCENT);
   const totalCap = Math.floor(defender.stats.maxHealth * MAX_TOTAL_DAMAGE_PERCENT);
