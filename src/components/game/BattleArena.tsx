@@ -5,9 +5,11 @@ import {
   calcRageGain,
   RAGE_THRESHOLD,
   applyAbilityEffect,
+  applyInlineEffect,
   applyEnergyDrain,
   tickStatusEffects,
   isStunned,
+  isSkillDisabled,
   calcFirstStrike,
 } from '@/lib/combat';
 import battleArenaBg from '@/assets/battle-arena-bg.jpg';
@@ -146,28 +148,49 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
           stats: { ...defenderChar.stats, health: Math.max(0, defenderChar.stats.health - result.damage) },
         };
 
-        // Energy drain
-        const drainAmount = applyEnergyDrain(ability, defenderChar);
-        if (drainAmount > 0) {
-          newDefender.stats.energy = Math.max(0, newDefender.stats.energy - drainAmount);
-          logMsg += ` ⚡ Drained ${drainAmount} energy!`;
+        // Inline effects (heal, energy recovery, drain, cooldown increase)
+        const inlineResult = applyInlineEffect(ability, attackerChar, defenderChar);
+        if (inlineResult.defenderUpdate) {
+          Object.assign(newDefender.stats, inlineResult.defenderUpdate);
+        }
+        if (inlineResult.log) logMsg += ` ${inlineResult.log}`;
+
+        // Apply status effect (buff on attacker, debuff on defender)
+        const effect = applyAbilityEffect(ability, defenderChar, attackerChar);
+        if (effect) {
+          // Buffs go on attacker, debuffs on defender
+          const isBuff = ['buff_attack', 'defense_buff', 'crit_buff', 'damage_absorb', 'dodge', 'stat_buff_all', 'reflect'].includes(effect.type);
+          if (isBuff) {
+            // Will be applied to attacker below
+          } else {
+            newDefender.statusEffects = [...newDefender.statusEffects, effect];
+          }
+          logMsg += ` [${effect.type}]`;
         }
 
-        // Apply status effect to defender
-        const effect = applyAbilityEffect(ability, defenderChar);
-        if (effect) {
-          newDefender.statusEffects = [...newDefender.statusEffects, effect];
-          logMsg += ` [${effect.type}]`;
+        // Cooldown increase effect
+        if (ability.effect === 'cooldown_increase') {
+          newDefender.abilities = newDefender.abilities?.map(a => ({
+            ...a,
+            currentCooldown: a.currentCooldown > 0 ? a.currentCooldown + 1 : a.currentCooldown,
+          })) || [];
         }
 
         // Rage gain
         const rageGain = calcRageGain(result.damage);
         const newAttacker = {
           ...attackerChar,
-          stats: { ...attackerChar.stats, energy: Math.max(0, attackerChar.stats.energy - ability.energyCost) },
+          stats: {
+            ...attackerChar.stats,
+            energy: Math.max(0, attackerChar.stats.energy - ability.energyCost),
+            ...(inlineResult.attackerUpdate || {}),
+          },
           abilities: attackerChar.abilities.map(a => a.id === ability.id ? { ...a, currentCooldown: a.cooldown } : a),
           rage: Math.min(attackerChar.maxRage, attackerChar.rage + rageGain),
           isDefending: false,
+          statusEffects: effect && ['buff_attack', 'defense_buff', 'crit_buff', 'damage_absorb', 'dodge', 'stat_buff_all', 'reflect'].includes(effect.type)
+            ? [...attackerChar.statusEffects, effect]
+            : attackerChar.statusEffects,
         };
 
         const newDefenderWithRage = {

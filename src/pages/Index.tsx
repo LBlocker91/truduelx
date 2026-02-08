@@ -14,6 +14,7 @@ const INITIAL_STATE: GameState = {
   enemy: null,
   battleState: null,
   pendingXp: 0,
+  unlockedPremiumClasses: [],
 };
 
 const Index = () => {
@@ -24,13 +25,13 @@ const Index = () => {
   }, []);
 
   const handleBackToTitle = useCallback(() => {
-    setGameState(INITIAL_STATE);
+    setGameState(prev => ({ ...INITIAL_STATE, unlockedPremiumClasses: prev.unlockedPremiumClasses, player: prev.player }));
   }, []);
 
   const handleCharacterSelect = useCallback((characterClass: CharacterClass, name: string) => {
     const player = createCharacter(characterClass, name, 'player');
     const enemy = createEnemy(player.level);
-    setGameState({ screen: 'battle', player, enemy, battleState: null, pendingXp: 0 });
+    setGameState(prev => ({ ...prev, screen: 'battle', player, enemy, battleState: null, pendingXp: 0 }));
   }, []);
 
   const handleBattleEnd = useCallback((winner: 'player' | 'enemy') => {
@@ -59,7 +60,6 @@ const Index = () => {
 
   const handleLevelUpComplete = useCallback((updatedPlayer: Character) => {
     setGameState(prev => ({ ...prev, player: updatedPlayer }));
-    // Go straight to next battle
     const newEnemy = createEnemy(updatedPlayer.level);
     const resetPlayer: Character = {
       ...updatedPlayer,
@@ -73,7 +73,7 @@ const Index = () => {
       isDefending: false,
       statusEffects: [],
     };
-    setGameState({ screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 });
+    setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));
   }, []);
 
   const handlePlayAgain = useCallback(() => {
@@ -91,8 +91,10 @@ const Index = () => {
       statusEffects: [],
     };
     const newEnemy = createEnemy(gameState.player.level);
-    setGameState({ screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 });
+    setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));
   }, [gameState.player]);
+
+  const playerLevel = gameState.player?.level ?? 0;
 
   return (
     <div className="min-h-screen">
@@ -100,7 +102,12 @@ const Index = () => {
         <TitleScreen onStart={handleStart} />
       )}
       {gameState.screen === 'character-select' && (
-        <CharacterSelect onSelect={handleCharacterSelect} onBack={handleBackToTitle} />
+        <CharacterSelect
+          onSelect={handleCharacterSelect}
+          onBack={handleBackToTitle}
+          playerLevel={playerLevel}
+          unlockedPremiumClasses={gameState.unlockedPremiumClasses}
+        />
       )}
       {gameState.screen === 'battle' && gameState.player && gameState.enemy && (
         <BattleArena player={gameState.player} enemy={gameState.enemy} onBattleEnd={handleBattleEnd} />
