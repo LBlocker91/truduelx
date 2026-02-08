@@ -1,5 +1,5 @@
 import { Character } from '@/types/game';
-import { Heart, Zap, Flame } from 'lucide-react';
+import { Heart, Zap, Flame, Star } from 'lucide-react';
 
 interface CharacterStatusProps {
   character: Character;
@@ -10,16 +10,31 @@ export const CharacterStatus = ({ character, isPlayer }: CharacterStatusProps) =
   const healthPercent = (character.stats.health / character.stats.maxHealth) * 100;
   const energyPercent = (character.stats.energy / character.stats.maxEnergy) * 100;
   const ragePercent = (character.rage / character.maxRage) * 100;
+  const xpPercent = character.xpToNext > 0 ? (character.xp / character.xpToNext) * 100 : 0;
 
   return (
     <div className={`flex items-start gap-2 ${isPlayer ? '' : 'flex-row-reverse'}`}>
       {/* Level circle */}
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-orbitron text-sm font-black border-2 shrink-0 ${
-        isPlayer
-          ? 'bg-primary/20 border-primary text-primary'
-          : 'bg-accent/20 border-accent text-accent'
-      }`}>
-        {character.level}
+      <div className="flex flex-col items-center gap-0.5 shrink-0">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-orbitron text-sm font-black border-2 ${
+          isPlayer
+            ? 'bg-primary/20 border-primary text-primary'
+            : 'bg-accent/20 border-accent text-accent'
+        }`}>
+          {character.level}
+        </div>
+        {/* XP mini-bar under level circle (player only) */}
+        {isPlayer && (
+          <div className="w-10 h-1.5 rounded-full overflow-hidden" style={{ background: 'hsl(var(--muted))' }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${xpPercent}%`,
+                background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--secondary)))',
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Bars */}
@@ -28,6 +43,13 @@ export const CharacterStatus = ({ character, isPlayer }: CharacterStatusProps) =
           <span className={`font-orbitron text-[11px] font-bold text-foreground/90 truncate max-w-32 leading-none ${isPlayer ? '' : 'text-right'}`}>
             {character.name}
           </span>
+          {/* XP text (player only) */}
+          {isPlayer && (
+            <span className="font-orbitron text-[8px] text-muted-foreground flex items-center gap-0.5">
+              <Star className="w-2.5 h-2.5 text-primary" />
+              {character.xp}/{character.xpToNext}
+            </span>
+          )}
           {/* Status effect icons */}
           {character.statusEffects.length > 0 && (
             <div className="flex gap-0.5">
