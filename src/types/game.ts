@@ -1,4 +1,19 @@
-export type CharacterClass = 'warrior' | 'mage' | 'hunter';
+export type CharacterClass =
+  | 'mercenary' | 'tech-mage' | 'gunner'           // Free (starter)
+  | 'blademaster' | 'tech-sentinel' | 'tactician'   // Unlock at Level 30
+  | 'shadow-operative' | 'demolisher' | 'cyber-warden'; // Premium
+
+export type ClassUnlockType = 'free' | 'level' | 'premium';
+
+export interface ClassMeta {
+  name: string;
+  description: string;
+  playstyle: string;
+  primaryStats: string;
+  unlockType: ClassUnlockType;
+  unlockLevel?: number; // for 'level' type
+  color: string; // tailwind text class
+}
 
 export interface CharacterStats {
   health: number;
@@ -11,6 +26,25 @@ export interface CharacterStats {
   support: number;
 }
 
+export type AbilityEffect =
+  | 'stun'
+  | 'dot'
+  | 'energy_drain'
+  | 'buff_attack'
+  | 'debuff_defense'
+  | 'heal'
+  | 'energy_recovery'
+  | 'defense_buff'
+  | 'crit_buff'
+  | 'damage_absorb'
+  | 'damage_taken_increase'
+  | 'reflect'
+  | 'stat_buff_all'
+  | 'skill_disable'
+  | 'cooldown_increase'
+  | 'dodge'
+  | 'bonus_low_hp';
+
 export interface Ability {
   id: string;
   name: string;
@@ -18,10 +52,10 @@ export interface Ability {
   energyCost: number;
   baseDamage: number;
   type: 'physical' | 'magical' | 'special';
-  scaleStat: 'strength' | 'technology' | 'support';
+  scaleStat: 'strength' | 'technology' | 'support' | 'dexterity';
   cooldown: number;
   currentCooldown: number;
-  effect?: 'stun' | 'dot' | 'energy_drain' | 'buff_attack' | 'debuff_defense';
+  effect?: AbilityEffect;
 }
 
 export type BattleAction = 'attack' | 'skill' | 'defend' | 'item';
@@ -44,7 +78,9 @@ export interface Character {
 }
 
 export interface StatusEffect {
-  type: 'stun' | 'dot' | 'buff_attack' | 'debuff_defense';
+  type: 'stun' | 'dot' | 'buff_attack' | 'debuff_defense' | 'defense_buff'
+    | 'crit_buff' | 'damage_absorb' | 'damage_taken_increase' | 'reflect'
+    | 'stat_buff_all' | 'skill_disable' | 'dodge';
   turnsRemaining: number;
   value: number;
 }
@@ -75,4 +111,5 @@ export interface GameState {
   enemy: Character | null;
   battleState: BattleState | null;
   pendingXp: number;
+  unlockedPremiumClasses: CharacterClass[];
 }

@@ -4,19 +4,14 @@ import { Character, Ability, HitResult, StatusEffect } from '@/types/game';
 // EpicDuel-style stat multipliers
 // ============================================================
 
-// TECH damage multiplier: 1 + TECH × 0.015
-export function techDamageMultiplier(tech: number): number {
-  return 1 + tech * 0.015;
+// Unified skill power scaling: Base × (1 + Stat × 0.015) × (1 + Level × 0.01)
+export function skillPowerMultiplier(statValue: number, level: number): number {
+  return (1 + statValue * 0.015) * (1 + level * 0.01);
 }
 
 // TECH defense: damage reduction %, capped at 50%
 export function techDefenseReduction(tech: number): number {
   return Math.min(0.50, tech * 0.0025);
-}
-
-// DEX skill damage multiplier: 1 + DEX × 0.012
-export function dexSkillMultiplier(dex: number): number {
-  return 1 + dex * 0.012;
 }
 
 // DEX flat defense
@@ -39,6 +34,11 @@ export function gunDamageMultiplier(sup: number): number {
   return 1 + sup * 0.02;
 }
 
+// SUP rocket damage multiplier
+export function rocketDamageMultiplier(sup: number): number {
+  return 1 + sup * 0.025;
+}
+
 // SUP buff strength multiplier
 export function buffStrengthMultiplier(sup: number): number {
   return 1 + sup * 0.015;
@@ -46,7 +46,11 @@ export function buffStrengthMultiplier(sup: number): number {
 
 // Base crit chance: flat 8% + minor SUP scaling
 export function calcCritChance(attacker: Character): number {
-  return Math.min(0.30, 0.08 + attacker.stats.support * 0.002);
+  let chance = Math.min(0.30, 0.08 + attacker.stats.support * 0.002);
+  // Crit buff increases chance
+  const critBuff = attacker.statusEffects.filter(e => e.type === 'crit_buff').reduce((s, e) => s + e.value, 0);
+  chance += critBuff * 0.01;
+  return Math.min(0.50, chance);
 }
 
 // First strike
@@ -58,7 +62,7 @@ export function calcFirstStrike(a: Character, b: Character): 'player' | 'enemy' 
 }
 
 // ============================================================
-// Damage resolution (EpicDuel final formula)
+// Damage resolution (EpicDuel final formula + skill scaling)
 // ============================================================
 
 export function resolveAttack(
@@ -68,15 +72,21 @@ export function resolveAttack(
 ): HitResult {
   const statValue = attacker.stats[ability.scaleStat];
 
-  // Step 1: raw damage = baseDamage × statMultiplier
-  let statMultiplier: number;
-  if (ability.type === 'magical' || ability.scaleStat === 'technology') {
-    statMultiplier = techDamageMultiplier(statValue);
-  } else {
-    statMultiplier = dexSkillMultiplier(statValue);
+  // Step 1: Skill Power = baseDamage × (1 + RelevantStat × 0.015) × (1 + Level × 0.01)
+  const multiplier = skillPowerMultiplier(statValue, attacker.level);
+
+  // Apply gun/rocket scaling for support-based physical abilities
+  let extraMultiplier = 1;
+  if (ability.scaleStat === 'support' && ability.type === 'physical') {
+    extraMultiplier = gunDamageMultiplier(attacker.stats.support);
   }
 
-  let rawDamage = Math.floor(ability.baseDamage * statMultiplier) + Math.floor(Math.random() * 4);
+  let rawDamage = Math.floor(ability.baseDamage * multiplier * extraMultiplier) + Math.floor(Math.random() * 4);
+
+  // Bonus low HP damage (Execution Protocol)
+  if (ability.effect === 'bonus_low_hp' && defender.stats.health / defender.stats.maxHealth < 0.3) {
+    rawDamage = Math.floor(rawDamage * 1.5);
+  }
 
   // Attack buff from status effects
   const atkBuff = attacker.statusEffects
@@ -84,18 +94,48 @@ export function resolveAttack(
     .reduce((sum, e) => sum + e.value, 0);
   rawDamage += atkBuff;
 
+  // Stat buff all bonus
+  const statBuff = attacker.statusEffects
+    .filter(e => e.type === 'stat_buff_all')
+    .reduce((sum, e) => sum + e.value, 0);
+  if (statBuff > 0) rawDamage = Math.floor(rawDamage * (1 + statBuff * 0.01));
+
   // Step 2: subtract flat defense (DEX)
   rawDamage -= Math.floor(dexFlatDefense(defender.stats.dexterity));
+
+  // Defense buff on defender reduces damage
+  const defBuff = defender.statusEffects
+    .filter(e => e.type === 'defense_buff')
+    .reduce((sum, e) => sum + e.value, 0);
+  if (defBuff > 0) rawDamage = Math.floor(rawDamage * Math.max(0.3, 1 - defBuff * 0.01));
+
+  // Damage taken increase debuff on defender
+  const dmgIncrease = defender.statusEffects
+    .filter(e => e.type === 'damage_taken_increase')
+    .reduce((sum, e) => sum + e.value, 0);
+  if (dmgIncrease > 0) rawDamage = Math.floor(rawDamage * (1 + dmgIncrease * 0.01));
 
   // Step 3: tech defense reduction for tech/magical abilities
   if (ability.type === 'magical' || ability.scaleStat === 'technology') {
     rawDamage = Math.floor(rawDamage * (1 - techDefenseReduction(defender.stats.technology)));
   }
 
+  // Damage absorb shield
+  const absorb = defender.statusEffects
+    .filter(e => e.type === 'damage_absorb')
+    .reduce((sum, e) => sum + e.value, 0);
+  if (absorb > 0) rawDamage = Math.max(0, rawDamage - absorb);
+
   let damage = rawDamage;
   let blocked = false;
   let deflected = false;
   let critical = false;
+
+  // Dodge check
+  const dodgeBuff = defender.statusEffects.filter(e => e.type === 'dodge').reduce((s, e) => s + e.value, 0);
+  if (dodgeBuff > 0 && Math.random() < dodgeBuff * 0.01) {
+    return { damage: 0, blocked: false, deflected: true, critical: false, rawDamage: 0 };
+  }
 
   // Step 4: crit check
   if (Math.random() < calcCritChance(attacker)) {
@@ -109,7 +149,7 @@ export function resolveAttack(
     damage = Math.floor(damage * 0.5);
   }
 
-  // Deflect for magical/special (tech defense already applied, small extra chance)
+  // Deflect for magical/special
   if ((ability.type === 'magical' || ability.type === 'special') && Math.random() < techDefenseReduction(defender.stats.technology) * 0.5) {
     deflected = true;
     damage = Math.floor(damage * 0.5);
@@ -126,7 +166,11 @@ export function resolveAttack(
     .reduce((sum, e) => sum + e.value, 0);
   damage += defDebuff;
 
-  // Floor at 1
+  // Reflect damage back
+  const reflectBuff = defender.statusEffects.filter(e => e.type === 'reflect').reduce((s, e) => s + e.value, 0);
+  // Reflect is handled in BattleArena (apply damage back to attacker)
+
+  // Floor at 1 (unless dodged)
   damage = Math.max(1, damage);
 
   return { damage, blocked, deflected, critical, rawDamage: Math.max(1, rawDamage) };
@@ -142,8 +186,11 @@ export const RAGE_THRESHOLD = 100;
 
 // --- Status effects ---
 
-export function applyAbilityEffect(ability: Ability, target: Character): StatusEffect | null {
+export function applyAbilityEffect(ability: Ability, target: Character, attacker: Character): StatusEffect | null {
   if (!ability.effect) return null;
+  const sup = attacker.stats.support;
+  const buffMult = buffStrengthMultiplier(sup);
+
   switch (ability.effect) {
     case 'stun':
       return { type: 'stun', turnsRemaining: 1, value: 0 };
@@ -152,10 +199,72 @@ export function applyAbilityEffect(ability: Ability, target: Character): StatusE
     case 'energy_drain':
       return null; // handled inline
     case 'buff_attack':
-      return { type: 'buff_attack', turnsRemaining: 2, value: Math.floor(ability.baseDamage * 0.5) };
+      return { type: 'buff_attack', turnsRemaining: 2, value: Math.floor(ability.baseDamage * 0.5 * buffMult) };
     case 'debuff_defense':
       return { type: 'debuff_defense', turnsRemaining: 2, value: Math.floor(ability.baseDamage * 0.4) };
+    case 'defense_buff':
+      return { type: 'defense_buff', turnsRemaining: 2, value: Math.floor(20 * buffMult) };
+    case 'crit_buff':
+      return { type: 'crit_buff', turnsRemaining: 3, value: Math.floor(15 * buffMult) };
+    case 'damage_absorb':
+      return { type: 'damage_absorb', turnsRemaining: 2, value: Math.floor(25 * buffMult) };
+    case 'damage_taken_increase':
+      return { type: 'damage_taken_increase', turnsRemaining: 2, value: Math.floor(20 * buffMult) };
+    case 'reflect':
+      return { type: 'reflect', turnsRemaining: 2, value: Math.floor(15 * buffMult) };
+    case 'stat_buff_all':
+      return { type: 'stat_buff_all', turnsRemaining: 2, value: Math.floor(10 * buffMult) };
+    case 'skill_disable':
+      return { type: 'skill_disable', turnsRemaining: 1, value: 0 };
+    case 'dodge':
+      return { type: 'dodge', turnsRemaining: 2, value: Math.floor(30 * buffMult) };
+    case 'heal':
+    case 'energy_recovery':
+    case 'bonus_low_hp':
+    case 'cooldown_increase':
+      return null; // handled inline
   }
+}
+
+// Apply heal/energy_recovery/cooldown_increase effects inline
+export function applyInlineEffect(
+  ability: Ability,
+  attacker: Character,
+  defender: Character
+): { attackerUpdate?: Partial<Character['stats']>; defenderUpdate?: Partial<Character['stats']>; log?: string } {
+  const result: ReturnType<typeof applyInlineEffect> = {};
+  if (!ability.effect) return result;
+
+  const sup = attacker.stats.support;
+  const buffMult = buffStrengthMultiplier(sup);
+
+  switch (ability.effect) {
+    case 'heal': {
+      const healAmount = Math.floor((20 + attacker.stats.technology * 2) * buffMult);
+      const newHp = Math.min(attacker.stats.maxHealth, attacker.stats.health + healAmount);
+      result.attackerUpdate = { health: newHp };
+      result.log = `💚 Healed for ${healAmount} HP!`;
+      break;
+    }
+    case 'energy_recovery': {
+      const amount = Math.floor(30 * buffMult);
+      const newEnergy = Math.min(attacker.stats.maxEnergy, attacker.stats.energy + amount);
+      result.attackerUpdate = { energy: newEnergy };
+      result.log = `⚡ Recovered ${amount} energy!`;
+      break;
+    }
+    case 'energy_drain': {
+      const drain = Math.floor(ability.baseDamage * 0.5);
+      result.defenderUpdate = { energy: Math.max(0, defender.stats.energy - drain) };
+      result.log = `⚡ Drained ${drain} energy!`;
+      break;
+    }
+    case 'cooldown_increase': {
+      result.log = `⏱️ Enemy cooldowns increased!`;
+      break;
+    }
+  }
+  return result;
 }
 
 export function tickStatusEffects(character: Character): { char: Character; dotDamage: number } {
@@ -189,7 +298,11 @@ export function isStunned(character: Character): boolean {
   return character.statusEffects.some(e => e.type === 'stun');
 }
 
-// --- Energy drain ---
+export function isSkillDisabled(character: Character): boolean {
+  return character.statusEffects.some(e => e.type === 'skill_disable');
+}
+
+// --- Energy drain (legacy, kept for compat) ---
 
 export function applyEnergyDrain(ability: Ability, target: Character): number {
   if (ability.effect !== 'energy_drain') return 0;
