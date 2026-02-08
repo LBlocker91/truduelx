@@ -214,7 +214,7 @@ export function calcRageGains(
   if (damage <= 0) return { attackerRage: 0, defenderRage: 0 };
 
   let attackerRage = rageFromDealing(damage, defenderMaxHP) * rageSupMultiplier(attackerSup);
-  let defenderRage = rageFromTaking(damage, attackerMaxHP) * rageSupMultiplier(defenderSup);
+  let defenderRage = rageFromTaking(damage, defenderMaxHP) * rageSupMultiplier(defenderSup);
 
   if (blocked) {
     attackerRage *= 0.6;
