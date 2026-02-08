@@ -1,22 +1,55 @@
 import { Character, Ability, HitResult, StatusEffect } from '@/types/game';
 
-// --- Hit resolution ---
+// ============================================================
+// EpicDuel-style stat multipliers
+// ============================================================
 
+// TECH damage multiplier: 1 + TECH × 0.015
+export function techDamageMultiplier(tech: number): number {
+  return 1 + tech * 0.015;
+}
+
+// TECH defense: damage reduction %, capped at 50%
+export function techDefenseReduction(tech: number): number {
+  return Math.min(0.50, tech * 0.0025);
+}
+
+// DEX skill damage multiplier: 1 + DEX × 0.012
+export function dexSkillMultiplier(dex: number): number {
+  return 1 + dex * 0.012;
+}
+
+// DEX flat defense
+export function dexFlatDefense(dex: number): number {
+  return dex * 0.3;
+}
+
+// DEX block chance (basic attacks only), capped at 40%
 export function calcBlockChance(defender: Character): number {
-  // Dexterity-based block: ~5% base + 2% per dex point, capped at 40%
-  return Math.min(0.40, 0.05 + defender.stats.dexterity * 0.02);
+  return Math.min(0.40, defender.stats.dexterity * 0.0015);
 }
 
-export function calcDeflectChance(defender: Character): number {
-  // Technology-based deflection for magical/special attacks
-  return Math.min(0.35, 0.03 + defender.stats.technology * 0.02);
+// SUP critical damage multiplier: 1.5 + SUP × 0.01
+export function critDamageMultiplier(sup: number): number {
+  return 1.5 + sup * 0.01;
 }
 
+// SUP gun damage multiplier
+export function gunDamageMultiplier(sup: number): number {
+  return 1 + sup * 0.02;
+}
+
+// SUP buff strength multiplier
+export function buffStrengthMultiplier(sup: number): number {
+  return 1 + sup * 0.015;
+}
+
+// Base crit chance: flat 8% + minor SUP scaling
 export function calcCritChance(attacker: Character): number {
-  // Support-based crit chance: ~5% base + 1.5% per support
-  return Math.min(0.30, 0.05 + attacker.stats.support * 0.015);
+  return Math.min(0.30, 0.08 + attacker.stats.support * 0.002);
 }
 
+// First strike
 export function calcFirstStrike(a: Character, b: Character): 'player' | 'enemy' {
   const supportDiff = a.stats.support - b.stats.support;
   const levelDiff = a.level - b.level;
@@ -24,47 +57,62 @@ export function calcFirstStrike(a: Character, b: Character): 'player' | 'enemy' 
   return Math.random() < chance ? 'player' : 'enemy';
 }
 
+// ============================================================
+// Damage resolution (EpicDuel final formula)
+// ============================================================
+
 export function resolveAttack(
   attacker: Character,
   defender: Character,
   ability: Ability
 ): HitResult {
-  // Base damage = ability base + stat scaling
   const statValue = attacker.stats[ability.scaleStat];
-  const rawDamage = ability.baseDamage + Math.floor(statValue * 1.5) + Math.floor(Math.random() * 6);
+
+  // Step 1: raw damage = baseDamage × statMultiplier
+  let statMultiplier: number;
+  if (ability.type === 'magical' || ability.scaleStat === 'technology') {
+    statMultiplier = techDamageMultiplier(statValue);
+  } else {
+    statMultiplier = dexSkillMultiplier(statValue);
+  }
+
+  let rawDamage = Math.floor(ability.baseDamage * statMultiplier) + Math.floor(Math.random() * 4);
+
+  // Attack buff from status effects
+  const atkBuff = attacker.statusEffects
+    .filter(e => e.type === 'buff_attack')
+    .reduce((sum, e) => sum + e.value, 0);
+  rawDamage += atkBuff;
+
+  // Step 2: subtract flat defense (DEX)
+  rawDamage -= Math.floor(dexFlatDefense(defender.stats.dexterity));
+
+  // Step 3: tech defense reduction for tech/magical abilities
+  if (ability.type === 'magical' || ability.scaleStat === 'technology') {
+    rawDamage = Math.floor(rawDamage * (1 - techDefenseReduction(defender.stats.technology)));
+  }
 
   let damage = rawDamage;
   let blocked = false;
   let deflected = false;
   let critical = false;
 
-  // Attack buff from status effects
-  const atkBuff = attacker.statusEffects
-    .filter(e => e.type === 'buff_attack')
-    .reduce((sum, e) => sum + e.value, 0);
-  damage += atkBuff;
-
-  // Defense debuff on defender
-  const defDebuff = defender.statusEffects
-    .filter(e => e.type === 'debuff_defense')
-    .reduce((sum, e) => sum + e.value, 0);
-
-  // Critical check
+  // Step 4: crit check
   if (Math.random() < calcCritChance(attacker)) {
     critical = true;
-    damage = Math.floor(damage * 1.5);
+    damage = Math.floor(damage * critDamageMultiplier(attacker.stats.support));
   }
 
-  // Block check (physical)
+  // Step 5: block (physical/basic only)
   if (ability.type === 'physical' && Math.random() < calcBlockChance(defender)) {
     blocked = true;
-    damage = Math.floor(damage * 0.3);
+    damage = Math.floor(damage * 0.5);
   }
 
-  // Deflect check (magical/special)
-  if ((ability.type === 'magical' || ability.type === 'special') && Math.random() < calcDeflectChance(defender)) {
+  // Deflect for magical/special (tech defense already applied, small extra chance)
+  if ((ability.type === 'magical' || ability.type === 'special') && Math.random() < techDefenseReduction(defender.stats.technology) * 0.5) {
     deflected = true;
-    damage = Math.floor(damage * 0.4);
+    damage = Math.floor(damage * 0.5);
   }
 
   // Defending reduces damage by 50%
@@ -72,13 +120,16 @@ export function resolveAttack(
     damage = Math.floor(damage * 0.5);
   }
 
-  // Apply defense debuff (increases damage taken)
+  // Defense debuff on defender
+  const defDebuff = defender.statusEffects
+    .filter(e => e.type === 'debuff_defense')
+    .reduce((sum, e) => sum + e.value, 0);
   damage += defDebuff;
 
   // Floor at 1
   damage = Math.max(1, damage);
 
-  return { damage, blocked, deflected, critical, rawDamage };
+  return { damage, blocked, deflected, critical, rawDamage: Math.max(1, rawDamage) };
 }
 
 // --- Rage ---
@@ -142,6 +193,5 @@ export function isStunned(character: Character): boolean {
 
 export function applyEnergyDrain(ability: Ability, target: Character): number {
   if (ability.effect !== 'energy_drain') return 0;
-  const drain = Math.floor(ability.baseDamage * 0.5);
-  return drain;
+  return Math.floor(ability.baseDamage * 0.5);
 }

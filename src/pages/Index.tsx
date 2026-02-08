@@ -35,8 +35,9 @@ const Index = () => {
 
   const handleBattleEnd = useCallback((winner: 'player' | 'enemy') => {
     setGameState(prev => {
+      const playerLevel = prev.player?.level ?? 1;
       const enemyLevel = prev.enemy?.level ?? 1;
-      const xp = calcBattleXp(enemyLevel, winner === 'player');
+      const xp = calcBattleXp(playerLevel, enemyLevel, winner === 'player');
       return {
         ...prev,
         screen: winner === 'player' ? 'victory' : 'defeat',
