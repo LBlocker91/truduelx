@@ -232,19 +232,18 @@ async function executeTurn({
   return { result };
 }
 
-// Simple bot AI: heal if HP < 30%, stun if available, otherwise highest-damage usable skill, else basic attack.
+// Simple bot AI: heal if HP < 30%, stun/disable if available, else highest-damage usable skill, else basic attack.
 function botChooseAction(bot: ParticipantState): { action: string; skillSlug?: string } {
   const hpPct = bot.hp / bot.max_hp;
   const slugs = Object.keys(bot.snapshot.skill_levels ?? {});
-  // We don't have skill metadata here; we rely on slug naming heuristics.
-  const usable = slugs.filter(s => (bot.cooldowns[s] ?? 0) === 0);
+  const usable = slugs.filter(s => (bot.cooldowns[s] ?? 0) === 0 && bot.energy >= 10);
   if (hpPct < 0.3) {
-    const heal = usable.find(s => /heal|repair|regen|adrenaline|reinforced/.test(s));
+    const heal = usable.find(s => /medic|vanish|firewall|battle-orders/.test(s));
     if (heal) return { action: 'skill', skillSlug: heal };
   }
-  const stun = usable.find(s => /stun|smoke|shock/.test(s));
+  const stun = usable.find(s => /shock|emp|system-lock|virus/.test(s));
   if (stun && Math.random() < 0.5) return { action: 'skill', skillSlug: stun };
-  const dmg = usable.find(s => /strike|fire|cannon|barrage|flurry|blade|shot|plasma/.test(s));
+  const dmg = usable.find(s => /strike|cut|shot|volley|bomb|flurry|edge|spark|rend|slam|storm|fire|spike|cascade|bash/.test(s));
   if (dmg) return { action: 'skill', skillSlug: dmg };
   return { action: 'attack' };
 }
