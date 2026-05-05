@@ -233,7 +233,7 @@ function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: 
     <div className={`p-3 border rounded ${mine ? 'border-primary' : 'border-destructive'}`}>
       <div className="flex justify-between items-baseline mb-2">
         <span className="font-orbitron text-sm">{label}</span>
-        <span className="text-xs text-muted-foreground">Lv {p.snapshot.level} {p.snapshot.class}</span>
+        <span className="text-xs text-muted-foreground">Lv {p.snapshot.level}{mine ? ` ${p.snapshot.class}` : ''}</span>
       </div>
       <div className="space-y-1">
         <div>
