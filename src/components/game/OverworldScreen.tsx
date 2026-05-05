@@ -416,108 +416,111 @@ export const OverworldScreen = ({
             aspectRatio: '16 / 10',
           }}
         >
-          {/* Camera-follow world layer (translate + scale around viewport center) */}
+          {/* Camera-follow world layer */}
           {(() => {
-            const vw = stageSize.w || 1;
-            const vh = stageSize.h || 1;
-            // Auto-fit zoom: never let world be smaller than viewport
-            const fitScale = Math.max(vw / zone.width, vh / zone.height);
-            const scale = Math.max(CAMERA_ZOOM, fitScale);
-            const worldW = zone.width * scale;
-            const worldH = zone.height * scale;
-            // Use SMOOTHED camera position (lerped per-frame in rAF)
-            let tx = vw / 2 - camPos.x * scale;
-            let ty = vh / 2 - camPos.y * scale;
-            if (worldW <= vw) tx = (vw - worldW) / 2;
-            else tx = Math.min(0, Math.max(vw - worldW, tx));
-            if (worldH <= vh) ty = (vh - worldH) / 2;
-            else ty = Math.min(0, Math.max(vh - worldH, ty));
-            cameraRef.current = { tx, ty, scale };
+            const viewportWidth = Math.max(stageSize.w, 1);
+            const viewportHeight = Math.max(stageSize.h, 1);
+            const zoom = CAMERA_ZOOM;
+            const halfVisibleWorldWidth = viewportWidth / (2 * zoom);
+            const halfVisibleWorldHeight = viewportHeight / (2 * zoom);
 
-            // Parallax background — moves at 70% camera speed → depth illusion
-            const PARALLAX_BG = 0.7;
-            const bgScale = scale * 1.08; // slightly oversized to never expose edges
-            const bgW = zone.width * bgScale;
-            const bgH = zone.height * bgScale;
-            const bgTx = (vw / 2 - camPos.x * bgScale) * PARALLAX_BG + (1 - PARALLAX_BG) * (vw / 2 - (zone.width / 2) * bgScale);
-            const bgTy = (vh / 2 - camPos.y * bgScale) * PARALLAX_BG + (1 - PARALLAX_BG) * (vh / 2 - (zone.height / 2) * bgScale);
+            const clamp = (value: number, min: number, max: number) => {
+              if (min > max) return (min + max) / 2;
+              return Math.min(max, Math.max(min, value));
+            };
+
+            const worldFitsHorizontally = zone.width * zoom <= viewportWidth;
+            const worldFitsVertically = zone.height * zoom <= viewportHeight;
+
+            const minCameraX = halfVisibleWorldWidth;
+            const maxCameraX = zone.width - halfVisibleWorldWidth;
+            const minCameraY = halfVisibleWorldHeight;
+            const maxCameraY = zone.height - halfVisibleWorldHeight;
+
+            const cameraX = worldFitsHorizontally
+              ? zone.width / 2
+              : clamp(camPos.x, minCameraX, maxCameraX);
+            const cameraY = worldFitsVertically
+              ? zone.height / 2
+              : clamp(camPos.y, minCameraY, maxCameraY);
+
+            const worldTranslateX = worldFitsHorizontally
+              ? (viewportWidth - zone.width * zoom) / 2
+              : viewportWidth / 2 - cameraX * zoom;
+            const worldTranslateY = worldFitsVertically
+              ? (viewportHeight - zone.height * zoom) / 2
+              : viewportHeight / 2 - cameraY * zoom;
+
+            cameraRef.current = { tx: worldTranslateX, ty: worldTranslateY, scale: zoom };
 
             return (
               <>
-                {/* === BACKGROUND LAYER (parallax, slower) === */}
-                <div
-                  className="absolute top-0 left-0 origin-top-left pointer-events-none"
-                  style={{
-                    width: bgW,
-                    height: bgH,
-                    transform: `translate3d(${bgTx}px, ${bgTy}px, 0)`,
-                    backgroundImage: `url(${bg})`,
-                    backgroundSize: '100% 100%',
-                    filter: 'brightness(0.85) saturate(1.05)',
-                  }}
-                >
-                  {/* Subtle panel flickers — desynced specks of brightness */}
-                  {[0, 1, 2, 3].map(i => (
-                    <div
-                      key={i}
-                      className="absolute bg-flicker pointer-events-none"
-                      style={{
-                        left: `${15 + i * 22}%`,
-                        top: `${20 + (i * 13) % 50}%`,
-                        width: 60 + (i * 18) % 40,
-                        height: 14 + (i * 7) % 18,
-                        background:
-                          zone.id === 'neon-district'
-                            ? 'radial-gradient(ellipse, hsl(190 100% 70% / 0.7), transparent 70%)'
-                            : zone.id === 'wasteland'
-                            ? 'radial-gradient(ellipse, hsl(30 100% 65% / 0.55), transparent 70%)'
-                            : 'radial-gradient(ellipse, hsl(210 100% 75% / 0.55), transparent 70%)',
-                        animationDelay: `${i * 1.7}s`,
-                      }}
-                    />
-                  ))}
-                  {/* Slow horizontal light strip sweep */}
-                  <div
-                    className="absolute light-sweep pointer-events-none"
-                    style={{
-                      top: '38%',
-                      left: 0,
-                      width: '40%',
-                      height: 2,
-                      background:
-                        'linear-gradient(90deg, transparent, hsl(190 100% 80% / 0.55), transparent)',
-                      filter: 'blur(1px)',
-                    }}
-                  />
-                  <div
-                    className="absolute light-sweep pointer-events-none"
-                    style={{
-                      top: '62%',
-                      left: 0,
-                      width: '30%',
-                      height: 1.5,
-                      background:
-                        'linear-gradient(90deg, transparent, hsl(280 100% 75% / 0.45), transparent)',
-                      filter: 'blur(1px)',
-                      animationDelay: '5s',
-                    }}
-                  />
-                </div>
-
-                {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) ===
-                    The camera transform lives on the OUTER div and must NEVER be
-                    overwritten by an animation. The nudge is applied to a nested
-                    wrapper so it composes with (not replaces) the camera matrix. */}
                 <div
                   className="absolute top-0 left-0 origin-top-left"
                   style={{
                     width: zone.width,
                     height: zone.height,
-                    transform: `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`,
+                    transform: `translate3d(${worldTranslateX}px, ${worldTranslateY}px, 0) scale(${zoom})`,
                     transformOrigin: '0 0',
                     willChange: 'transform',
                   }}
                 >
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage: `url(${bg})`,
+                      backgroundSize: '100% 100%',
+                      backgroundPosition: 'top left',
+                      filter: 'brightness(0.85) saturate(1.05)',
+                    }}
+                  >
+                    {[0, 1, 2, 3].map(i => (
+                      <div
+                        key={i}
+                        className="absolute bg-flicker pointer-events-none"
+                        style={{
+                          left: `${15 + i * 22}%`,
+                          top: `${20 + (i * 13) % 50}%`,
+                          width: 60 + (i * 18) % 40,
+                          height: 14 + (i * 7) % 18,
+                          background:
+                            zone.id === 'neon-district'
+                              ? 'radial-gradient(ellipse, hsl(190 100% 70% / 0.7), transparent 70%)'
+                              : zone.id === 'wasteland'
+                              ? 'radial-gradient(ellipse, hsl(30 100% 65% / 0.55), transparent 70%)'
+                              : 'radial-gradient(ellipse, hsl(210 100% 75% / 0.55), transparent 70%)',
+                          animationDelay: `${i * 1.7}s`,
+                        }}
+                      />
+                    ))}
+                    <div
+                      className="absolute light-sweep pointer-events-none"
+                      style={{
+                        top: '38%',
+                        left: 0,
+                        width: '40%',
+                        height: 2,
+                        background:
+                          'linear-gradient(90deg, transparent, hsl(190 100% 80% / 0.55), transparent)',
+                        filter: 'blur(1px)',
+                      }}
+                    />
+                    <div
+                      className="absolute light-sweep pointer-events-none"
+                      style={{
+                        top: '62%',
+                        left: 0,
+                        width: '30%',
+                        height: 1.5,
+                        background:
+                          'linear-gradient(90deg, transparent, hsl(280 100% 75% / 0.45), transparent)',
+                        filter: 'blur(1px)',
+                        animationDelay: '5s',
+                      }}
+                    />
+                  </div>
+
+                  {/* The nudge is applied to a nested wrapper so it composes with the camera transform. */}
                   <div
                     key={`nudge-${nudgeKey}`}
                     className="absolute inset-0 camera-nudge"
@@ -700,9 +703,11 @@ export const OverworldScreen = ({
           {debug && (
             <div className="absolute top-2 left-2 z-20 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
               <div>player: x={pos.x.toFixed(0)} y={pos.y.toFixed(0)} dir={direction} {moving ? 'walk' : 'idle'}</div>
-              <div>world: {zone.width}×{zone.height}</div>
+              <div>player: x={pos.x.toFixed(0)} y={pos.y.toFixed(0)} dir={direction} {moving ? 'walk' : 'idle'}</div>
+              <div>camera: x={camPos.x.toFixed(1)} y={camPos.y.toFixed(1)} zoom={cameraRef.current.scale.toFixed(2)}</div>
+              <div>worldTranslate: x={cameraRef.current.tx.toFixed(1)} y={cameraRef.current.ty.toFixed(1)}</div>
               <div>viewport: {stageSize.w}×{stageSize.h}</div>
-              <div>camera: tx={cameraRef.current.tx.toFixed(0)} ty={cameraRef.current.ty.toFixed(0)} scale={cameraRef.current.scale.toFixed(2)}</div>
+              <div>world: {zone.width}×{zone.height}</div>
               <div className="text-emerald-500/70">[`] toggle debug</div>
             </div>
           )}
