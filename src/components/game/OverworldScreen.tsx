@@ -289,7 +289,7 @@ export const OverworldScreen = ({
   })(); }, [activeNpc]);
 
   // Camera offset (in viewport CSS px) — kept in a ref so click handler can invert it
-  const cameraRef = useRef({ tx: 0, ty: 0, scale: 1 });
+  const cameraRef = useRef({ tx: 0, ty: 0, scale: 1, x: 0, y: 0, viewportWidth: 0, viewportHeight: 0, worldWidth: 0, worldHeight: 0 });
 
   const handleStageClick = (e: React.MouseEvent) => {
     if (!zone || !stageRef.current) return;
@@ -451,7 +451,17 @@ export const OverworldScreen = ({
               ? (viewportHeight - zone.height * zoom) / 2
               : viewportHeight / 2 - cameraY * zoom;
 
-            cameraRef.current = { tx: worldTranslateX, ty: worldTranslateY, scale: zoom };
+            cameraRef.current = {
+              tx: worldTranslateX,
+              ty: worldTranslateY,
+              scale: zoom,
+              x: cameraX,
+              y: cameraY,
+              viewportWidth,
+              viewportHeight,
+              worldWidth: zone.width,
+              worldHeight: zone.height,
+            };
 
             return (
               <>
@@ -703,11 +713,10 @@ export const OverworldScreen = ({
           {debug && (
             <div className="absolute top-2 left-2 z-20 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
               <div>player: x={pos.x.toFixed(0)} y={pos.y.toFixed(0)} dir={direction} {moving ? 'walk' : 'idle'}</div>
-              <div>player: x={pos.x.toFixed(0)} y={pos.y.toFixed(0)} dir={direction} {moving ? 'walk' : 'idle'}</div>
-              <div>camera: x={camPos.x.toFixed(1)} y={camPos.y.toFixed(1)} zoom={cameraRef.current.scale.toFixed(2)}</div>
+              <div>camera: x={cameraRef.current.x.toFixed(1)} y={cameraRef.current.y.toFixed(1)} zoom={cameraRef.current.scale.toFixed(2)}</div>
               <div>worldTranslate: x={cameraRef.current.tx.toFixed(1)} y={cameraRef.current.ty.toFixed(1)}</div>
-              <div>viewport: {stageSize.w}×{stageSize.h}</div>
-              <div>world: {zone.width}×{zone.height}</div>
+              <div>viewport: {cameraRef.current.viewportWidth.toFixed(0)}×{cameraRef.current.viewportHeight.toFixed(0)}</div>
+              <div>world: {cameraRef.current.worldWidth.toFixed(0)}×{cameraRef.current.worldHeight.toFixed(0)}</div>
               <div className="text-emerald-500/70">[`] toggle debug</div>
             </div>
           )}
