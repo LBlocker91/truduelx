@@ -457,19 +457,21 @@ export const OverworldScreen = ({
           {(() => {
             const viewportWidth = Math.max(stageSize.w, 1);
             const viewportHeight = Math.max(stageSize.h, 1);
+            const worldWidth = Math.max(Number(zone.width) || 0, 1);
+            const worldHeight = Math.max(Number(zone.height) || 0, 1);
             // Slight overscan avoids 1px gaps from sub-pixel rounding during resize /
             // fullscreen transitions on some aspect ratios.
             const overscanPx = 4;
             const coverZoom = Math.max(
-              (viewportWidth + overscanPx) / zone.width,
-              (viewportHeight + overscanPx) / zone.height,
+              (viewportWidth + overscanPx) / worldWidth,
+              (viewportHeight + overscanPx) / worldHeight,
             );
             const preferredZoom = Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, CAMERA_ZOOM));
             const zoom = Math.max(coverZoom, preferredZoom);
             const halfVisibleWorldWidth = viewportWidth / (2 * zoom);
             const halfVisibleWorldHeight = viewportHeight / (2 * zoom);
-            const scaledWorldWidth = zone.width * zoom;
-            const scaledWorldHeight = zone.height * zoom;
+            const scaledWorldWidth = worldWidth * zoom;
+            const scaledWorldHeight = worldHeight * zoom;
 
             const clamp = (value: number, min: number, max: number) => {
               if (min > max) return (min + max) / 2;
@@ -477,9 +479,9 @@ export const OverworldScreen = ({
             };
 
             const minCameraX = halfVisibleWorldWidth;
-            const maxCameraX = zone.width - halfVisibleWorldWidth;
+            const maxCameraX = worldWidth - halfVisibleWorldWidth;
             const minCameraY = halfVisibleWorldHeight;
-            const maxCameraY = zone.height - halfVisibleWorldHeight;
+            const maxCameraY = worldHeight - halfVisibleWorldHeight;
 
             const cameraX = clamp(camPos.x, minCameraX, maxCameraX);
             const cameraY = clamp(camPos.y, minCameraY, maxCameraY);
@@ -500,8 +502,8 @@ export const OverworldScreen = ({
               y: cameraY,
               viewportWidth,
               viewportHeight,
-              worldWidth: zone.width,
-              worldHeight: zone.height,
+                worldWidth,
+                worldHeight,
             };
 
             return (
@@ -509,8 +511,10 @@ export const OverworldScreen = ({
                 <div
                     className="absolute top-0 left-0 origin-top-left"
                   style={{
-                    width: zone.width,
-                    height: zone.height,
+                      width: `${worldWidth}px`,
+                      height: `${worldHeight}px`,
+                      minWidth: `${worldWidth}px`,
+                      minHeight: `${worldHeight}px`,
                     transform: `translate3d(${worldTranslateX}px, ${worldTranslateY}px, 0) scale(${zoom})`,
                     transformOrigin: '0 0',
                     willChange: 'transform',
