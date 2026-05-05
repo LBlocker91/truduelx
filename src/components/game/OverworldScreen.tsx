@@ -232,6 +232,23 @@ export const OverworldScreen = ({
           y: Math.abs(py - ny) < 0.1 ? py : ny,
         };
       });
+      // Emit movement trail puffs while moving (~every 90ms)
+      const now = performance.now();
+      const v = velRef.current;
+      const speed = Math.hypot(v.vx, v.vy);
+      if (speed > 0.6 && now - lastTrailRef.current > 90) {
+        lastTrailRef.current = now;
+        const id = ++trailIdRef.current;
+        const px = posRef.current.x, py = posRef.current.y;
+        setTrail(prev => {
+          const next = [...prev, { id, x: px, y: py }];
+          // Cap and let CSS animation finish; prune after ~700ms
+          return next.length > 12 ? next.slice(-12) : next;
+        });
+        window.setTimeout(() => {
+          setTrail(prev => prev.filter(p => p.id !== id));
+        }, 750);
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
