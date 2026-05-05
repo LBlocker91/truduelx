@@ -174,6 +174,20 @@ const PlayerSpriteImpl = ({
         />
       )}
 
+      {/* Rarity aura — soft pulsing colored ring under feet, behind sprite */}
+      {showGlow && rarity !== 'common' && (
+        <div
+          className="absolute left-1/2 pointer-events-none rarity-aura"
+          style={{
+            bottom: -2,
+            width: w * 0.85,
+            height: Math.max(10, h * 0.09),
+            background: `radial-gradient(ellipse at center, ${glowColor} 0%, transparent 65%)`,
+            filter: 'blur(4px)',
+          }}
+        />
+      )}
+
       {/* Sprite stack — bobs / leans, but the shadow above stays put */}
       <div
         className="absolute inset-0"
