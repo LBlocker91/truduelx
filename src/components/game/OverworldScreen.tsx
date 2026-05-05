@@ -103,20 +103,29 @@ export const OverworldScreen = ({
     const loop = () => {
       setPos(prev => {
         let { x, y } = prev;
+        let dx = 0, dy = 0;
         const k = keysRef.current;
-        if (k.has('a') || k.has('arrowleft')) x -= MOVE_SPEED;
-        if (k.has('d') || k.has('arrowright')) x += MOVE_SPEED;
-        if (k.has('w') || k.has('arrowup')) y -= MOVE_SPEED;
-        if (k.has('s') || k.has('arrowdown')) y += MOVE_SPEED;
+        if (k.has('a') || k.has('arrowleft')) dx -= MOVE_SPEED;
+        if (k.has('d') || k.has('arrowright')) dx += MOVE_SPEED;
+        if (k.has('w') || k.has('arrowup')) dy -= MOVE_SPEED;
+        if (k.has('s') || k.has('arrowdown')) dy += MOVE_SPEED;
         const t = targetRef.current;
-        if (t) {
-          const dx = t.x - x, dy = t.y - y;
-          const dist = Math.hypot(dx, dy);
+        if (!dx && !dy && t) {
+          const tdx = t.x - x, tdy = t.y - y;
+          const dist = Math.hypot(tdx, tdy);
           if (dist < MOVE_SPEED) { x = t.x; y = t.y; targetRef.current = null; }
-          else { x += (dx / dist) * MOVE_SPEED; y += (dy / dist) * MOVE_SPEED; }
+          else { dx = (tdx / dist) * MOVE_SPEED; dy = (tdy / dist) * MOVE_SPEED; }
         }
+        x += dx; y += dy;
         x = Math.max(40, Math.min(zone.width - 40, x));
         y = Math.max(zone.height * 0.55, Math.min(zone.height - 40, y));
+        const isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
+        // Update direction & moving via refs avoids per-frame React re-render unless changed
+        if (Math.abs(dx) > 0.01) {
+          const nd: SpriteDirection = dx < 0 ? 'left' : 'right';
+          if (dirRef.current !== nd) setDirection(nd);
+        }
+        setMoving(prevMoving => prevMoving === isMoving ? prevMoving : isMoving);
         return { x, y };
       });
       raf = requestAnimationFrame(loop);
@@ -127,12 +136,23 @@ export const OverworldScreen = ({
 
   useEffect(() => {
     if (!zone) return;
-    const hb = setInterval(() => { heartbeat(zone.id, posRef.current.x, posRef.current.y); }, HEARTBEAT_MS);
+    const hb = setInterval(() => {
+      heartbeat(zone.id, posRef.current.x, posRef.current.y, dirRef.current);
+    }, HEARTBEAT_MS);
     const np = setInterval(async () => {
       try { setNearby(await fetchNearbyPlayers(zone.id)); } catch { }
     }, NEARBY_POLL_MS);
     return () => { clearInterval(hb); clearInterval(np); };
   }, [zone]);
+
+  // Load equipped loadout once and publish to presence so others can see it
+  useEffect(() => {
+    (async () => {
+      const lo = await fetchMyLoadout(characterId);
+      setLoadout(lo);
+      await publishLoadout(lo);
+    })();
+  }, [characterId]);
 
   useEffect(() => { (async () => {
     const { data } = await import('@/integrations/supabase/client').then(m => m.supabase.auth.getUser());
