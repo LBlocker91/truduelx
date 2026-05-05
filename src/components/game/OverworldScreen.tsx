@@ -479,8 +479,8 @@ export const OverworldScreen = ({
                 onClick={(e) => { e.stopPropagation(); openNpc(n); }}
                 className="absolute group"
                 style={{
-                  left: `${n._x}%`,
-                  top: `${n._y}%`,
+                  left: `${n._vx}%`,
+                  top: `${n._vy}%`,
                   transform: 'translate(-50%, -100%)',
                   height: 'clamp(55px, 9vh, 100px)',
                 }}
