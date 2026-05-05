@@ -502,17 +502,24 @@ export const OverworldScreen = ({
                   />
                 </div>
 
-                {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) === */}
+                {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) ===
+                    The camera transform lives on the OUTER div and must NEVER be
+                    overwritten by an animation. The nudge is applied to a nested
+                    wrapper so it composes with (not replaces) the camera matrix. */}
                 <div
-                  key={`world-${nudgeKey}`}
-                  className="absolute top-0 left-0 origin-top-left camera-nudge"
+                  className="absolute top-0 left-0 origin-top-left"
                   style={{
                     width: zone.width,
                     height: zone.height,
                     transform: `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`,
                     transformOrigin: '0 0',
+                    willChange: 'transform',
                   }}
                 >
+                  <div
+                    key={`nudge-${nudgeKey}`}
+                    className="absolute inset-0 camera-nudge"
+                  >
                   {/* NPCs in world coords (px) */}
                   {npcs.map((n, idx) => {
                     const close = interactable?.id === n.id;
@@ -613,7 +620,7 @@ export const OverworldScreen = ({
                         armorVariant={loadout.armorVariant}
                         weaponVariant={loadout.weaponVariant}
                         rarity={playerRarity}
-                        scale={1}
+                        scale={1.15}
                       />
                       {/* Interaction flash — re-mounts on each E press via key */}
                       {flashKey > 0 && (
@@ -630,6 +637,7 @@ export const OverworldScreen = ({
                         />
                       )}
                     </div>
+                  </div>
                   </div>
                 </div>
 
