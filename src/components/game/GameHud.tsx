@@ -1,0 +1,124 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  User as UserIcon, Backpack, ScrollText, Map as MapIcon, Swords,
+  Sparkles, Store, Settings as SettingsIcon, LogOut, Crown, Coins,
+} from 'lucide-react';
+import { OverworldScreen } from './OverworldScreen';
+import { ProfilePanel } from './panels/ProfilePanel';
+import { InventoryPanel } from './panels/InventoryPanel';
+import { QuestsPanel } from './panels/QuestsPanel';
+import { PvpPanel } from './panels/PvpPanel';
+
+type PanelKey = 'profile' | 'inventory' | 'quests' | 'map' | 'pvp' | 'skills' | 'shop' | 'settings' | null;
+
+interface GameHudProps {
+  characterId: string;
+  characterName: string;
+  characterClass: string;
+  characterLevel: number;
+  credits: number;
+  isPremium: boolean;
+  onEnterNpcBattle: (battleId: string) => void;
+  onJoinPvpQueue: () => void;
+  onExitToSlots: () => void;
+}
+
+export const GameHud = (props: GameHudProps) => {
+  const [panel, setPanel] = useState<PanelKey>(null);
+  const [loadoutBust, setLoadoutBust] = useState(0);
+
+  const close = () => setPanel(null);
+
+  const items: { key: PanelKey; icon: React.ReactNode; label: string }[] = [
+    { key: 'profile',   icon: <UserIcon className="w-4 h-4" />,   label: 'Profile' },
+    { key: 'inventory', icon: <Backpack className="w-4 h-4" />,   label: 'Inventory' },
+    { key: 'quests',    icon: <ScrollText className="w-4 h-4" />, label: 'Quests' },
+    { key: 'pvp',       icon: <Swords className="w-4 h-4" />,     label: 'PvP' },
+    { key: 'skills',    icon: <Sparkles className="w-4 h-4" />,   label: 'Skills' },
+    { key: 'map',       icon: <MapIcon className="w-4 h-4" />,    label: 'Map' },
+    { key: 'shop',      icon: <Store className="w-4 h-4" />,      label: 'Shop' },
+    { key: 'settings',  icon: <SettingsIcon className="w-4 h-4" />, label: 'Settings' },
+  ];
+
+  return (
+    <div className="relative min-h-screen flex flex-col bg-black">
+      {/* Top bar */}
+      <header className="flex items-center justify-between gap-3 px-3 py-2 bg-card/85 backdrop-blur border-b border-border z-20">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="font-orbitron text-sm truncate">{props.characterName}</span>
+          <span className="text-xs text-muted-foreground capitalize">Lv {props.characterLevel} · {props.characterClass}</span>
+          {props.isPremium && (
+            <span className="text-[10px] text-shield font-orbitron flex items-center gap-1">
+              <Crown className="w-3 h-3" /> PREMIUM
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-shield font-orbitron flex items-center gap-1">
+            <Coins className="w-3 h-3" /> {props.credits.toLocaleString()}
+          </span>
+          <Button size="sm" variant="ghost" onClick={props.onExitToSlots}>
+            <LogOut className="w-4 h-4 mr-1" /> Characters
+          </Button>
+        </div>
+      </header>
+
+      {/* Game viewport (overworld) */}
+      <div className="flex-1 relative">
+        <OverworldScreen
+          characterId={props.characterId}
+          characterName={props.characterName}
+          characterClass={props.characterClass}
+          characterLevel={props.characterLevel}
+          onEnterNpcBattle={props.onEnterNpcBattle}
+          onJoinPvpQueue={props.onJoinPvpQueue}
+          onExit={props.onExitToSlots}
+          hideChrome
+          loadoutBust={loadoutBust}
+        />
+
+        {/* Vertical dock (right side) */}
+        <nav className="absolute top-3 right-3 z-30 flex flex-col gap-1 bg-card/85 backdrop-blur border border-border rounded-lg p-1.5">
+          {items.map((it) => (
+            <Button
+              key={it.label}
+              size="sm"
+              variant="ghost"
+              className="justify-start gap-2 h-8 px-2 text-xs"
+              onClick={() => setPanel(it.key)}
+              title={it.label}
+            >
+              {it.icon}
+              <span className="hidden md:inline">{it.label}</span>
+            </Button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Side panel */}
+      <Sheet open={panel !== null} onOpenChange={(o) => !o && close()}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-orbitron capitalize">{panel}</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            {panel === 'profile'   && <ProfilePanel characterId={props.characterId} />}
+            {panel === 'inventory' && <InventoryPanel characterId={props.characterId} onLoadoutChanged={() => setLoadoutBust((n) => n + 1)} />}
+            {panel === 'quests'    && <QuestsPanel characterId={props.characterId} />}
+            {panel === 'pvp'       && <PvpPanel onJoinRanked={() => { close(); props.onJoinPvpQueue(); }} />}
+            {panel === 'skills'    && <Placeholder text="Skills tree — open from Profile to spend skill points (coming soon: dedicated tree view)." />}
+            {panel === 'map'       && <Placeholder text="Use the zone selector in the overworld to travel. Full minimap coming soon." />}
+            {panel === 'shop'      && <Placeholder text="Walk up to a vendor NPC in the overworld to trade." />}
+            {panel === 'settings'  && <Placeholder text="Settings — sound and graphics options coming soon." />}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+};
+
+const Placeholder = ({ text }: { text: string }) => (
+  <p className="text-sm text-muted-foreground">{text}</p>
+);
