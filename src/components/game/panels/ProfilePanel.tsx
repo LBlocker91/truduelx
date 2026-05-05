@@ -30,6 +30,8 @@ interface CharRow {
   support: number;
   defense: number;
   resistance: number;
+  bonus_max_hp: number;
+  bonus_max_mp: number;
   equipped_weapon_id: string | null;
   equipped_armor_id: string | null;
 }
