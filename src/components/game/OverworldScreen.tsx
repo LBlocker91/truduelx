@@ -53,14 +53,14 @@ const getClassIcon = (cls: string) => {
 };
 
 // Rarity → display color (HSL components)
-const RARITY_HSL: Record<string, string> = {
+const RARITY_HSL: Record<SpriteRarity, string> = {
   common: '210 10% 70%',
   uncommon: '150 100% 55%',
   rare: '210 100% 60%',
   epic: '280 100% 65%',
   legendary: '40 100% 60%',
 };
-const variantToRarity = (armor: string | null, weapon: string | null): keyof typeof RARITY_HSL => {
+const variantToRarity = (armor: string | null, weapon: string | null): SpriteRarity => {
   if (!armor && !weapon) return 'common';
   if (armor?.startsWith('heavy_')) return (weapon === 'staff' || weapon === 'axe') ? 'legendary' : 'epic';
   if (armor?.startsWith('medium_')) return 'rare';
