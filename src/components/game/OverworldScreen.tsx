@@ -302,7 +302,7 @@ export const OverworldScreen = ({
     const y = (vy - cam.ty) / cam.scale;
     targetRef.current = {
       x: Math.max(40, Math.min(zone.width - 40, x)),
-      y: Math.max(zone.height * 0.55, Math.min(zone.height - 40, y)),
+      y: Math.max(zone.height * 0.35, Math.min(zone.height - 40, y)),
     };
   };
 
