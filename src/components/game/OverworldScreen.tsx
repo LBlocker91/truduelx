@@ -309,6 +309,9 @@ export const OverworldScreen = ({
 
   const tryInteract = () => {
     const n = closestNpc();
+    // Always fire flash + camera nudge for immediate feedback
+    setFlashKey(k => k + 1);
+    setNudgeKey(k => k + 1);
     if (n) openNpc(n);
   };
 
