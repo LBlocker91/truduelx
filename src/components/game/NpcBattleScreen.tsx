@@ -65,12 +65,28 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [actions, setActions] = useState<ActionRow[]>([]);
   const [skills, setSkills] = useState<SkillCatalog[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [potions, setPotions] = useState<{ hp: number; mp: number }>({ hp: 0, mp: 0 });
+  const [characterId, setCharacterId] = useState<string | null>(null);
 
   const me = participants.find(p => p.user_id === myUserId);
   const enemy = participants.find(p => p.is_bot);
   const finished = battle?.status === 'finished';
   const won = finished && battle?.winner_user_id === myUserId;
   const myTurn = !finished && battle?.current_turn === myUserId;
+
+  const refreshPotions = useCallback(async (charId: string) => {
+    const { data } = await supabase
+      .from('inventory')
+      .select('quantity, items!inner(subtype, consumable)')
+      .eq('character_id', charId)
+      .eq('items.consumable', true);
+    let hp = 0, mp = 0;
+    for (const row of (data ?? []) as any[]) {
+      if (row.items?.subtype === 'hp_potion') hp += row.quantity ?? 0;
+      else if (row.items?.subtype === 'mp_potion') mp += row.quantity ?? 0;
+    }
+    setPotions({ hp, mp });
+  }, []);
 
   const refresh = useCallback(async () => {
     const [b, p, a] = await Promise.all([
@@ -79,9 +95,16 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       supabase.from('battle_actions').select('*').eq('battle_id', battleId).order('created_at', { ascending: false }).limit(20),
     ]);
     if (b.data) setBattle(b.data as any);
-    if (p.data) setParticipants(p.data as any);
+    if (p.data) {
+      setParticipants(p.data as any);
+      const myRow = (p.data as any[]).find(r => r.user_id === myUserId);
+      if (myRow?.character_id) {
+        setCharacterId(myRow.character_id);
+        refreshPotions(myRow.character_id);
+      }
+    }
     if (a.data) setActions(a.data as any);
-  }, [battleId]);
+  }, [battleId, myUserId, refreshPotions]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
