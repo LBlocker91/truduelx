@@ -61,6 +61,7 @@ export const OverworldScreen = ({
   const [myQuests, setMyQuests] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
+  const [debug, setDebug] = useState(false);
   const posRef = useRef(pos);
   posRef.current = pos;
   const dirRef = useRef<SpriteDirection>('right');
@@ -106,6 +107,7 @@ export const OverworldScreen = ({
         targetRef.current = null;
       }
       if (e.key === 'e' || e.key === 'E') tryInteract();
+      if (e.key === '`') setDebug(d => !d);
     };
     const up = (e: KeyboardEvent) => keysRef.current.delete(e.key.toLowerCase());
     window.addEventListener('keydown', down);
@@ -305,28 +307,33 @@ export const OverworldScreen = ({
         ))}
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-2 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-2 overflow-hidden bg-black">
         <div
           ref={stageRef}
           onClick={handleStageClick}
-          className="relative w-full max-w-[1400px] aspect-[16/10] bg-black cursor-crosshair border border-border rounded overflow-hidden select-none"
+          className="relative bg-black cursor-crosshair border border-border rounded overflow-hidden select-none"
+          style={{
+            width: 'min(100%, calc((100vh - 140px) * 16 / 10))',
+            aspectRatio: '16 / 10',
+          }}
         >
           {/* Camera-follow world layer (translate + scale around viewport center) */}
           {(() => {
-            const scale = CAMERA_ZOOM;
             const vw = stageSize.w || 1;
             const vh = stageSize.h || 1;
-            // World pixel size when scaled
+            // Auto-fit zoom: never let world be smaller than viewport
+            const fitScale = Math.max(vw / zone.width, vh / zone.height);
+            const scale = Math.max(CAMERA_ZOOM, fitScale);
             const worldW = zone.width * scale;
             const worldH = zone.height * scale;
             // Desired translate to put player at viewport center
             let tx = vw / 2 - pos.x * scale;
             let ty = vh / 2 - pos.y * scale;
-            // Clamp so we don't show beyond world edges
-            const minTx = vw - worldW;
-            const minTy = vh - worldH;
-            tx = Math.min(0, Math.max(minTx, tx));
-            ty = Math.min(0, Math.max(minTy, ty));
+            // Clamp: if world larger than viewport, keep edges inside; if not, center it.
+            if (worldW <= vw) tx = (vw - worldW) / 2;
+            else tx = Math.min(0, Math.max(vw - worldW, tx));
+            if (worldH <= vh) ty = (vh - worldH) / 2;
+            else ty = Math.min(0, Math.max(vh - worldH, ty));
             cameraRef.current = { tx, ty, scale };
             return (
               <div
@@ -413,6 +420,19 @@ export const OverworldScreen = ({
               </div>
             );
           })()}
+
+          {debug && (
+            <div className="absolute top-2 left-2 z-20 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
+              <div>player: x={pos.x.toFixed(0)} y={pos.y.toFixed(0)} dir={direction} {moving ? 'walk' : 'idle'}</div>
+              <div>world: {zone.width}×{zone.height}</div>
+              <div>viewport: {stageSize.w}×{stageSize.h}</div>
+              <div>camera: tx={cameraRef.current.tx.toFixed(0)} ty={cameraRef.current.ty.toFixed(0)} scale={cameraRef.current.scale.toFixed(2)}</div>
+              <div className="text-emerald-500/70">[`] toggle debug</div>
+            </div>
+          )}
+          {!debug && (
+            <div className="absolute top-2 right-2 z-20 text-[10px] text-white/40 font-mono pointer-events-none">[`] debug</div>
+          )}
         </div>
       </div>
 
