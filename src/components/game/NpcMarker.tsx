@@ -41,12 +41,18 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
 
       {/* In-world figure */}
       <div className="relative npc-bob" style={{ width: 64, height: 88 }}>
-        {/* Interaction ring on hover/proximity */}
+        {/* Interaction ring on hover/proximity — smoother dual-pulse */}
         {close && (
-          <div
-            className="absolute left-1/2 top-1/2 interact-ring rounded-full pointer-events-none"
-            style={{ width: 90, height: 30, border: `2px solid ${color}`, boxShadow: `0 0 12px ${color}` }}
-          />
+          <>
+            <div
+              className="absolute left-1/2 top-1/2 interact-ring rounded-full pointer-events-none"
+              style={{ width: 96, height: 32, border: `2px solid ${color}`, boxShadow: `0 0 16px ${color}` }}
+            />
+            <div
+              className="absolute left-1/2 top-1/2 interact-ring rounded-full pointer-events-none"
+              style={{ width: 96, height: 32, border: `1px solid ${color}`, boxShadow: `0 0 10px ${color}`, animationDelay: '0.7s' }}
+            />
+          </>
         )}
 
         {kind === 'enemy' ? (
