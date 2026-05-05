@@ -12,9 +12,11 @@ import { ResultScreen } from '@/components/game/ResultScreen';
 import { LevelUpScreen } from '@/components/game/LevelUpScreen';
 import { MatchmakingScreen } from '@/components/game/MatchmakingScreen';
 import { PvpBattleScreen } from '@/components/game/PvpBattleScreen';
+import { OverworldScreen } from '@/components/game/OverworldScreen';
+import { NpcBattleScreen } from '@/components/game/NpcBattleScreen';
 import { toast } from 'sonner';
 
-type Screen = GameState['screen'] | 'pvp-queue' | 'pvp-battle';
+type Screen = GameState['screen'] | 'pvp-queue' | 'pvp-battle' | 'overworld' | 'npc-battle';
 
 const INITIAL_STATE: GameState = {
   screen: 'title',
@@ -31,6 +33,8 @@ const Index = () => {
   const [saveData, setSaveData] = useState<SaveData | null>(null);
   const [pvpCharacterId, setPvpCharacterId] = useState<string | null>(null);
   const [pvpBattleId, setPvpBattleId] = useState<string | null>(null);
+  const [npcBattleId, setNpcBattleId] = useState<string | null>(null);
+  const [cloudCharacterId, setCloudCharacterId] = useState<string | null>(null);
   const { user, ready } = useAuth();
 
   useEffect(() => {
@@ -88,10 +92,39 @@ const Index = () => {
     }
   }, [user, saveData]);
 
+  const handleOverworld = useCallback(async () => {
+    if (!user) { toast.error('Connecting…'); return; }
+    if (!saveData) { toast.error('Create a character first'); return; }
+    try {
+      const synced = await syncCharacterToCloud(saveData.player);
+      if (!synced?.id) throw new Error('sync failed');
+      setCloudCharacterId(synced.id);
+      setScreen('overworld');
+    } catch (e: any) {
+      toast.error(`Overworld unavailable: ${e.message ?? e}`);
+    }
+  }, [user, saveData]);
+
   const handleMatched = useCallback((battleId: string) => {
     setPvpBattleId(battleId);
     setScreen('pvp-battle');
   }, []);
+
+  const handleEnterNpcBattle = useCallback((battleId: string) => {
+    setNpcBattleId(battleId);
+    setScreen('npc-battle');
+  }, []);
+
+  const handleNpcBattleEnd = useCallback(() => {
+    setNpcBattleId(null);
+    setScreen('overworld');
+  }, []);
+
+  const handleOverworldPvp = useCallback(async () => {
+    if (!cloudCharacterId) return;
+    setPvpCharacterId(cloudCharacterId);
+    setScreen('pvp-queue');
+  }, [cloudCharacterId]);
 
   const handleCharacterSelect = useCallback((characterClass: CharacterClass, name: string) => {
     const player = createCharacter(characterClass, name, 'player');
@@ -174,6 +207,7 @@ const Index = () => {
           onStart={handleStart}
           onContinue={saveData ? handleContinue : undefined}
           onPvp={ready ? handlePvp : undefined}
+          onOverworld={ready ? handleOverworld : undefined}
           saveData={saveData}
         />
       )}
