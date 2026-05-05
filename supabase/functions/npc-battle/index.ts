@@ -10,6 +10,7 @@ import {
   resolveHit, applyEffect, tickStatusEffects, tickCooldowns, isStunned,
   makeRng, calcMaxHp, ParticipantState, SkillDef, CharacterSnapshot,
 } from '../_shared/combat.ts';
+import { applyXp } from '../_shared/leveling.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
