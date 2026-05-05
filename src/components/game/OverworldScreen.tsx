@@ -33,13 +33,15 @@ interface OverworldScreenProps {
   onExit: () => void;
 }
 
-const MOVE_SPEED = 4.5;
-const MOVE_ACCEL = 0.25; // easing factor 0..1 (lerp toward target velocity)
+const MOVE_SPEED = 6.5;            // faster on a much larger map
+const MOVE_ACCEL = 0.18;           // softer start/stop easing
 const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
-const INTERACTION_RADIUS = 90;
-const CAMERA_ZOOM = 1.85; // ~15% larger player + tighter framing
-const CAMERA_LERP = 0.22; // snappier follow, still smooth
+const INTERACTION_RADIUS = 110;
+const CAMERA_ZOOM = 1.05;          // zoomed OUT — more visible world
+const CAMERA_LERP = 0.10;          // slightly delayed, smooth follow
+const RENDER_RADIUS = 1400;        // only render players within this world distance
+const FADE_RADIUS  = 900;          // distant players fade out softly
 
 // Map class name → icon for the nameplate
 const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -216,7 +218,7 @@ export const OverworldScreen = ({
 
         x += v.vx; y += v.vy;
         x = Math.max(40, Math.min(zone.width - 40, x));
-        y = Math.max(zone.height * 0.55, Math.min(zone.height - 40, y));
+        y = Math.max(zone.height * 0.35, Math.min(zone.height - 40, y));
 
         const speed = Math.hypot(v.vx, v.vy);
         const isMoving = speed > 0.4;
@@ -300,7 +302,7 @@ export const OverworldScreen = ({
     const y = (vy - cam.ty) / cam.scale;
     targetRef.current = {
       x: Math.max(40, Math.min(zone.width - 40, x)),
-      y: Math.max(zone.height * 0.55, Math.min(zone.height - 40, y)),
+      y: Math.max(zone.height * 0.35, Math.min(zone.height - 40, y)),
     };
   };
 
@@ -567,12 +569,20 @@ export const OverworldScreen = ({
 
                   {/* Other players */}
                   {nearby.map(p => {
+                    // Distance-based culling + opacity fade
+                    const dx = p.x_position - pos.x;
+                    const dy = p.y_position - pos.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > RENDER_RADIUS) return null;
+                    const fade = dist <= FADE_RADIUS
+                      ? 1
+                      : Math.max(0.25, 1 - (dist - FADE_RADIUS) / (RENDER_RADIUS - FADE_RADIUS));
                     const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
                     const otherRarity = variantToRarity(p.equipped_armor_variant, p.equipped_weapon_variant);
                     const OtherIcon = getClassIcon(p.character_class ?? '');
                     return (
                       <div key={p.user_id}
-                        style={{ left: p.x_position, top: p.y_position, position: 'absolute' }}
+                        style={{ left: p.x_position, top: p.y_position, position: 'absolute', opacity: fade }}
                         className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
                       >
                         <div
@@ -589,7 +599,7 @@ export const OverworldScreen = ({
                           armorVariant={p.equipped_armor_variant}
                           weaponVariant={p.equipped_weapon_variant}
                           rarity={otherRarity}
-                          scale={0.9}
+                          scale={0.7}
                         />
                       </div>
                     );
@@ -620,7 +630,7 @@ export const OverworldScreen = ({
                         armorVariant={loadout.armorVariant}
                         weaponVariant={loadout.weaponVariant}
                         rarity={playerRarity}
-                        scale={1.15}
+                        scale={0.78}
                       />
                       {/* Interaction flash — re-mounts on each E press via key */}
                       {flashKey > 0 && (
