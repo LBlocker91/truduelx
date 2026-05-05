@@ -420,7 +420,8 @@ export const OverworldScreen = ({
             const viewportHeight = Math.max(stageSize.h, 1);
             // Ensure world always fully covers viewport (no black bars on any screen size).
             const coverZoom = Math.max(viewportWidth / zone.width, viewportHeight / zone.height);
-            const zoom = Math.max(CAMERA_ZOOM, coverZoom);
+            const rawZoom = Math.max(CAMERA_ZOOM, coverZoom);
+            const zoom = Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, rawZoom));
             const halfVisibleWorldWidth = viewportWidth / (2 * zoom);
             const halfVisibleWorldHeight = viewportHeight / (2 * zoom);
 
