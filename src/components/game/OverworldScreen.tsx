@@ -447,7 +447,54 @@ export const OverworldScreen = ({
                     backgroundSize: '100% 100%',
                     filter: 'brightness(0.85) saturate(1.05)',
                   }}
-                />
+                >
+                  {/* Subtle panel flickers — desynced specks of brightness */}
+                  {[0, 1, 2, 3].map(i => (
+                    <div
+                      key={i}
+                      className="absolute bg-flicker pointer-events-none"
+                      style={{
+                        left: `${15 + i * 22}%`,
+                        top: `${20 + (i * 13) % 50}%`,
+                        width: 60 + (i * 18) % 40,
+                        height: 14 + (i * 7) % 18,
+                        background:
+                          zone.id === 'neon-district'
+                            ? 'radial-gradient(ellipse, hsl(190 100% 70% / 0.7), transparent 70%)'
+                            : zone.id === 'wasteland'
+                            ? 'radial-gradient(ellipse, hsl(30 100% 65% / 0.55), transparent 70%)'
+                            : 'radial-gradient(ellipse, hsl(210 100% 75% / 0.55), transparent 70%)',
+                        animationDelay: `${i * 1.7}s`,
+                      }}
+                    />
+                  ))}
+                  {/* Slow horizontal light strip sweep */}
+                  <div
+                    className="absolute light-sweep pointer-events-none"
+                    style={{
+                      top: '38%',
+                      left: 0,
+                      width: '40%',
+                      height: 2,
+                      background:
+                        'linear-gradient(90deg, transparent, hsl(190 100% 80% / 0.55), transparent)',
+                      filter: 'blur(1px)',
+                    }}
+                  />
+                  <div
+                    className="absolute light-sweep pointer-events-none"
+                    style={{
+                      top: '62%',
+                      left: 0,
+                      width: '30%',
+                      height: 1.5,
+                      background:
+                        'linear-gradient(90deg, transparent, hsl(280 100% 75% / 0.45), transparent)',
+                      filter: 'blur(1px)',
+                      animationDelay: '5s',
+                    }}
+                  />
+                </div>
 
                 {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) === */}
                 <div
