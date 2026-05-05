@@ -670,16 +670,37 @@ export const OverworldScreen = ({
               {vendorItems.length === 0 && <p className="text-xs text-muted-foreground">No stock right now.</p>}
               {vendorItems.map(vi => (
                 <div key={vi.id} className="flex items-center justify-between border border-border rounded p-2">
-                  <div>
-                    <div className="text-sm font-medium">{vi.items?.name}</div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{vi.items?.name}</div>
                     <div className="text-[10px] text-muted-foreground">
-                      Lv {vi.items?.level_req} · {vi.items?.rarity} · {vi.items?.slot}
+                      Lv {vi.items?.level_req} · {vi.items?.rarity} · {vi.items?.consumable ? 'consumable' : vi.items?.slot}
                     </div>
+                    {vi.items?.description && (
+                      <div className="text-[10px] text-muted-foreground/80 mt-0.5 line-clamp-2">{vi.items.description}</div>
+                    )}
                   </div>
-                  <Button size="sm" variant="outline" disabled>{vi.price}c</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const { buyVendorItem } = await import('@/lib/overworld');
+                        await buyVendorItem(characterId, vi.id, 1);
+                        setLoadoutBust(b => b + 1);
+                        // Refresh vendor list (no quantity change but for UX consistency)
+                        // and re-fetch player credits via parent reload mechanism.
+                        const { toast } = await import('sonner');
+                        toast.success(`Bought ${vi.items?.name} for ${vi.price}c`);
+                      } catch (e: any) {
+                        const { toast } = await import('sonner');
+                        toast.error(e.message ?? 'purchase failed');
+                      }
+                    }}
+                  >
+                    {vi.price}c
+                  </Button>
                 </div>
               ))}
-              <p className="text-[10px] text-muted-foreground italic">Currency system coming soon — items are display-only.</p>
             </div>
           )}
 
