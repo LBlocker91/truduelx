@@ -166,6 +166,17 @@ export const OverworldScreen = ({
         setMoving(prevMoving => prevMoving === isMoving ? prevMoving : isMoving);
         return { x, y };
       });
+      // Smooth camera follow (per-frame lerp). Camera target = player pos.
+      setCamPos(prev => {
+        const px = posRef.current.x, py = posRef.current.y;
+        const nx = prev.x + (px - prev.x) * CAMERA_LERP;
+        const ny = prev.y + (py - prev.y) * CAMERA_LERP;
+        // Snap when very close to avoid sub-pixel jitter
+        return {
+          x: Math.abs(px - nx) < 0.1 ? px : nx,
+          y: Math.abs(py - ny) < 0.1 ? py : ny,
+        };
+      });
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
