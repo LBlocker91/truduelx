@@ -473,19 +473,47 @@ export const OverworldScreen = ({
             </div>
           )}
 
-          {/* NPCs — anchored to background via xPercent/yPercent */}
+          {/* Floor perspective highlight — tied to walkable polygon. Gives a clear,
+              game-like floor band so players see exactly where they can move. */}
+          {(() => {
+            const wk = walkableFor(zone.id);
+            return (
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                className="absolute inset-0 w-full h-full pointer-events-none z-[5]"
+              >
+                <defs>
+                  <linearGradient id="floor-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stopColor="hsl(195 100% 70%)" stopOpacity="0" />
+                    <stop offset="55%" stopColor="hsl(195 100% 65%)" stopOpacity="0.08" />
+                    <stop offset="100%" stopColor="hsl(195 100% 70%)" stopOpacity="0.22" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d={polygonToSvgPath(wk.polygon)}
+                  fill="url(#floor-grad)"
+                  stroke="hsl(195 100% 70% / 0.45)"
+                  strokeWidth={0.25}
+                />
+              </svg>
+            );
+          })()}
+
+          {/* NPCs — anchored to background via xPercent/yPercent, larger & responsive */}
           {npcsWithPos.map((n) => {
             const close = interactable?.id === n.id;
             return (
               <button
                 key={n.id}
                 onClick={(e) => { e.stopPropagation(); openNpc(n); }}
-                className="absolute group"
+                className="absolute group z-10"
                 style={{
                   left: `${n._vx}%`,
                   top: `${n._vy}%`,
                   transform: 'translate(-50%, -100%)',
-                  height: 'clamp(55px, 9vh, 100px)',
+                  width: 'clamp(72px, 7.5vw, 120px)',
+                  height: 'clamp(96px, 13vh, 160px)',
                 }}
               >
                 <NpcMarker
@@ -509,19 +537,18 @@ export const OverworldScreen = ({
             return (
               <div
                 key={p.user_id}
-                className="absolute flex flex-col items-center pointer-events-none"
+                className="absolute flex flex-col items-center pointer-events-none z-10"
                 style={{
                   left: `${xp}%`,
                   top: `${yp}%`,
                   transform: 'translate(-50%, -100%)',
-                  height: 'clamp(70px, 8vh, 120px)',
                 }}
               >
                 <div
-                  className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-card/85 mb-0.5 flex items-center gap-1"
+                  className="text-[11px] font-orbitron px-1.5 py-0.5 rounded bg-card/85 mb-1 flex items-center gap-1 whitespace-nowrap"
                   style={{ border: `1px solid hsl(${RARITY_HSL[otherRarity]} / 0.7)` }}
                 >
-                  <OtherIcon className="w-2.5 h-2.5" />
+                  <OtherIcon className="w-3 h-3" />
                   <span>{p.display_name}</span>
                   <span className="opacity-70">L{p.character_level}</span>
                 </div>
@@ -531,7 +558,7 @@ export const OverworldScreen = ({
                   armorVariant={p.equipped_armor_variant}
                   weaponVariant={p.equipped_weapon_variant}
                   rarity={otherRarity}
-                  scale={0.7}
+                  scale={0.95}
                 />
               </div>
             );
@@ -539,24 +566,23 @@ export const OverworldScreen = ({
 
           {/* Local player */}
           <div
-            className="absolute flex flex-col items-center pointer-events-none"
+            className="absolute flex flex-col items-center pointer-events-none z-20"
             style={{
               left: `${pos.x}%`,
               top: `${pos.y}%`,
               transform: 'translate(-50%, -100%)',
-              height: 'clamp(80px, 10vh, 140px)',
               transition: 'left 90ms linear, top 90ms linear',
             }}
           >
             <div
-              className="text-[11px] font-orbitron px-2 py-0.5 rounded mb-1 flex items-center gap-1.5 bg-background/90 backdrop-blur drop-shadow"
+              className="text-xs font-orbitron px-2 py-0.5 rounded mb-1 flex items-center gap-1.5 bg-background/90 backdrop-blur drop-shadow whitespace-nowrap"
               style={{
                 border: `1px solid hsl(${RARITY_HSL[playerRarity]})`,
                 boxShadow: `0 0 8px hsl(${RARITY_HSL[playerRarity]} / 0.55)`,
                 color: `hsl(${RARITY_HSL[playerRarity]})`,
               }}
             >
-              <ClassIcon className="w-3 h-3" />
+              <ClassIcon className="w-3.5 h-3.5" />
               <span className="text-foreground">{characterName}</span>
               <span className="opacity-80">L{characterLevel}</span>
             </div>
@@ -566,7 +592,7 @@ export const OverworldScreen = ({
               armorVariant={loadout.armorVariant}
               weaponVariant={loadout.weaponVariant}
               rarity={playerRarity}
-              scale={0.85}
+              scale={1.15}
             />
           </div>
 
