@@ -406,21 +406,19 @@ export const OverworldScreen = ({
         ))}
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-2 overflow-hidden bg-black">
+      <div className="flex-1 relative overflow-hidden bg-black">
         <div
           ref={stageRef}
           onClick={handleStageClick}
-          className="relative bg-black cursor-crosshair border border-border rounded overflow-hidden select-none"
-          style={{
-            width: 'min(100%, calc((100vh - 140px) * 16 / 10))',
-            aspectRatio: '16 / 10',
-          }}
+          className="absolute inset-0 bg-black cursor-crosshair overflow-hidden select-none"
         >
           {/* Camera-follow world layer */}
           {(() => {
             const viewportWidth = Math.max(stageSize.w, 1);
             const viewportHeight = Math.max(stageSize.h, 1);
-            const zoom = CAMERA_ZOOM;
+            // Ensure world always fully covers viewport (no black bars on any screen size).
+            const coverZoom = Math.max(viewportWidth / zone.width, viewportHeight / zone.height);
+            const zoom = Math.max(CAMERA_ZOOM, coverZoom);
             const halfVisibleWorldWidth = viewportWidth / (2 * zoom);
             const halfVisibleWorldHeight = viewportHeight / (2 * zoom);
 
