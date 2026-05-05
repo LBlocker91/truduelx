@@ -60,10 +60,23 @@ export const OverworldScreen = ({
   const [questData, setQuestData] = useState<any>(null);
   const [myQuests, setMyQuests] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const posRef = useRef(pos);
   posRef.current = pos;
   const dirRef = useRef<SpriteDirection>('right');
   dirRef.current = direction;
+
+  // Track stage size for camera math
+  useEffect(() => {
+    if (!stageRef.current) return;
+    const el = stageRef.current;
+    const ro = new ResizeObserver(() => {
+      setStageSize({ w: el.clientWidth, h: el.clientHeight });
+    });
+    ro.observe(el);
+    setStageSize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     (async () => {
