@@ -363,12 +363,13 @@
   }
   .armor-shimmer { animation: armor-shimmer 3s ease-in-out infinite; }
 
-  /* Ground shadow soft pulse */
+  /* Ground shadow soft pulse — stays under feet, doesn't bob with sprite */
   @keyframes ground-shadow {
-    0%, 100% { transform: translateX(-50%) scale(1);    opacity: 0.45; }
-    50%      { transform: translateX(-50%) scale(0.88); opacity: 0.32; }
+    0%, 100% { transform: translateX(-50%) scale(1);    opacity: 0.55; }
+    50%      { transform: translateX(-50%) scale(0.92); opacity: 0.42; }
   }
   .ground-shadow { animation: ground-shadow 2.4s ease-in-out infinite; }
+  .ground-shadow-walk { animation: ground-shadow 0.28s ease-in-out infinite; }
 
   /* Rare gear sparkle */
   @keyframes sparkle-float {
@@ -378,6 +379,25 @@
   }
   .sparkle { animation: sparkle-float 2.2s ease-out infinite; }
 
-  /* Smooth camera transform */
-  .camera-smooth { transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+  /* NPC presence — hologram flicker + idle bob */
+  @keyframes hologram-flicker {
+    0%, 100% { opacity: 0.92; filter: brightness(1) drop-shadow(0 0 6px currentColor); }
+    47%      { opacity: 1;    filter: brightness(1.15) drop-shadow(0 0 10px currentColor); }
+    50%      { opacity: 0.78; filter: brightness(0.85); }
+    53%      { opacity: 1; }
+  }
+  .hologram-flicker { animation: hologram-flicker 3.2s ease-in-out infinite; }
+  @keyframes npc-bob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-3px); }
+  }
+  .npc-bob { animation: npc-bob 2.6s ease-in-out infinite; }
+  @keyframes interact-ring {
+    0%   { transform: translate(-50%, -50%) scale(0.85); opacity: 0.9; }
+    100% { transform: translate(-50%, -50%) scale(1.4);  opacity: 0; }
+  }
+  .interact-ring { animation: interact-ring 1.4s ease-out infinite; }
+
+  /* Camera now lerped per-frame in JS — keep class as no-op for compatibility */
+  .camera-smooth { will-change: transform; }
 }

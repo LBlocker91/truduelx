@@ -158,21 +158,23 @@ const PlayerSpriteImpl = ({
       className={`relative ${className}`}
       style={{ width: w, height: h, willChange: 'transform' }}
     >
-      {/* Ground shadow — sits below feet, NOT flipped with sprite */}
+      {/* Ground shadow — fixed under feet, NOT inside the bobbing layer.
+          Slightly larger when walking to sell weight transfer. */}
       {showShadow && (
         <div
-          className="absolute left-1/2 ground-shadow pointer-events-none"
+          className={`absolute left-1/2 pointer-events-none ${state === 'walk' ? 'ground-shadow-walk' : 'ground-shadow'}`}
           style={{
-            bottom: -2,
-            width: w * 0.55,
-            height: Math.max(6, h * 0.06),
-            background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0) 70%)',
-            filter: 'blur(2px)',
+            bottom: -4,
+            width: w * 0.6,
+            height: Math.max(8, h * 0.07),
+            background:
+              'radial-gradient(ellipse at center, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0) 75%)',
+            filter: 'blur(2.5px)',
           }}
         />
       )}
 
-      {/* Sprite stack — flipped for direction */}
+      {/* Sprite stack — bobs / leans, but the shadow above stays put */}
       <div
         className="absolute inset-0"
         style={{ transform: flip, transformOrigin: 'center bottom' }}
@@ -197,10 +199,28 @@ const PlayerSpriteImpl = ({
             loading="lazy"
             draggable={false}
             className="absolute inset-0 w-full h-full object-contain select-none"
-            style={{ filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.55))' }}
+            style={{ filter: 'drop-shadow(0 3px 2px rgba(0,0,0,0.6))' }}
           />
           {armorVariant && <ArmorOverlay variant={armorVariant} />}
           {weaponVariant && <WeaponOverlay variant={weaponVariant} direction="right" />}
+          {/* Top-down rim light — sells the lighting direction */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(ellipse 55% 25% at 50% 12%, rgba(255,240,210,0.28) 0%, rgba(255,240,210,0) 70%)',
+              mixBlendMode: 'screen',
+            }}
+          />
+          {/* Bottom contact darkening */}
+          <div
+            className="absolute inset-x-0 bottom-0 pointer-events-none"
+            style={{
+              height: '14%',
+              background:
+                'linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0))',
+            }}
+          />
         </div>
       </div>
 
