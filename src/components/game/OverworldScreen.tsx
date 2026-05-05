@@ -380,38 +380,42 @@ export const OverworldScreen = ({
 
   return (
     <div className="min-h-screen bg-black text-foreground flex flex-col">
-      <header className="flex items-center justify-between gap-2 px-3 py-2 bg-card/80 backdrop-blur border-b border-border z-10">
-        <div className="flex items-center gap-3">
-          <Map className="w-4 h-4 text-primary" />
-          <span className="font-orbitron text-sm">{zone.name}</span>
-          <span className="text-xs text-muted-foreground hidden md:inline">{zone.description}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden md:inline">
-            {characterName} · Lv {characterLevel} {characterClass}
-          </span>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="w-3 h-3" /> {nearby.length}
+      {!hideChrome && (
+        <header className="flex items-center justify-between gap-2 px-3 py-2 bg-card/80 backdrop-blur border-b border-border z-10">
+          <div className="flex items-center gap-3">
+            <Map className="w-4 h-4 text-primary" />
+            <span className="font-orbitron text-sm">{zone.name}</span>
+            <span className="text-xs text-muted-foreground hidden md:inline">{zone.description}</span>
           </div>
-          <Button size="sm" variant="default" onClick={handlePvpQueue}>
-            <Swords className="w-3 h-3 mr-1" /> PvP
-          </Button>
-          <Button size="sm" variant="outline" onClick={onExit}>Menu</Button>
-        </div>
-      </header>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden md:inline">
+              {characterName} · Lv {characterLevel} {characterClass}
+            </span>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Users className="w-3 h-3" /> {nearby.length}
+            </div>
+            <Button size="sm" variant="default" onClick={handlePvpQueue}>
+              <Swords className="w-3 h-3 mr-1" /> PvP
+            </Button>
+            <Button size="sm" variant="outline" onClick={onExit}>Menu</Button>
+          </div>
+        </header>
+      )}
 
-      <div className="flex gap-1 px-3 py-2 bg-card/40 border-b border-border z-10 overflow-x-auto">
-        {zones.map(z => (
-          <Button
-            key={z.id}
-            size="sm"
-            variant={z.id === zone.id ? 'default' : 'outline'}
-            onClick={() => switchZone(z.id)}
-          >
-            {z.name}
-          </Button>
-        ))}
-      </div>
+      {!hideChrome && (
+        <div className="flex gap-1 px-3 py-2 bg-card/40 border-b border-border z-10 overflow-x-auto">
+          {zones.map(z => (
+            <Button
+              key={z.id}
+              size="sm"
+              variant={z.id === zone.id ? 'default' : 'outline'}
+              onClick={() => switchZone(z.id)}
+            >
+              {z.name}
+            </Button>
+          ))}
+        </div>
+      )}
 
       <div className="flex-1 relative overflow-hidden bg-black">
         <div
@@ -733,10 +737,12 @@ export const OverworldScreen = ({
       </div>
 
 
-      <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
-        <span>WASD or click to move · [E] to interact</span>
-        <span>{interactable ? `Press E to talk to ${interactable.name}` : 'Find an NPC to interact'}</span>
-      </footer>
+      {!hideChrome && (
+        <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
+          <span>WASD or click to move · [E] to interact</span>
+          <span>{interactable ? `Press E to talk to ${interactable.name}` : 'Find an NPC to interact'}</span>
+        </footer>
+      )}
 
       <Dialog open={!!activeNpc} onOpenChange={(o) => !o && closeNpc()}>
         <DialogContent className="max-w-md">
