@@ -92,7 +92,11 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
       const r = await spendStatPoint(characterId, stat);
       setC(r.character as CharRow);
       onProgressionChange?.(null);
-      toast.success(`+1 ${stat}`);
+      const labels: Record<string, string> = {
+        strength: '+1 Strength', dexterity: '+1 Dexterity', technology: '+1 Tech', support: '+1 Support',
+        defense: '+1 Defense', resistance: '+1 Resistance', max_hp: '+5 Max HP', max_energy: '+3 Max MP',
+      };
+      toast.success(labels[stat] ?? `+1 ${stat}`);
     } catch (e: any) {
       toast.error(e.message ?? String(e));
     } finally {
