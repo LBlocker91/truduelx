@@ -498,7 +498,8 @@ export const OverworldScreen = ({
 
                 {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) === */}
                 <div
-                  className="absolute top-0 left-0 origin-top-left"
+                  key={`world-${nudgeKey}`}
+                  className="absolute top-0 left-0 origin-top-left camera-nudge"
                   style={{
                     width: zone.width,
                     height: zone.height,
@@ -507,13 +508,19 @@ export const OverworldScreen = ({
                   }}
                 >
                   {/* NPCs in world coords (px) */}
-                  {npcs.map(n => {
+                  {npcs.map((n, idx) => {
                     const close = interactable?.id === n.id;
                     return (
                       <button
                         key={n.id}
                         onClick={(e) => { e.stopPropagation(); openNpc(n); }}
-                        style={{ left: n.position_x, top: n.position_y, position: 'absolute' }}
+                        style={{
+                          left: n.position_x,
+                          top: n.position_y,
+                          position: 'absolute',
+                          // Desync NPC idle bob/flicker per NPC
+                          animationDelay: `${(idx * 0.37) % 2.6}s`,
+                        }}
                         className="-translate-x-1/2 -translate-y-full group"
                       >
                         <NpcMarker
@@ -525,45 +532,99 @@ export const OverworldScreen = ({
                     );
                   })}
 
-                {/* Other players */}
-                {nearby.map(p => {
-                  const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
-                  return (
-                    <div key={p.user_id}
-                      style={{ left: p.x_position, top: p.y_position, position: 'absolute' }}
-                      className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
-                    >
-                      <div className="text-[10px] px-1.5 py-0.5 rounded bg-card/85 border border-secondary/50 mb-0.5">
-                        {p.display_name} L{p.character_level}
-                      </div>
-                      <PlayerSprite
-                        direction={dir}
-                        state="idle"
-                        armorVariant={p.equipped_armor_variant}
-                        weaponVariant={p.equipped_weapon_variant}
-                        scale={0.9}
+                  {/* Movement trail puffs — small fading energy specks under feet */}
+                  {trail.map(t => {
+                    const auraColor = `hsl(${RARITY_HSL[playerRarity]} / 0.85)`;
+                    return (
+                      <div
+                        key={t.id}
+                        className="absolute trail-puff pointer-events-none"
+                        style={{
+                          left: t.x,
+                          top: t.y - 4,
+                          width: 14,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: `radial-gradient(ellipse, ${auraColor} 0%, transparent 70%)`,
+                          filter: 'blur(2px)',
+                        }}
                       />
-                    </div>
-                  );
-                })}
+                    );
+                  })}
 
-                {/* Player */}
-                <div
-                  style={{ left: pos.x, top: pos.y, position: 'absolute' }}
-                  className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
-                >
-                  <div className="text-[11px] font-orbitron px-2 py-0.5 rounded bg-primary text-primary-foreground mb-1 drop-shadow">
-                    {characterName}
+                  {/* Other players */}
+                  {nearby.map(p => {
+                    const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
+                    const otherRarity = variantToRarity(p.equipped_armor_variant, p.equipped_weapon_variant);
+                    const OtherIcon = getClassIcon(p.character_class ?? '');
+                    return (
+                      <div key={p.user_id}
+                        style={{ left: p.x_position, top: p.y_position, position: 'absolute' }}
+                        className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
+                      >
+                        <div
+                          className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-card/85 mb-0.5 flex items-center gap-1"
+                          style={{ border: `1px solid hsl(${RARITY_HSL[otherRarity]} / 0.7)` }}
+                        >
+                          <OtherIcon className="w-2.5 h-2.5" />
+                          <span>{p.display_name}</span>
+                          <span className="opacity-70">L{p.character_level}</span>
+                        </div>
+                        <PlayerSprite
+                          direction={dir}
+                          state="idle"
+                          armorVariant={p.equipped_armor_variant}
+                          weaponVariant={p.equipped_weapon_variant}
+                          rarity={otherRarity}
+                          scale={0.9}
+                        />
+                      </div>
+                    );
+                  })}
+
+                  {/* Player */}
+                  <div
+                    style={{ left: pos.x, top: pos.y, position: 'absolute' }}
+                    className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
+                  >
+                    {/* Upgraded nameplate: class icon + name + level, ringed by rarity color */}
+                    <div
+                      className="text-[11px] font-orbitron px-2 py-0.5 rounded mb-1 flex items-center gap-1.5 bg-background/90 backdrop-blur drop-shadow"
+                      style={{
+                        border: `1px solid hsl(${RARITY_HSL[playerRarity]})`,
+                        boxShadow: `0 0 8px hsl(${RARITY_HSL[playerRarity]} / 0.55)`,
+                        color: `hsl(${RARITY_HSL[playerRarity]})`,
+                      }}
+                    >
+                      <ClassIcon className="w-3 h-3" />
+                      <span className="text-foreground">{characterName}</span>
+                      <span className="opacity-80">L{characterLevel}</span>
+                    </div>
+                    <div className="relative">
+                      <PlayerSprite
+                        direction={direction}
+                        state={moving ? 'walk' : 'idle'}
+                        armorVariant={loadout.armorVariant}
+                        weaponVariant={loadout.weaponVariant}
+                        rarity={playerRarity}
+                        scale={1}
+                      />
+                      {/* Interaction flash — re-mounts on each E press via key */}
+                      {flashKey > 0 && (
+                        <div
+                          key={`flash-${flashKey}`}
+                          className="absolute left-1/2 top-1/2 interact-flash pointer-events-none rounded-full"
+                          style={{
+                            width: 80,
+                            height: 80,
+                            background: `radial-gradient(circle, hsl(${RARITY_HSL[playerRarity]} / 0.85) 0%, transparent 70%)`,
+                            border: `2px solid hsl(${RARITY_HSL[playerRarity]})`,
+                            mixBlendMode: 'screen',
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
-                  <PlayerSprite
-                    direction={direction}
-                    state={moving ? 'walk' : 'idle'}
-                    armorVariant={loadout.armorVariant}
-                    weaponVariant={loadout.weaponVariant}
-                    rarity="rare"
-                    scale={1}
-                  />
-                </div>
                 </div>
 
                 {/* === FOREGROUND LAYER (vignette + ambient lighting, viewport-fixed) === */}
@@ -587,6 +648,26 @@ export const OverworldScreen = ({
                     mixBlendMode: 'soft-light',
                   }}
                 />
+
+                {/* Ambient floating particles — viewport-fixed, low opacity */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  {ambientParticles.map((p, i) => (
+                    <div
+                      key={i}
+                      className="absolute particle-drift rounded-full"
+                      style={{
+                        left: `${p.left}%`,
+                        bottom: '-10px',
+                        width: p.size,
+                        height: p.size,
+                        background: `hsl(${p.hue} 100% 70% / 0.6)`,
+                        boxShadow: `0 0 ${p.size * 2}px hsl(${p.hue} 100% 70% / 0.5)`,
+                        animationDuration: `${p.duration}s`,
+                        animationDelay: `${p.delay}s`,
+                      }}
+                    />
+                  ))}
+                </div>
               </>
             );
           })()}
