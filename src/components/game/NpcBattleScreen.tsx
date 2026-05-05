@@ -166,10 +166,22 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       </div>
 
       {finished ? (
-        <div className="text-center py-6">
+        <div className="text-center py-6 space-y-2">
           <h2 className={`font-orbitron text-4xl ${won ? 'text-primary' : 'text-destructive'}`}>
             {won ? 'VICTORY' : 'DEFEAT'}
           </h2>
+          {won && rewards && (
+            <div className="text-sm font-rajdhani space-y-0.5">
+              <div>+<span className="font-orbitron text-primary">{rewards.xpGained}</span> XP</div>
+              <div>+<span className="font-orbitron text-shield">{rewards.creditsGained}</span> credits</div>
+              {pendingLevel && pendingLevel.levelsGained > 0 && (
+                <div className="text-secondary font-orbitron">
+                  LEVEL UP! {pendingLevel.oldLevel} → {pendingLevel.newLevel}
+                  {' '}(+{pendingLevel.statPointsGained} stat, +{pendingLevel.skillPointsGained} skill)
+                </div>
+              )}
+            </div>
+          )}
           <Button className="mt-4" onClick={handleExit}>Return to Overworld</Button>
         </div>
       ) : (
