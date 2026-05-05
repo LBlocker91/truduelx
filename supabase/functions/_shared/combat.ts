@@ -54,6 +54,7 @@ export interface CharacterSnapshot {
   weapon_min: number;
   weapon_max: number;
   defense: number;
+  resistance: number;
   skill_levels: Record<string, number>;
 }
 
@@ -134,20 +135,36 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
   const crit = rng() < critChance;
   if (crit) raw *= 1.6;
 
-  // Defense
-  let defense = dSnap.defense + dSnap.strength * 0.5;
-  const defBuff = defender.status_effects.find(e => e.type === 'defense_buff');
-  if (defBuff) defense *= 1 + defBuff.value / 100;
-  const defDebuff = defender.status_effects.find(e => e.type === 'debuff_defense');
-  if (defDebuff) defense *= 1 - defDebuff.value / 100;
+  // ---- Mitigation by damage type (percent-based) ----
+  // physical -> Defense, magical/energy -> Resistance, special/hybrid -> avg
+  const dmgType = skill?.type ?? 'physical';
+  let mitStat: number;
+  if (dmgType === 'physical') {
+    mitStat = (dSnap.defense ?? 0) + dSnap.strength * 0.5;
+  } else if (dmgType === 'magical') {
+    mitStat = (dSnap.resistance ?? 0) + dSnap.technology * 0.5;
+  } else {
+    mitStat = ((dSnap.defense ?? 0) + (dSnap.resistance ?? 0)) / 2 + dSnap.dexterity * 0.3;
+  }
 
-  raw -= defense;
+  const defBuff = defender.status_effects.find(e => e.type === 'defense_buff');
+  if (defBuff) mitStat *= 1 + defBuff.value / 100;
+  const defDebuff = defender.status_effects.find(e => e.type === 'debuff_defense');
+  if (defDebuff) mitStat *= 1 - defDebuff.value / 100;
+
+  const mitPct = mitStat / (mitStat + 100); // soft, asymptotic to 1
+  const rawBeforeMit = raw;
+  raw = raw * (1 - mitPct);
 
   // Block
   const blockChance = 0.05 + dSnap.dexterity * 0.003;
   const blocked = !crit && rng() < blockChance;
   if (blocked) raw *= 0.5;
   if (defending) raw *= 0.5;
+
+  // Floor: at least max(3, 15% of pre-mitigation raw)
+  const floor = Math.max(3, Math.floor(rawBeforeMit * 0.15));
+  if (raw < floor) raw = floor;
 
   // Damage absorb shield
   const absorb = defender.status_effects.find(e => e.type === 'damage_absorb');
