@@ -165,7 +165,7 @@ export async function claimQuestReward(characterId: string, questId: string) {
   return data;
 }
 
-export type SpendableStat = 'strength'|'dexterity'|'technology'|'support'|'defense'|'resistance';
+export type SpendableStat = 'strength'|'dexterity'|'technology'|'support'|'defense'|'resistance'|'max_hp'|'max_energy';
 
 export async function spendStatPoint(characterId: string, stat: SpendableStat) {
   const { data, error } = await supabase.functions.invoke('spend-stat-point', {
@@ -173,6 +173,15 @@ export async function spendStatPoint(characterId: string, stat: SpendableStat) {
   });
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error ?? 'spend failed');
+  return data;
+}
+
+export async function buyVendorItem(characterId: string, vendorItemId: string, quantity = 1) {
+  const { data, error } = await supabase.functions.invoke('buy-item', {
+    body: { characterId, vendorItemId, quantity },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? 'purchase failed');
   return data;
 }
 
