@@ -173,6 +173,38 @@ export type Database = {
           },
         ]
       }
+      character_skills: {
+        Row: {
+          character_id: string
+          id: string
+          rank: number
+          skill_slug: string
+          unlocked_at: string
+        }
+        Insert: {
+          character_id: string
+          id?: string
+          rank?: number
+          skill_slug: string
+          unlocked_at?: string
+        }
+        Update: {
+          character_id?: string
+          id?: string
+          rank?: number
+          skill_slug?: string
+          unlocked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_skills_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       characters: {
         Row: {
           class: Database["public"]["Enums"]["character_class"]
@@ -370,6 +402,7 @@ export type Database = {
       npc_enemies: {
         Row: {
           class: Database["public"]["Enums"]["character_class"]
+          credit_reward: number
           defense: number
           dexterity: number
           level: number
@@ -384,6 +417,7 @@ export type Database = {
         }
         Insert: {
           class: Database["public"]["Enums"]["character_class"]
+          credit_reward?: number
           defense?: number
           dexterity?: number
           level?: number
@@ -398,6 +432,7 @@ export type Database = {
         }
         Update: {
           class?: Database["public"]["Enums"]["character_class"]
+          credit_reward?: number
           defense?: number
           dexterity?: number
           level?: number
