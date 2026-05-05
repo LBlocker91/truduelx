@@ -45,7 +45,7 @@ export const GameHud = (props: GameHudProps) => {
   ];
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-black">
+    <div className="relative h-screen flex flex-col bg-black overflow-hidden">
       {/* Top bar */}
       <header className="flex items-center justify-between gap-3 px-3 py-2 bg-card/85 backdrop-blur border-b border-border z-20">
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -89,7 +89,7 @@ export const GameHud = (props: GameHudProps) => {
       </header>
 
       {/* Game viewport (overworld) */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0">
         <OverworldScreen
           characterId={props.characterId}
           characterName={props.characterName}
