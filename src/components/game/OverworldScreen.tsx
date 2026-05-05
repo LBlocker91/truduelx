@@ -440,8 +440,19 @@ export const OverworldScreen = ({
         <div
           ref={stageRef}
           onClick={handleStageClick}
-          className="absolute inset-0 bg-black cursor-crosshair overflow-hidden select-none"
+          className="absolute inset-0 cursor-crosshair overflow-hidden select-none"
+          style={{ backgroundColor: 'hsl(var(--background))' }}
         >
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `url(${bg})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'brightness(0.72) saturate(1.02)',
+              transform: 'scale(1.02)',
+            }}
+          />
           {/* Camera-follow world layer */}
           {(() => {
             const viewportWidth = Math.max(stageSize.w, 1);
@@ -700,7 +711,7 @@ export const OverworldScreen = ({
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
-                      'radial-gradient(ellipse 88% 80% at 50% 55%, transparent 50%, rgba(0,0,0,0.14) 78%, rgba(0,0,0,0.24) 100%)',
+                      'radial-gradient(ellipse 92% 86% at 50% 55%, transparent 56%, rgba(0,0,0,0.06) 82%, rgba(0,0,0,0.12) 100%)',
                   }}
                 />
                 {/* Ambient color tint — zone mood */}
@@ -709,10 +720,10 @@ export const OverworldScreen = ({
                   style={{
                     background:
                       zone.id === 'neon-district'
-                        ? 'linear-gradient(180deg, hsl(280 70% 30% / 0.18), hsl(190 80% 30% / 0.18))'
+                        ? 'linear-gradient(180deg, hsl(280 70% 30% / 0.12), hsl(190 80% 30% / 0.1))'
                         : zone.id === 'wasteland'
-                        ? 'linear-gradient(180deg, hsl(30 60% 35% / 0.22), hsl(15 50% 25% / 0.18))'
-                        : 'linear-gradient(180deg, hsl(210 50% 25% / 0.18), hsl(220 40% 15% / 0.18))',
+                        ? 'linear-gradient(180deg, hsl(30 60% 35% / 0.12), hsl(15 50% 25% / 0.1))'
+                        : 'linear-gradient(180deg, hsl(210 50% 25% / 0.1), hsl(220 40% 15% / 0.08))',
                     mixBlendMode: 'soft-light',
                   }}
                 />
