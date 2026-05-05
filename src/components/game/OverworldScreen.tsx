@@ -101,6 +101,7 @@ export const OverworldScreen = ({
     setZone(z);
     setNpcs(ns);
     setPos({ x: z.spawn_x, y: z.spawn_y });
+    setCamPos({ x: z.spawn_x, y: z.spawn_y });
     targetRef.current = null;
   }, [zones]);
 
