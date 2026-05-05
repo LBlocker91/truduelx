@@ -25,14 +25,14 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
       {/* Name / interaction prompt */}
       {close ? (
         <div
-          className="text-[10px] font-orbitron px-2 py-0.5 rounded mb-1 animate-pulse"
-          style={{ background: color, color: '#000', boxShadow: `0 0 10px ${color}` }}
+          className="text-xs font-orbitron px-2.5 py-1 rounded mb-1.5 animate-pulse whitespace-nowrap"
+          style={{ background: color, color: '#000', boxShadow: `0 0 14px ${color}` }}
         >
           [E] {name}
         </div>
       ) : (
         <div
-          className="text-[10px] font-orbitron px-1.5 py-0.5 rounded mb-1 opacity-80 group-hover:opacity-100"
+          className="text-[11px] font-orbitron px-2 py-0.5 rounded mb-1.5 opacity-90 group-hover:opacity-100 whitespace-nowrap"
           style={{ background: 'rgba(8,12,18,0.85)', border: `1px solid ${colorSoft}`, color }}
         >
           {name}
@@ -40,7 +40,7 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
       )}
 
       {/* In-world figure */}
-      <div className="relative npc-bob" style={{ width: 64, height: 88 }}>
+      <div className="relative npc-bob w-full h-full">
         {/* Interaction ring on hover/proximity — smoother dual-pulse */}
         {close && (
           <>
