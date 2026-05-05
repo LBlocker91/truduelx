@@ -356,10 +356,6 @@ export const OverworldScreen = ({
         </div>
       </div>
 
-      <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
-        <span>WASD or click to move · [E] to interact</span>
-        </div>
-      </div>
 
       <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
         <span>WASD or click to move · [E] to interact</span>
