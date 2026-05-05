@@ -31,8 +31,29 @@ interface GameHudProps {
 export const GameHud = (props: GameHudProps) => {
   const [panel, setPanel] = useState<PanelKey>(null);
   const [loadoutBust, setLoadoutBust] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const close = () => setPanel(null);
+
+  // Track fullscreen state so the icon stays in sync if user presses Esc
+  useEffect(() => {
+    const sync = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await rootRef.current?.requestFullscreen?.();
+      } else {
+        await document.exitFullscreen?.();
+      }
+    } catch {
+      /* ignore — some browsers block without user gesture */
+    }
+  };
 
   const items: { key: PanelKey; icon: React.ReactNode; label: string }[] = [
     { key: 'profile',   icon: <UserIcon className="w-4 h-4" />,   label: 'Profile' },
@@ -46,7 +67,7 @@ export const GameHud = (props: GameHudProps) => {
   ];
 
   return (
-    <div className="relative grid h-[100dvh] grid-rows-[auto_minmax(0,1fr)] bg-black overflow-hidden">
+    <div ref={rootRef} className="relative grid h-[100dvh] w-screen grid-rows-[auto_minmax(0,1fr)] bg-black overflow-hidden">
       {/* Top bar */}
       <header className="flex items-center justify-between gap-3 px-3 py-2 bg-card/85 backdrop-blur border-b border-border z-20">
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -82,6 +103,9 @@ export const GameHud = (props: GameHudProps) => {
           </span>
           <Button size="sm" variant="ghost" onClick={() => setPanel('pvp')} title="PvP">
             <Swords className="w-4 h-4 mr-1" /> PvP
+          </Button>
+          <Button size="sm" variant="ghost" onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </Button>
           <Button size="sm" variant="ghost" onClick={props.onExitToSlots}>
             <LogOut className="w-4 h-4 mr-1" /> Characters
