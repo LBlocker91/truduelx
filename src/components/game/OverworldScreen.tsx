@@ -107,6 +107,7 @@ export const OverworldScreen = ({
         targetRef.current = null;
       }
       if (e.key === 'e' || e.key === 'E') tryInteract();
+      if (e.key === '`') setDebug(d => !d);
     };
     const up = (e: KeyboardEvent) => keysRef.current.delete(e.key.toLowerCase());
     window.addEventListener('keydown', down);
