@@ -342,57 +342,66 @@ export const OverworldScreen = ({
             const scale = Math.max(CAMERA_ZOOM, fitScale);
             const worldW = zone.width * scale;
             const worldH = zone.height * scale;
-            // Desired translate to put player at viewport center
-            let tx = vw / 2 - pos.x * scale;
-            let ty = vh / 2 - pos.y * scale;
-            // Clamp: if world larger than viewport, keep edges inside; if not, center it.
+            // Use SMOOTHED camera position (lerped per-frame in rAF)
+            let tx = vw / 2 - camPos.x * scale;
+            let ty = vh / 2 - camPos.y * scale;
             if (worldW <= vw) tx = (vw - worldW) / 2;
             else tx = Math.min(0, Math.max(vw - worldW, tx));
             if (worldH <= vh) ty = (vh - worldH) / 2;
             else ty = Math.min(0, Math.max(vh - worldH, ty));
             cameraRef.current = { tx, ty, scale };
+
+            // Parallax background — moves at 70% camera speed → depth illusion
+            const PARALLAX_BG = 0.7;
+            const bgScale = scale * 1.08; // slightly oversized to never expose edges
+            const bgW = zone.width * bgScale;
+            const bgH = zone.height * bgScale;
+            const bgTx = (vw / 2 - camPos.x * bgScale) * PARALLAX_BG + (1 - PARALLAX_BG) * (vw / 2 - (zone.width / 2) * bgScale);
+            const bgTy = (vh / 2 - camPos.y * bgScale) * PARALLAX_BG + (1 - PARALLAX_BG) * (vh / 2 - (zone.height / 2) * bgScale);
+
             return (
-              <div
-                className="absolute top-0 left-0 origin-top-left camera-smooth"
-                style={{
-                  width: zone.width,
-                  height: zone.height,
-                  transform: `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`,
-                  transformOrigin: '0 0',
-                  backgroundImage: `url(${bg})`,
-                  backgroundSize: '100% 100%',
-                }}
-              >
-                {/* NPCs in world coords (px) */}
-                {npcs.map(n => {
-                  const Icon = n.type === 'vendor' ? Store : n.type === 'quest' ? ScrollText : Skull;
-                  const close = interactable?.id === n.id;
-                  return (
-                    <button
-                      key={n.id}
-                      onClick={(e) => { e.stopPropagation(); openNpc(n); }}
-                      style={{ left: n.position_x, top: n.position_y, position: 'absolute' }}
-                      className="-translate-x-1/2 -translate-y-full flex flex-col items-center group"
-                    >
-                      {close && (
-                        <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 animate-pulse">
-                          [E] {n.name}
-                        </div>
-                      )}
-                      {!close && (
-                        <div className="text-[10px] font-orbitron px-1 py-0.5 rounded bg-card/90 border border-border opacity-0 group-hover:opacity-100 mb-0.5">
-                          {n.name}
-                        </div>
-                      )}
-                      <div className={`w-14 h-16 rounded-t-full flex items-end justify-center pb-1
-                        ${n.type === 'vendor' ? 'bg-blue-500/80' : n.type === 'quest' ? 'bg-amber-500/80' : 'bg-red-500/80'}
-                        border-2 ${close ? 'border-primary' : 'border-white/50'} shadow-lg`}>
-                        <Icon className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="w-3 h-3 rounded-full bg-black/50 blur-[1px]" />
-                    </button>
-                  );
-                })}
+              <>
+                {/* === BACKGROUND LAYER (parallax, slower) === */}
+                <div
+                  className="absolute top-0 left-0 origin-top-left pointer-events-none"
+                  style={{
+                    width: bgW,
+                    height: bgH,
+                    transform: `translate3d(${bgTx}px, ${bgTy}px, 0)`,
+                    backgroundImage: `url(${bg})`,
+                    backgroundSize: '100% 100%',
+                    filter: 'brightness(0.85) saturate(1.05)',
+                  }}
+                />
+
+                {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) === */}
+                <div
+                  className="absolute top-0 left-0 origin-top-left"
+                  style={{
+                    width: zone.width,
+                    height: zone.height,
+                    transform: `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`,
+                    transformOrigin: '0 0',
+                  }}
+                >
+                  {/* NPCs in world coords (px) */}
+                  {npcs.map(n => {
+                    const close = interactable?.id === n.id;
+                    return (
+                      <button
+                        key={n.id}
+                        onClick={(e) => { e.stopPropagation(); openNpc(n); }}
+                        style={{ left: n.position_x, top: n.position_y, position: 'absolute' }}
+                        className="-translate-x-1/2 -translate-y-full group"
+                      >
+                        <NpcMarker
+                          kind={n.type as 'vendor' | 'quest' | 'enemy'}
+                          name={n.name}
+                          close={close}
+                        />
+                      </button>
+                    );
+                  })}
 
                 {/* Other players */}
                 {nearby.map(p => {
