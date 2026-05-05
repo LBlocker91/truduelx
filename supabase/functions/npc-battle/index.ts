@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       return await startBattle(admin, user.id, body.npcId, body.characterId);
     }
     if (body.action === 'act') {
-      return await processAction(admin, user.id, body.battleId, body.playerAction, body.skillSlug);
+      return await processAction(admin, user.id, body.battleId, body.playerAction, body.skillSlug, body.itemSubtype);
     }
     return j({ error: 'invalid action' }, 400);
   } catch (e) {
