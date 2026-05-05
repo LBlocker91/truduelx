@@ -9,6 +9,7 @@ import { GameHud } from '@/components/game/GameHud';
 import { MatchmakingScreen } from '@/components/game/MatchmakingScreen';
 import { PvpBattleScreen } from '@/components/game/PvpBattleScreen';
 import { NpcBattleScreen } from '@/components/game/NpcBattleScreen';
+import { LevelUpToast } from '@/components/game/LevelUpToast';
 import {
   createNewCharacter,
   getMaxSlots,
@@ -20,6 +21,14 @@ import { supabase } from '@/integrations/supabase/client';
 
 type Screen = 'slots' | 'create' | 'game' | 'pvp-queue' | 'pvp-battle' | 'npc-battle';
 
+export interface LevelUpInfo {
+  oldLevel: number;
+  newLevel: number;
+  statPointsGained: number;
+  skillPointsGained: number;
+  maxHpGained: number;
+}
+
 const Index = () => {
   const { user, ready } = useAuth();
   const [screen, setScreen] = useState<Screen>('slots');
@@ -28,6 +37,8 @@ const Index = () => {
   const [isPremium, setIsPremium] = useState(false);
   const [pvpBattleId, setPvpBattleId] = useState<string | null>(null);
   const [npcBattleId, setNpcBattleId] = useState<string | null>(null);
+  const [pendingLevelUp, setPendingLevelUp] = useState<LevelUpInfo | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Load premium flag whenever the user changes
   useEffect(() => {
@@ -43,6 +54,7 @@ const Index = () => {
     const all = await listMyCharacters();
     const found = all.find(c => c.id === id) ?? null;
     setActiveChar(found);
+    setRefreshTick(t => t + 1);
   }, []);
 
   const handlePlayCharacter = useCallback(async (id: string) => {
@@ -92,6 +104,21 @@ const Index = () => {
     setScreen('npc-battle');
   }, []);
 
+  const handleNpcBattleExit = useCallback(async (won: boolean, level?: LevelUpInfo | null) => {
+    setScreen('game');
+    if (activeCharId) await reloadActiveChar(activeCharId);
+    if (won && level && level.newLevel > level.oldLevel) {
+      setPendingLevelUp(level);
+    }
+  }, [activeCharId, reloadActiveChar]);
+
+  const handleProgressionChange = useCallback(async (level?: LevelUpInfo | null) => {
+    if (activeCharId) await reloadActiveChar(activeCharId);
+    if (level && level.newLevel > level.oldLevel) {
+      setPendingLevelUp(level);
+    }
+  }, [activeCharId, reloadActiveChar]);
+
   // ---- Render ----
 
   if (!ready) {
@@ -102,10 +129,8 @@ const Index = () => {
     );
   }
 
-  // A. Not authenticated
   if (!user) return <AuthScreen />;
 
-  // B. Authenticated but no character chosen → slot select / create
   if (screen === 'slots') {
     return (
       <CharacterSlots
@@ -126,7 +151,6 @@ const Index = () => {
     );
   }
 
-  // PvP queue & battles
   if (screen === 'pvp-queue' && activeCharId) {
     return (
       <MatchmakingScreen
@@ -142,7 +166,7 @@ const Index = () => {
       <PvpBattleScreen
         battleId={pvpBattleId}
         myUserId={user.id}
-        onExit={() => setScreen('game')}
+        onExit={() => { setScreen('game'); if (activeCharId) reloadActiveChar(activeCharId); }}
       />
     );
   }
@@ -152,26 +176,32 @@ const Index = () => {
       <NpcBattleScreen
         battleId={npcBattleId}
         myUserId={user.id}
-        onExit={() => setScreen('game')}
+        onExit={handleNpcBattleExit}
       />
     );
   }
 
-  // C. In game with HUD
   if (screen === 'game' && activeCharId && activeChar) {
     return (
-      <GameHud
-        characterId={activeCharId}
-        characterName={activeChar.name}
-        characterClass={activeChar.class}
-        characterLevel={activeChar.level}
-        characterXp={activeChar.xp ?? 0}
-        credits={activeChar.credits ?? 0}
-        isPremium={isPremium}
-        onEnterNpcBattle={handleEnterNpcBattle}
-        onJoinPvpQueue={handleJoinPvp}
-        onExitToSlots={handleExitToSlots}
-      />
+      <>
+        <GameHud
+          characterId={activeCharId}
+          characterName={activeChar.name}
+          characterClass={activeChar.class}
+          characterLevel={activeChar.level}
+          characterXp={activeChar.xp ?? 0}
+          credits={activeChar.credits ?? 0}
+          isPremium={isPremium}
+          refreshTick={refreshTick}
+          onEnterNpcBattle={handleEnterNpcBattle}
+          onJoinPvpQueue={handleJoinPvp}
+          onExitToSlots={handleExitToSlots}
+          onProgressionChange={handleProgressionChange}
+        />
+        {pendingLevelUp && (
+          <LevelUpToast info={pendingLevelUp} onClose={() => setPendingLevelUp(null)} />
+        )}
+      </>
     );
   }
 

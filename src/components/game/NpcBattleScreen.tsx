@@ -6,10 +6,19 @@ import { Swords, Shield, Loader2, Flag, Sparkles } from 'lucide-react';
 import { submitNpcAction } from '@/lib/overworld';
 import { setInBattle } from '@/lib/overworld';
 
+interface LevelUpInfo {
+  oldLevel: number;
+  newLevel: number;
+  levelsGained: number;
+  statPointsGained: number;
+  skillPointsGained: number;
+  maxHpGained: number;
+}
+
 interface NpcBattleScreenProps {
   battleId: string;
   myUserId: string;
-  onExit: (won: boolean) => void;
+  onExit: (won: boolean, level?: LevelUpInfo | null) => void;
 }
 
 interface ParticipantRow {
@@ -95,6 +104,10 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     return () => { supabase.removeChannel(ch); };
   }, [battleId, refresh]);
 
+  // Reward summary captured from the last action response.
+  const [rewards, setRewards] = useState<{ xpGained: number; creditsGained: number } | null>(null);
+  const [pendingLevel, setPendingLevel] = useState<LevelUpInfo | null>(null);
+
   const doAction = async (action: 'attack'|'defend'|'forfeit'|'skill', skillSlug?: string) => {
     if (submitting || !myTurn) return;
     setSubmitting(true);
@@ -102,6 +115,10 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       const r = await submitNpcAction(battleId, action, skillSlug);
       if (r?.finished) {
         await setInBattle(false);
+        if (r.won) {
+          setRewards({ xpGained: r.xpGained ?? 0, creditsGained: r.creditsGained ?? 0 });
+          if (r.level && r.level.levelsGained > 0) setPendingLevel(r.level);
+        }
       }
     } catch (e: any) { console.error(e); }
     finally { setSubmitting(false); }
@@ -109,7 +126,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
 
   const handleExit = async () => {
     await setInBattle(false);
-    onExit(!!won);
+    onExit(!!won, pendingLevel);
   };
 
   if (!battle || !me || !enemy) {
@@ -150,10 +167,22 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       </div>
 
       {finished ? (
-        <div className="text-center py-6">
+        <div className="text-center py-6 space-y-2">
           <h2 className={`font-orbitron text-4xl ${won ? 'text-primary' : 'text-destructive'}`}>
             {won ? 'VICTORY' : 'DEFEAT'}
           </h2>
+          {won && rewards && (
+            <div className="text-sm font-rajdhani space-y-0.5">
+              <div>+<span className="font-orbitron text-primary">{rewards.xpGained}</span> XP</div>
+              <div>+<span className="font-orbitron text-shield">{rewards.creditsGained}</span> credits</div>
+              {pendingLevel && pendingLevel.levelsGained > 0 && (
+                <div className="text-secondary font-orbitron">
+                  LEVEL UP! {pendingLevel.oldLevel} → {pendingLevel.newLevel}
+                  {' '}(+{pendingLevel.statPointsGained} stat, +{pendingLevel.skillPointsGained} skill)
+                </div>
+              )}
+            </div>
+          )}
           <Button className="mt-4" onClick={handleExit}>Return to Overworld</Button>
         </div>
       ) : (
