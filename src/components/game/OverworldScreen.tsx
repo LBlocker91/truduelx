@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Swords, Map, Store, ScrollText, Skull, Users } from 'lucide-react';
+import { Loader2, Swords, Map, Store, ScrollText, Skull, Users, Shield, Zap, Crosshair, Wrench, Flame, Cpu, Sparkles, Ghost, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Zone, Npc, NearbyPlayer,
