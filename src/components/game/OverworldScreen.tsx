@@ -569,12 +569,20 @@ export const OverworldScreen = ({
 
                   {/* Other players */}
                   {nearby.map(p => {
+                    // Distance-based culling + opacity fade
+                    const dx = p.x_position - pos.x;
+                    const dy = p.y_position - pos.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > RENDER_RADIUS) return null;
+                    const fade = dist <= FADE_RADIUS
+                      ? 1
+                      : Math.max(0.25, 1 - (dist - FADE_RADIUS) / (RENDER_RADIUS - FADE_RADIUS));
                     const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
                     const otherRarity = variantToRarity(p.equipped_armor_variant, p.equipped_weapon_variant);
                     const OtherIcon = getClassIcon(p.character_class ?? '');
                     return (
                       <div key={p.user_id}
-                        style={{ left: p.x_position, top: p.y_position, position: 'absolute' }}
+                        style={{ left: p.x_position, top: p.y_position, position: 'absolute', opacity: fade }}
                         className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
                       >
                         <div
@@ -591,7 +599,7 @@ export const OverworldScreen = ({
                           armorVariant={p.equipped_armor_variant}
                           weaponVariant={p.equipped_weapon_variant}
                           rarity={otherRarity}
-                          scale={0.9}
+                          scale={0.7}
                         />
                       </div>
                     );
