@@ -9,7 +9,9 @@ import {
   enterZone, heartbeat, setInBattle,
   fetchVendorItems, fetchQuestForNpc, fetchPlayerQuests, acceptQuest,
   startNpcBattle,
+  fetchMyLoadout, publishLoadout, EquippedLoadout,
 } from '@/lib/overworld';
+import { PlayerSprite, SpriteDirection } from './PlayerSprite';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
 import neonDistrict from '@/assets/zones/neon-district.jpg';
