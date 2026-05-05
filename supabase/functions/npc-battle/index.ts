@@ -188,7 +188,8 @@ async function executeTurn({
   admin, battle, actor, target, action, skillSlug, isBot,
 }: {
   admin: any; battle: any; actor: ParticipantState; target: ParticipantState;
-  action: string; skillSlug?: string; isBot: boolean;
+  action: string; skillSlug?: string; itemSubtype?: string; isBot: boolean;
+  characterId?: string | null;
 }): Promise<{ result: any; error?: string }> {
   if (isStunned(actor)) {
     tickStatusEffects(actor); tickCooldowns(actor);
@@ -201,7 +202,43 @@ async function executeTurn({
     actor.hp = 0;
     return { result: { forfeit: true } };
   }
-  if (action === 'defend') {
+  if (action === 'use_item') {
+    if (isBot || !characterId) return { result: {}, error: 'cannot use item' };
+    if (!itemSubtype || (itemSubtype !== 'hp_potion' && itemSubtype !== 'mp_potion')) {
+      return { result: {}, error: 'invalid item' };
+    }
+    // Look up the item + inventory row owned by this character
+    const { data: invRow } = await admin.from('inventory')
+      .select('id, quantity, items!inner(id, subtype, consumable, name)')
+      .eq('character_id', characterId)
+      .eq('items.subtype', itemSubtype)
+      .maybeSingle();
+    if (!invRow || !invRow.items?.consumable) return { result: {}, error: 'item not in inventory' };
+    if ((invRow.quantity ?? 0) <= 0) return { result: {}, error: 'out of potions' };
+
+    if (itemSubtype === 'hp_potion') {
+      if (actor.hp >= actor.max_hp) return { result: {}, error: 'HP already full' };
+      const restore = Math.floor(actor.max_hp * 0.5);
+      const before = actor.hp;
+      actor.hp = Math.min(actor.max_hp, actor.hp + restore);
+      result.heal = actor.hp - before;
+      result.item = 'hp_potion';
+    } else {
+      if (actor.energy >= actor.max_energy) return { result: {}, error: 'MP already full' };
+      const restore = Math.floor(actor.max_energy * 0.5);
+      const before = actor.energy;
+      actor.energy = Math.min(actor.max_energy, actor.energy + restore);
+      result.mpHeal = actor.energy - before;
+      result.item = 'mp_potion';
+    }
+
+    const newQty = (invRow.quantity ?? 1) - 1;
+    if (newQty <= 0) {
+      await admin.from('inventory').delete().eq('id', invRow.id);
+    } else {
+      await admin.from('inventory').update({ quantity: newQty }).eq('id', invRow.id);
+    }
+  } else if (action === 'defend') {
     actor.energy = Math.min(actor.max_energy, actor.energy + 15);
     result.defending = true;
   } else if (action === 'attack') {
