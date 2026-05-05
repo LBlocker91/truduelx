@@ -38,8 +38,8 @@ const MOVE_ACCEL = 0.25; // easing factor 0..1 (lerp toward target velocity)
 const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
 const INTERACTION_RADIUS = 90;
-const CAMERA_ZOOM = 1.6; // makes player ~12-18% of screen
-const CAMERA_LERP = 0.2; // slightly snappier follow
+const CAMERA_ZOOM = 1.85; // ~15% larger player + tighter framing
+const CAMERA_LERP = 0.22; // snappier follow, still smooth
 
 // Map class name → icon for the nameplate
 const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
