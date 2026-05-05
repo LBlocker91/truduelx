@@ -34,57 +34,58 @@ export interface ZoneWalkable {
 
 export const ZONE_WALKABLE: Record<string, ZoneWalkable> = {
   'station-hub': {
-    // Bazaar floor: wide trapezoid across the lower half; tighter at the back wall.
+    // Bazaar floor — wide, deep trapezoid covering ~half the screen so the
+    // player can roam left↔right AND forward↔back across the hub.
     polygon: [
-      { x: 22, y: 58 },  // back-left
-      { x: 78, y: 58 },  // back-right
-      { x: 96, y: 92 },  // front-right
-      { x:  4, y: 92 },  // front-left
+      { x: 10, y: 48 },  // back-left
+      { x: 90, y: 48 },  // back-right
+      { x: 99, y: 96 },  // front-right
+      { x:  1, y: 96 },  // front-left
     ],
-    spawn: { x: 50, y: 80 },
+    spawn: { x: 50, y: 78 },
     npcs: {
-      // Vendors / quest-givers stand on the floor in front of their stalls.
-      'Scout Junko':       { visual: { x: 16, y: 70 }, interaction: { x: 18, y: 78 } },
-      'Quartermaster Vex': { visual: { x: 32, y: 74 }, interaction: { x: 32, y: 82 } },
-      'Commander Hale':    { visual: { x: 52, y: 70 }, interaction: { x: 52, y: 82 } },
-      'Doc Circuits':      { visual: { x: 68, y: 74 }, interaction: { x: 68, y: 82 } },
-      'Tinker Mira':       { visual: { x: 84, y: 70 }, interaction: { x: 82, y: 78 } },
+      // Vendors / quest-givers spread across width AND depth.
+      'Scout Junko':       { visual: { x: 14, y: 60 }, interaction: { x: 18, y: 68 } },
+      'Quartermaster Vex': { visual: { x: 30, y: 82 }, interaction: { x: 30, y: 88 } },
+      'Commander Hale':    { visual: { x: 50, y: 56 }, interaction: { x: 50, y: 66 } },
+      'Doc Circuits':      { visual: { x: 70, y: 82 }, interaction: { x: 70, y: 88 } },
+      'Tinker Mira':       { visual: { x: 86, y: 60 }, interaction: { x: 82, y: 68 } },
     },
   },
 
   'wasteland': {
-    // Open desert path: gently curving, wide in front, narrow at horizon.
+    // Open desert — even wider trapezoid for big sandbox feel.
     polygon: [
-      { x: 28, y: 60 },
-      { x: 72, y: 60 },
-      { x: 98, y: 94 },
-      { x:  2, y: 94 },
+      { x: 14, y: 50 },
+      { x: 86, y: 50 },
+      { x: 99, y: 96 },
+      { x:  1, y: 96 },
     ],
-    spawn: { x: 50, y: 82 },
+    spawn: { x: 50, y: 80 },
     npcs: {
-      'Scrapper Drone':     { visual: { x: 18, y: 72 }, interaction: { x: 20, y: 80 } },
-      'Stranded Survivor':  { visual: { x: 36, y: 76 }, interaction: { x: 36, y: 84 } },
-      'Wasteland Marauder': { visual: { x: 52, y: 72 }, interaction: { x: 52, y: 82 } },
-      'Rogue War-Mech':     { visual: { x: 68, y: 76 }, interaction: { x: 68, y: 84 } },
-      'Wasteland Overlord': { visual: { x: 84, y: 72 }, interaction: { x: 82, y: 80 } },
+      'Scrapper Drone':     { visual: { x: 16, y: 64 }, interaction: { x: 20, y: 72 } },
+      'Stranded Survivor':  { visual: { x: 36, y: 84 }, interaction: { x: 36, y: 90 } },
+      'Wasteland Marauder': { visual: { x: 52, y: 58 }, interaction: { x: 52, y: 68 } },
+      'Rogue War-Mech':     { visual: { x: 68, y: 84 }, interaction: { x: 68, y: 90 } },
+      'Wasteland Overlord': { visual: { x: 84, y: 64 }, interaction: { x: 80, y: 72 } },
     },
   },
 
   'neon-district': {
-    // Wet neon street: trapezoidal sidewalk strip, slightly higher horizon.
+    // Wet neon street — wide sidewalk band, deep enough for vertical movement.
     polygon: [
-      { x: 24, y: 62 },
-      { x: 76, y: 62 },
-      { x: 96, y: 93 },
-      { x:  4, y: 93 },
+      { x: 12, y: 50 },
+      { x: 88, y: 50 },
+      { x: 98, y: 96 },
+      { x:  2, y: 96 },
     ],
     spawn: { x: 50, y: 80 },
     npcs: {
-      'Whisper':            { visual: { x: 16, y: 72 }, interaction: { x: 18, y: 80 } },
-      'Cyber-Doc Riku':     { visual: { x: 34, y: 76 }, interaction: { x: 34, y: 84 } },
-      'Neon Gangster':      { visual: { x: 52, y: 72 }, interaction: { x: 52, y: 82 } },
-      'Syndicate Enforcer': { visual: { x: 68, y: 76 }, interaction: { x: 68, y: 84 } },
-      'The Fixer':          { visual: { x: 84, y: 72 }, interaction: { x: 82, y: 80 } },
+      'Whisper':            { visual: { x: 14, y: 62 }, interaction: { x: 18, y: 70 } },
+      'Cyber-Doc Riku':     { visual: { x: 34, y: 84 }, interaction: { x: 34, y: 90 } },
+      'Neon Gangster':      { visual: { x: 52, y: 58 }, interaction: { x: 52, y: 68 } },
+      'Syndicate Enforcer': { visual: { x: 68, y: 84 }, interaction: { x: 68, y: 90 } },
+      'The Fixer':          { visual: { x: 86, y: 62 }, interaction: { x: 82, y: 70 } },
     },
   },
 };
