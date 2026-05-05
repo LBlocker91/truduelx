@@ -10,6 +10,7 @@ import { ProfilePanel } from './panels/ProfilePanel';
 import { InventoryPanel } from './panels/InventoryPanel';
 import { QuestsPanel } from './panels/QuestsPanel';
 import { PvpPanel } from './panels/PvpPanel';
+import { xpForLevel } from '@/lib/leveling';
 
 type PanelKey = 'profile' | 'inventory' | 'quests' | 'map' | 'pvp' | 'skills' | 'shop' | 'settings' | null;
 
@@ -18,6 +19,7 @@ interface GameHudProps {
   characterName: string;
   characterClass: string;
   characterLevel: number;
+  characterXp: number;
   credits: number;
   isPremium: boolean;
   onEnterNpcBattle: (battleId: string) => void;
@@ -46,19 +48,40 @@ export const GameHud = (props: GameHudProps) => {
     <div className="relative min-h-screen flex flex-col bg-black">
       {/* Top bar */}
       <header className="flex items-center justify-between gap-3 px-3 py-2 bg-card/85 backdrop-blur border-b border-border z-20">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <span className="font-orbitron text-sm truncate">{props.characterName}</span>
-          <span className="text-xs text-muted-foreground capitalize">Lv {props.characterLevel} · {props.characterClass}</span>
+          <span className="text-xs text-muted-foreground capitalize whitespace-nowrap">
+            Lv {props.characterLevel} · {props.characterClass}
+          </span>
           {props.isPremium && (
             <span className="text-[10px] text-shield font-orbitron flex items-center gap-1">
               <Crown className="w-3 h-3" /> PREMIUM
             </span>
           )}
+          {/* XP bar */}
+          {(() => {
+            const need = xpForLevel(props.characterLevel);
+            const pct = Math.min(100, Math.round((props.characterXp / need) * 100));
+            return (
+              <div className="hidden sm:flex items-center gap-2 min-w-[140px] max-w-[260px] flex-1">
+                <span className="text-[10px] text-muted-foreground font-orbitron">XP</span>
+                <div className="h-2 flex-1 bg-muted rounded overflow-hidden">
+                  <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {props.characterXp}/{need}
+                </span>
+              </div>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-shield font-orbitron flex items-center gap-1">
             <Coins className="w-3 h-3" /> {props.credits.toLocaleString()}
           </span>
+          <Button size="sm" variant="ghost" onClick={() => setPanel('pvp')} title="PvP">
+            <Swords className="w-4 h-4 mr-1" /> PvP
+          </Button>
           <Button size="sm" variant="ghost" onClick={props.onExitToSlots}>
             <LogOut className="w-4 h-4 mr-1" /> Characters
           </Button>

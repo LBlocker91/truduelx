@@ -379,7 +379,7 @@ export const OverworldScreen = ({
   const interactable = closestNpc();
 
   return (
-    <div className="min-h-screen bg-black text-foreground flex flex-col">
+    <div className={`${hideChrome ? 'absolute inset-0' : 'min-h-screen'} bg-black text-foreground flex flex-col`}>
       {!hideChrome && (
         <header className="flex items-center justify-between gap-2 px-3 py-2 bg-card/80 backdrop-blur border-b border-border z-10">
           <div className="flex items-center gap-3">
