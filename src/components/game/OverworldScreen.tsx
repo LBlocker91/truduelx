@@ -355,15 +355,20 @@ export const OverworldScreen = ({
   };
 
   // Click-to-move within hub: convert click → normalized %.
+  // Clicks that land outside the walkable floor are ignored entirely so the
+  // player can't path into walls / sky / windows.
   const handleStageClick = (e: React.MouseEvent) => {
     if (!rootRef.current || !zone) return;
     const rect = rootRef.current.getBoundingClientRect();
     const xp = ((e.clientX - rect.left) / rect.width) * 100;
     const yp = ((e.clientY - rect.top) / rect.height) * 100;
-    targetRef.current = {
-      x: Math.max(PLAYER_X_MIN, Math.min(PLAYER_X_MAX, xp)),
-      y: Math.max(PLAYER_Y_MIN, Math.min(PLAYER_Y_MAX, yp)),
-    };
+    const wk = walkableFor(zone.id);
+    if (!pointInPolygon({ x: xp, y: yp }, wk.polygon)) {
+      // Out-of-floor click → don't queue movement.
+      targetRef.current = null;
+      return;
+    }
+    targetRef.current = { x: xp, y: yp };
   };
 
   // ---------- Render ----------
