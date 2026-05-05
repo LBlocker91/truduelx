@@ -128,15 +128,18 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
           </svg>
         )}
 
-        {/* Holographic ground glow */}
+        {/* Holographic ground glow — intensifies in range */}
         <div
           className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
           style={{
             bottom: -6,
-            width: 56,
-            height: 12,
-            background: `radial-gradient(ellipse at center, ${colorSoft} 0%, ${colorFaint} 45%, transparent 75%)`,
-            filter: 'blur(3px)',
+            width: close ? 78 : 56,
+            height: close ? 16 : 12,
+            background: close
+              ? `radial-gradient(ellipse at center, ${color} 0%, ${colorSoft} 45%, transparent 80%)`
+              : `radial-gradient(ellipse at center, ${colorSoft} 0%, ${colorFaint} 45%, transparent 75%)`,
+            filter: close ? 'blur(4px)' : 'blur(3px)',
+            transition: 'width 250ms ease-out, height 250ms ease-out, filter 250ms ease-out',
           }}
         />
       </div>
