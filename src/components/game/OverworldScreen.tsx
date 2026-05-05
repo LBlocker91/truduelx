@@ -570,17 +570,46 @@ export const OverworldScreen = ({
             />
           </div>
 
-          {/* Debug overlay */}
-          {debug && (
-            <div className="absolute top-2 right-2 z-40 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
-              <div>rootSize: {rootSize.w}×{rootSize.h}</div>
-              <div>player: x={pos.x.toFixed(1)}% y={pos.y.toFixed(1)}% dir={direction} {moving ? 'walk' : 'idle'}</div>
-              <div>fitMode: cover-fixed</div>
-              <div>backgroundPosition: center center</div>
-              <div>noCameraMode: true</div>
-              <div className="text-emerald-500/70">[`] toggle debug</div>
-            </div>
-          )}
+          {/* Debug overlay — walkable polygon + interaction points */}
+          {debug && (() => {
+            const wk = walkableFor(zone.id);
+            return (
+              <>
+                <svg
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-40"
+                >
+                  <path
+                    d={polygonToSvgPath(wk.polygon)}
+                    fill="hsl(150 100% 50% / 0.10)"
+                    stroke="hsl(150 100% 60%)"
+                    strokeWidth={0.3}
+                  />
+                  {/* Spawn point */}
+                  <circle cx={wk.spawn.x} cy={wk.spawn.y} r={0.9} fill="hsl(50 100% 60%)" />
+                  {/* NPC visual + interaction points */}
+                  {npcsWithPos.map(n => (
+                    <g key={`dbg-${n.id}`}>
+                      <circle cx={n._vx} cy={n._vy} r={0.7} fill="hsl(0 0% 100%)" />
+                      <circle cx={n._ix} cy={n._iy} r={0.9} fill="hsl(200 100% 60%)" />
+                      <line x1={n._vx} y1={n._vy} x2={n._ix} y2={n._iy}
+                        stroke="hsl(200 100% 60% / 0.6)" strokeWidth={0.15} strokeDasharray="0.5 0.5" />
+                    </g>
+                  ))}
+                  {/* Player */}
+                  <circle cx={pos.x} cy={pos.y} r={1.0} fill="hsl(0 100% 60%)" />
+                </svg>
+                <div className="absolute top-2 right-2 z-40 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
+                  <div>rootSize: {rootSize.w}×{rootSize.h}</div>
+                  <div>player: x={pos.x.toFixed(1)}% y={pos.y.toFixed(1)}% dir={direction} {moving ? 'walk' : 'idle'}</div>
+                  <div>zone: {zone.id} · npcs: {npcsWithPos.length}</div>
+                  <div className="text-emerald-400">green=floor · yellow=spawn · blue=interact · white=visual</div>
+                  <div className="text-emerald-500/70">[`] toggle debug</div>
+                </div>
+              </>
+            );
+          })()}
           {!debug && (
             <div className="absolute bottom-2 right-2 z-30 text-[10px] text-white/40 font-mono pointer-events-none">[`] debug</div>
           )}
