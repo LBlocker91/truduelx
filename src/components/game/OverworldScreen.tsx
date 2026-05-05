@@ -38,8 +38,10 @@ const MOVE_ACCEL = 0.18;           // softer start/stop easing
 const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
 const INTERACTION_RADIUS = 110;
-const CAMERA_ZOOM = 0.55;          // zoomed OUT further — see twice as much area
-const CAMERA_LERP = 0.10;          // slightly delayed, smooth follow
+const CAMERA_ZOOM = 0.75;          // base zoom — readable but spacious
+const CAMERA_ZOOM_MIN = 0.65;
+const CAMERA_ZOOM_MAX = 0.9;
+const CAMERA_LERP = 0.10;          // smooth, not laggy
 const RENDER_RADIUS = 1400;        // only render players within this world distance
 const FADE_RADIUS  = 900;          // distant players fade out softly
 
