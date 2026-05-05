@@ -473,8 +473,9 @@ export const OverworldScreen = ({
             </div>
           )}
 
-          {/* Floor perspective highlight — tied to walkable polygon. Gives a clear,
-              game-like floor band so players see exactly where they can move. */}
+          {/* Floor perspective highlight — subtle gradient only, no visible
+              outline. The hard stroke read as a giant "4-shaped" outline
+              over the playable area, so we keep only a faint floor wash. */}
           {(() => {
             const wk = walkableFor(zone.id);
             return (
@@ -486,15 +487,13 @@ export const OverworldScreen = ({
                 <defs>
                   <linearGradient id="floor-grad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%"  stopColor="hsl(195 100% 70%)" stopOpacity="0" />
-                    <stop offset="55%" stopColor="hsl(195 100% 65%)" stopOpacity="0.08" />
-                    <stop offset="100%" stopColor="hsl(195 100% 70%)" stopOpacity="0.22" />
+                    <stop offset="60%" stopColor="hsl(195 100% 65%)" stopOpacity="0.04" />
+                    <stop offset="100%" stopColor="hsl(195 100% 70%)" stopOpacity="0.10" />
                   </linearGradient>
                 </defs>
                 <path
                   d={polygonToSvgPath(wk.polygon)}
                   fill="url(#floor-grad)"
-                  stroke="hsl(195 100% 70% / 0.45)"
-                  strokeWidth={0.25}
                 />
               </svg>
             );
