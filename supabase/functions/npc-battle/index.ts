@@ -96,7 +96,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 
   await admin.from('battle_participants').insert([
     { battle_id: battle.id, user_id: userId, character_id: characterId, slot: 0,
-      hp: playerHp, max_hp: playerHp, energy: 100, max_energy: 100,
+      hp: playerHp, max_hp: playerHp, energy: playerMp, max_energy: playerMp,
       snapshot: { ...playerSnap, max_hp: playerHp }, is_bot: false },
     { battle_id: battle.id, user_id: null, character_id: null, slot: 1, is_bot: true,
       hp: enemyHp, max_hp: enemyHp, energy: 100, max_energy: 100,
