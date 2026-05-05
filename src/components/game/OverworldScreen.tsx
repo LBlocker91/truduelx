@@ -319,20 +319,21 @@ export const OverworldScreen = ({
         >
           {/* Camera-follow world layer (translate + scale around viewport center) */}
           {(() => {
-            const scale = CAMERA_ZOOM;
             const vw = stageSize.w || 1;
             const vh = stageSize.h || 1;
-            // World pixel size when scaled
+            // Auto-fit zoom: never let world be smaller than viewport
+            const fitScale = Math.max(vw / zone.width, vh / zone.height);
+            const scale = Math.max(CAMERA_ZOOM, fitScale);
             const worldW = zone.width * scale;
             const worldH = zone.height * scale;
             // Desired translate to put player at viewport center
             let tx = vw / 2 - pos.x * scale;
             let ty = vh / 2 - pos.y * scale;
-            // Clamp so we don't show beyond world edges
-            const minTx = vw - worldW;
-            const minTy = vh - worldH;
-            tx = Math.min(0, Math.max(minTx, tx));
-            ty = Math.min(0, Math.max(minTy, ty));
+            // Clamp: if world larger than viewport, keep edges inside; if not, center it.
+            if (worldW <= vw) tx = (vw - worldW) / 2;
+            else tx = Math.min(0, Math.max(vw - worldW, tx));
+            if (worldH <= vh) ty = (vh - worldH) / 2;
+            else ty = Math.min(0, Math.max(vh - worldH, ty));
             cameraRef.current = { tx, ty, scale };
             return (
               <div
