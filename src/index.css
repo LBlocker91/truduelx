@@ -400,4 +400,72 @@
 
   /* Camera now lerped per-frame in JS — keep class as no-op for compatibility */
   .camera-smooth { will-change: transform; }
+
+  /* Player rarity aura — soft pulsing ring under feet / around body */
+  @keyframes rarity-aura {
+    0%, 100% { opacity: 0.55; transform: translateX(-50%) scale(1); }
+    50%      { opacity: 0.85; transform: translateX(-50%) scale(1.08); }
+  }
+  .rarity-aura { animation: rarity-aura 2.6s ease-in-out infinite; }
+
+  /* Movement trail puff — fades up & out */
+  @keyframes trail-fade {
+    0%   { opacity: 0.55; transform: translate(-50%, 0) scale(1); }
+    100% { opacity: 0;    transform: translate(-50%, -10px) scale(0.4); }
+  }
+  .trail-puff { animation: trail-fade 0.7s ease-out forwards; }
+
+  /* Idle micro-movements: head/torso subtle shift on top of breathing */
+  @keyframes idle-micro {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    20%      { transform: translate(0.4px, -0.3px) rotate(0.2deg); }
+    50%      { transform: translate(-0.3px, 0.2px) rotate(-0.15deg); }
+    80%      { transform: translate(0.2px, -0.2px) rotate(0.1deg); }
+  }
+  .idle-micro { animation: idle-micro 5.5s ease-in-out infinite; }
+
+  /* Interaction flash — quick burst when pressing E */
+  @keyframes interact-flash {
+    0%   { opacity: 0;    transform: translate(-50%, -50%) scale(0.6); }
+    30%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.1); }
+    100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.8); }
+  }
+  .interact-flash { animation: interact-flash 0.5s ease-out forwards; }
+
+  /* Camera nudge — small kick on interaction */
+  @keyframes camera-nudge {
+    0%   { transform: translate3d(0, 0, 0); }
+    25%  { transform: translate3d(0, -3px, 0); }
+    60%  { transform: translate3d(0, 1px, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+  }
+  .camera-nudge { animation: camera-nudge 0.32s ease-out; }
+
+  /* Ambient floating particles */
+  @keyframes particle-drift {
+    0%   { transform: translate3d(0, 0, 0);          opacity: 0; }
+    15%  { opacity: 0.55; }
+    100% { transform: translate3d(20px, -120px, 0);  opacity: 0; }
+  }
+  .particle-drift { animation: particle-drift 14s linear infinite; }
+
+  /* Background panel flicker */
+  @keyframes bg-flicker {
+    0%, 100% { opacity: 0.0; }
+    48%      { opacity: 0.0; }
+    50%      { opacity: 0.55; }
+    52%      { opacity: 0.0; }
+    74%      { opacity: 0.35; }
+    76%      { opacity: 0.0; }
+  }
+  .bg-flicker { animation: bg-flicker 6s ease-in-out infinite; }
+
+  /* Slow horizontal light strip sweep */
+  @keyframes light-sweep {
+    0%   { transform: translateX(-30%); opacity: 0; }
+    20%  { opacity: 0.45; }
+    80%  { opacity: 0.45; }
+    100% { transform: translateX(130%); opacity: 0; }
+  }
+  .light-sweep { animation: light-sweep 11s ease-in-out infinite; }
 }
