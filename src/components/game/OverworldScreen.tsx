@@ -311,86 +311,108 @@ export const OverworldScreen = ({
           onClick={handleStageClick}
           className="relative w-full max-w-[1400px] aspect-[16/10] bg-black cursor-crosshair border border-border rounded overflow-hidden select-none"
         >
-          {/* Camera-follow world layer */}
-          <WorldLayer
-            zone={zone}
-            bg={bg}
-            playerX={pos.x}
-            playerY={pos.y}
-            stageRef={stageRef}
-            zoom={CAMERA_ZOOM}
-          >
-            {/* NPCs in world coords (px) */}
-            {npcs.map(n => {
-              const Icon = n.type === 'vendor' ? Store : n.type === 'quest' ? ScrollText : Skull;
-              const close = interactable?.id === n.id;
-              return (
-                <button
-                  key={n.id}
-                  onClick={(e) => { e.stopPropagation(); openNpc(n); }}
-                  style={{ left: n.position_x, top: n.position_y, position: 'absolute' }}
-                  className="-translate-x-1/2 -translate-y-full flex flex-col items-center group"
-                >
-                  {close && (
-                    <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 animate-pulse">
-                      [E] {n.name}
-                    </div>
-                  )}
-                  {!close && (
-                    <div className="text-[10px] font-orbitron px-1 py-0.5 rounded bg-card/90 border border-border opacity-0 group-hover:opacity-100 mb-0.5">
-                      {n.name}
-                    </div>
-                  )}
-                  <div className={`w-14 h-16 rounded-t-full flex items-end justify-center pb-1
-                    ${n.type === 'vendor' ? 'bg-blue-500/80' : n.type === 'quest' ? 'bg-amber-500/80' : 'bg-red-500/80'}
-                    border-2 ${close ? 'border-primary' : 'border-white/50'} shadow-lg`}>
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="w-3 h-3 rounded-full bg-black/50 blur-[1px]" />
-                </button>
-              );
-            })}
+          {/* Camera-follow world layer (translate + scale around viewport center) */}
+          {(() => {
+            const scale = CAMERA_ZOOM;
+            const vw = stageSize.w || 1;
+            const vh = stageSize.h || 1;
+            // World pixel size when scaled
+            const worldW = zone.width * scale;
+            const worldH = zone.height * scale;
+            // Desired translate to put player at viewport center
+            let tx = vw / 2 - pos.x * scale;
+            let ty = vh / 2 - pos.y * scale;
+            // Clamp so we don't show beyond world edges
+            const minTx = vw - worldW;
+            const minTy = vh - worldH;
+            tx = Math.min(0, Math.max(minTx, tx));
+            ty = Math.min(0, Math.max(minTy, ty));
+            cameraRef.current = { tx, ty, scale };
+            return (
+              <div
+                className="absolute top-0 left-0 origin-top-left camera-smooth"
+                style={{
+                  width: zone.width,
+                  height: zone.height,
+                  transform: `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`,
+                  transformOrigin: '0 0',
+                  backgroundImage: `url(${bg})`,
+                  backgroundSize: '100% 100%',
+                }}
+              >
+                {/* NPCs in world coords (px) */}
+                {npcs.map(n => {
+                  const Icon = n.type === 'vendor' ? Store : n.type === 'quest' ? ScrollText : Skull;
+                  const close = interactable?.id === n.id;
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={(e) => { e.stopPropagation(); openNpc(n); }}
+                      style={{ left: n.position_x, top: n.position_y, position: 'absolute' }}
+                      className="-translate-x-1/2 -translate-y-full flex flex-col items-center group"
+                    >
+                      {close && (
+                        <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 animate-pulse">
+                          [E] {n.name}
+                        </div>
+                      )}
+                      {!close && (
+                        <div className="text-[10px] font-orbitron px-1 py-0.5 rounded bg-card/90 border border-border opacity-0 group-hover:opacity-100 mb-0.5">
+                          {n.name}
+                        </div>
+                      )}
+                      <div className={`w-14 h-16 rounded-t-full flex items-end justify-center pb-1
+                        ${n.type === 'vendor' ? 'bg-blue-500/80' : n.type === 'quest' ? 'bg-amber-500/80' : 'bg-red-500/80'}
+                        border-2 ${close ? 'border-primary' : 'border-white/50'} shadow-lg`}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="w-3 h-3 rounded-full bg-black/50 blur-[1px]" />
+                    </button>
+                  );
+                })}
 
-            {/* Other players */}
-            {nearby.map(p => {
-              const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
-              return (
-                <div key={p.user_id}
-                  style={{ left: p.x_position, top: p.y_position, position: 'absolute' }}
+                {/* Other players */}
+                {nearby.map(p => {
+                  const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
+                  return (
+                    <div key={p.user_id}
+                      style={{ left: p.x_position, top: p.y_position, position: 'absolute' }}
+                      className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
+                    >
+                      <div className="text-[10px] px-1.5 py-0.5 rounded bg-card/85 border border-secondary/50 mb-0.5">
+                        {p.display_name} L{p.character_level}
+                      </div>
+                      <PlayerSprite
+                        direction={dir}
+                        state="idle"
+                        armorVariant={p.equipped_armor_variant}
+                        weaponVariant={p.equipped_weapon_variant}
+                        scale={0.9}
+                      />
+                    </div>
+                  );
+                })}
+
+                {/* Player */}
+                <div
+                  style={{ left: pos.x, top: pos.y, position: 'absolute' }}
                   className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
                 >
-                  <div className="text-[10px] px-1.5 py-0.5 rounded bg-card/85 border border-secondary/50 mb-0.5">
-                    {p.display_name} L{p.character_level}
+                  <div className="text-[11px] font-orbitron px-2 py-0.5 rounded bg-primary text-primary-foreground mb-1 drop-shadow">
+                    {characterName}
                   </div>
                   <PlayerSprite
-                    direction={dir}
-                    state="idle"
-                    armorVariant={p.equipped_armor_variant}
-                    weaponVariant={p.equipped_weapon_variant}
-                    scale={0.9}
+                    direction={direction}
+                    state={moving ? 'walk' : 'idle'}
+                    armorVariant={loadout.armorVariant}
+                    weaponVariant={loadout.weaponVariant}
+                    rarity="rare"
+                    scale={1}
                   />
                 </div>
-              );
-            })}
-
-            {/* Player */}
-            <div
-              style={{ left: pos.x, top: pos.y, position: 'absolute' }}
-              className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
-            >
-              <div className="text-[11px] font-orbitron px-2 py-0.5 rounded bg-primary text-primary-foreground mb-1 drop-shadow">
-                {characterName}
               </div>
-              <PlayerSprite
-                direction={direction}
-                state={moving ? 'walk' : 'idle'}
-                armorVariant={loadout.armorVariant}
-                weaponVariant={loadout.weaponVariant}
-                rarity="rare"
-                scale={1}
-              />
-            </div>
-          </WorldLayer>
+            );
+          })()}
         </div>
       </div>
 
