@@ -63,8 +63,11 @@ export const OverworldScreen = ({
   const [busy, setBusy] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [debug, setDebug] = useState(false);
+  const [camPos, setCamPos] = useState({ x: 800, y: 750 }); // smoothed follow target (world coords)
   const posRef = useRef(pos);
   posRef.current = pos;
+  const camPosRef = useRef(camPos);
+  camPosRef.current = camPos;
   const dirRef = useRef<SpriteDirection>('right');
   dirRef.current = direction;
 
