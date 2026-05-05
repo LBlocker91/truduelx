@@ -370,7 +370,7 @@ export const OverworldScreen = ({
   };
 
   if (!zone) {
-    return <div className="min-h-screen flex items-center justify-center bg-background">
+    return <div className={`${hideChrome ? 'absolute inset-0' : 'min-h-screen'} flex items-center justify-center bg-background`}>
       <Loader2 className="w-8 h-8 animate-spin text-primary" />
     </div>;
   }
@@ -379,7 +379,7 @@ export const OverworldScreen = ({
   const interactable = closestNpc();
 
   return (
-    <div className={`${hideChrome ? 'absolute inset-0' : 'min-h-screen'} bg-black text-foreground flex flex-col`}>
+    <div className={`${hideChrome ? 'absolute inset-0 h-full w-full' : 'min-h-screen'} bg-black text-foreground flex flex-col min-h-0`}>
       {!hideChrome && (
         <header className="flex items-center justify-between gap-2 px-3 py-2 bg-card/80 backdrop-blur border-b border-border z-10">
           <div className="flex items-center gap-3">
@@ -417,7 +417,7 @@ export const OverworldScreen = ({
         </div>
       )}
 
-      <div className="flex-1 relative overflow-hidden bg-black">
+      <div className="flex-1 relative min-h-0 overflow-hidden bg-black">
         <div
           ref={stageRef}
           onClick={handleStageClick}
@@ -429,8 +429,8 @@ export const OverworldScreen = ({
             const viewportHeight = Math.max(stageSize.h, 1);
             // Ensure world always fully covers viewport (no black bars on any screen size).
             const coverZoom = Math.max(viewportWidth / zone.width, viewportHeight / zone.height);
-            const rawZoom = Math.max(CAMERA_ZOOM, coverZoom);
-            const zoom = Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, rawZoom));
+            const preferredZoom = Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, CAMERA_ZOOM));
+            const zoom = Math.max(coverZoom, preferredZoom);
             const halfVisibleWorldWidth = viewportWidth / (2 * zoom);
             const halfVisibleWorldHeight = viewportHeight / (2 * zoom);
 
