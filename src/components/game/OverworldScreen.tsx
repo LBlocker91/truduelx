@@ -563,14 +563,16 @@ export const OverworldScreen = ({
             );
           })}
 
-          {/* Local player */}
+          {/* Local player — position is updated every rAF frame, so we do NOT
+              add a CSS transition (it would visibly lag behind the logic and
+              produce a "shake then skip" effect on click-to-move). */}
           <div
             className="absolute flex flex-col items-center pointer-events-none z-20"
             style={{
               left: `${pos.x}%`,
               top: `${pos.y}%`,
               transform: 'translate(-50%, -100%)',
-              transition: 'left 90ms linear, top 90ms linear',
+              willChange: 'left, top',
             }}
           >
             <div
