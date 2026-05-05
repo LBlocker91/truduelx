@@ -234,8 +234,14 @@ export const OverworldScreen = ({
         if (Math.abs(v.vx) < 0.01) v.vx = 0;
         if (Math.abs(v.vy) < 0.01) v.vy = 0;
 
-        x = Math.max(PLAYER_X_MIN, Math.min(PLAYER_X_MAX, x + v.vx));
-        y = Math.max(PLAYER_Y_MIN, Math.min(PLAYER_Y_MAX, y + v.vy));
+        const candidate = { x: x + v.vx, y: y + v.vy };
+        const wk = walkableFor(zone!.id);
+        const clamped = clampToWalkable(candidate, wk.polygon);
+        // If we hit a wall, kill velocity in the rejected axes so we don't shudder.
+        if (clamped.x !== candidate.x) v.vx = 0;
+        if (clamped.y !== candidate.y) v.vy = 0;
+        x = clamped.x;
+        y = clamped.y;
 
         const speed = Math.hypot(v.vx, v.vy);
         const isMoving = speed > 0.04;
@@ -285,8 +291,12 @@ export const OverworldScreen = ({
   // ---------- Interaction ----------
   const npcsWithPos = useMemo(() => {
     return npcs.map((n, i) => {
-      const spot = npcSpot(zone?.id ?? '', n.name, i, npcs.length);
-      return { ...n, _x: spot.x, _y: spot.y };
+      const place = npcPlacement(zone?.id ?? '', n.name, i, npcs.length);
+      return {
+        ...n,
+        _vx: place.visual.x, _vy: place.visual.y,           // visual anchor
+        _ix: place.interaction.x, _iy: place.interaction.y, // floor interaction point
+      };
     });
   }, [npcs, zone?.id]);
 
@@ -294,7 +304,8 @@ export const OverworldScreen = ({
     let best: (typeof npcsWithPos)[number] | null = null;
     let bestD = Infinity;
     for (const n of npcsWithPos) {
-      const d = Math.hypot(n._x - pos.x, n._y - pos.y);
+      // Distance is measured against the floor interaction point, not the visual.
+      const d = Math.hypot(n._ix - pos.x, n._iy - pos.y);
       if (d < bestD && d <= INTERACTION_RADIUS_PCT) { best = n; bestD = d; }
     }
     return best;
