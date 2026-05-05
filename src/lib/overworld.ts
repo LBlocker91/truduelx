@@ -206,11 +206,12 @@ export async function startNpcBattle(npcId: string, characterId: string): Promis
 
 export async function submitNpcAction(
   battleId: string,
-  playerAction: 'attack' | 'defend' | 'forfeit' | 'skill',
+  playerAction: 'attack' | 'defend' | 'forfeit' | 'skill' | 'use_item',
   skillSlug?: string,
+  itemSubtype?: 'hp_potion' | 'mp_potion',
 ) {
   const { data, error } = await supabase.functions.invoke('npc-battle', {
-    body: { action: 'act', battleId, playerAction, skillSlug },
+    body: { action: 'act', battleId, playerAction, skillSlug, itemSubtype },
   });
   if (error) throw error;
   return data;
