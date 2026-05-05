@@ -32,10 +32,13 @@ interface OverworldScreenProps {
   onExit: () => void;
 }
 
-const MOVE_SPEED = 4;
+const MOVE_SPEED = 4.5;
+const MOVE_ACCEL = 0.25; // easing factor 0..1 (lerp toward target velocity)
 const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
-const INTERACTION_RADIUS = 60;
+const INTERACTION_RADIUS = 90;
+const CAMERA_ZOOM = 1.6; // makes player ~12-18% of screen
+const CAMERA_LERP = 0.14;
 
 export const OverworldScreen = ({
   characterId, characterName, characterClass, characterLevel,
@@ -57,10 +60,23 @@ export const OverworldScreen = ({
   const [questData, setQuestData] = useState<any>(null);
   const [myQuests, setMyQuests] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const posRef = useRef(pos);
   posRef.current = pos;
   const dirRef = useRef<SpriteDirection>('right');
   dirRef.current = direction;
+
+  // Track stage size for camera math
+  useEffect(() => {
+    if (!stageRef.current) return;
+    const el = stageRef.current;
+    const ro = new ResizeObserver(() => {
+      setStageSize({ w: el.clientWidth, h: el.clientHeight });
+    });
+    ro.observe(el);
+    setStageSize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -97,32 +113,47 @@ export const OverworldScreen = ({
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
   });
 
+  // Velocity-based movement with easing (no instant start/stop)
+  const velRef = useRef({ vx: 0, vy: 0 });
   useEffect(() => {
     if (!zone) return;
     let raf = 0;
     const loop = () => {
       setPos(prev => {
         let { x, y } = prev;
-        let dx = 0, dy = 0;
+        let tdx = 0, tdy = 0;
         const k = keysRef.current;
-        if (k.has('a') || k.has('arrowleft')) dx -= MOVE_SPEED;
-        if (k.has('d') || k.has('arrowright')) dx += MOVE_SPEED;
-        if (k.has('w') || k.has('arrowup')) dy -= MOVE_SPEED;
-        if (k.has('s') || k.has('arrowdown')) dy += MOVE_SPEED;
+        if (k.has('a') || k.has('arrowleft')) tdx -= 1;
+        if (k.has('d') || k.has('arrowright')) tdx += 1;
+        if (k.has('w') || k.has('arrowup')) tdy -= 1;
+        if (k.has('s') || k.has('arrowdown')) tdy += 1;
+        // Normalize keyboard direction
+        const klen = Math.hypot(tdx, tdy);
+        if (klen > 0) { tdx = (tdx / klen) * MOVE_SPEED; tdy = (tdy / klen) * MOVE_SPEED; }
+
         const t = targetRef.current;
-        if (!dx && !dy && t) {
-          const tdx = t.x - x, tdy = t.y - y;
-          const dist = Math.hypot(tdx, tdy);
-          if (dist < MOVE_SPEED) { x = t.x; y = t.y; targetRef.current = null; }
-          else { dx = (tdx / dist) * MOVE_SPEED; dy = (tdy / dist) * MOVE_SPEED; }
+        if (!tdx && !tdy && t) {
+          const ddx = t.x - x, ddy = t.y - y;
+          const dist = Math.hypot(ddx, ddy);
+          if (dist < 2) { targetRef.current = null; }
+          else { tdx = (ddx / dist) * MOVE_SPEED; tdy = (ddy / dist) * MOVE_SPEED; }
         }
-        x += dx; y += dy;
+
+        // Ease velocity toward target
+        const v = velRef.current;
+        v.vx += (tdx - v.vx) * MOVE_ACCEL;
+        v.vy += (tdy - v.vy) * MOVE_ACCEL;
+        if (Math.abs(v.vx) < 0.05) v.vx = 0;
+        if (Math.abs(v.vy) < 0.05) v.vy = 0;
+
+        x += v.vx; y += v.vy;
         x = Math.max(40, Math.min(zone.width - 40, x));
         y = Math.max(zone.height * 0.55, Math.min(zone.height - 40, y));
-        const isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
-        // Update direction & moving via refs avoids per-frame React re-render unless changed
-        if (Math.abs(dx) > 0.01) {
-          const nd: SpriteDirection = dx < 0 ? 'left' : 'right';
+
+        const speed = Math.hypot(v.vx, v.vy);
+        const isMoving = speed > 0.4;
+        if (Math.abs(v.vx) > 0.1) {
+          const nd: SpriteDirection = v.vx < 0 ? 'left' : 'right';
           if (dirRef.current !== nd) setDirection(nd);
         }
         setMoving(prevMoving => prevMoving === isMoving ? prevMoving : isMoving);
@@ -159,13 +190,18 @@ export const OverworldScreen = ({
     if (data?.user) setMyQuests(await fetchPlayerQuests(data.user.id));
   })(); }, [activeNpc]);
 
+  // Camera offset (in viewport CSS px) — kept in a ref so click handler can invert it
+  const cameraRef = useRef({ tx: 0, ty: 0, scale: 1 });
+
   const handleStageClick = (e: React.MouseEvent) => {
     if (!zone || !stageRef.current) return;
     const rect = stageRef.current.getBoundingClientRect();
-    const scaleX = zone.width / rect.width;
-    const scaleY = zone.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const cam = cameraRef.current;
+    // viewport px → world px (inverse of: world * scale + tx)
+    const vx = e.clientX - rect.left;
+    const vy = e.clientY - rect.top;
+    const x = (vx - cam.tx) / cam.scale;
+    const y = (vy - cam.ty) / cam.scale;
     targetRef.current = {
       x: Math.max(40, Math.min(zone.width - 40, x)),
       y: Math.max(zone.height * 0.55, Math.min(zone.height - 40, y)),
@@ -273,86 +309,110 @@ export const OverworldScreen = ({
         <div
           ref={stageRef}
           onClick={handleStageClick}
-          className="relative w-full max-w-[1400px] aspect-[16/10] bg-cover bg-center cursor-crosshair border border-border rounded overflow-hidden select-none"
-          style={{ backgroundImage: `url(${bg})` }}
+          className="relative w-full max-w-[1400px] aspect-[16/10] bg-black cursor-crosshair border border-border rounded overflow-hidden select-none"
         >
-          {npcs.map(n => {
-            const sx = (n.position_x / zone.width) * 100;
-            const sy = (n.position_y / zone.height) * 100;
-            const ico = n.type === 'vendor' ? Store : n.type === 'quest' ? ScrollText : Skull;
-            const Icon = ico;
-            const close = interactable?.id === n.id;
+          {/* Camera-follow world layer (translate + scale around viewport center) */}
+          {(() => {
+            const scale = CAMERA_ZOOM;
+            const vw = stageSize.w || 1;
+            const vh = stageSize.h || 1;
+            // World pixel size when scaled
+            const worldW = zone.width * scale;
+            const worldH = zone.height * scale;
+            // Desired translate to put player at viewport center
+            let tx = vw / 2 - pos.x * scale;
+            let ty = vh / 2 - pos.y * scale;
+            // Clamp so we don't show beyond world edges
+            const minTx = vw - worldW;
+            const minTy = vh - worldH;
+            tx = Math.min(0, Math.max(minTx, tx));
+            ty = Math.min(0, Math.max(minTy, ty));
+            cameraRef.current = { tx, ty, scale };
             return (
-              <button
-                key={n.id}
-                onClick={(e) => { e.stopPropagation(); openNpc(n); }}
-                style={{ left: `${sx}%`, top: `${sy}%` }}
-                className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center group"
+              <div
+                className="absolute top-0 left-0 origin-top-left camera-smooth"
+                style={{
+                  width: zone.width,
+                  height: zone.height,
+                  transform: `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`,
+                  transformOrigin: '0 0',
+                  backgroundImage: `url(${bg})`,
+                  backgroundSize: '100% 100%',
+                }}
               >
-                {close && (
-                  <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 animate-pulse">
-                    [E] {n.name}
-                  </div>
-                )}
-                {!close && (
-                  <div className="text-[10px] font-orbitron px-1 py-0.5 rounded bg-card/90 border border-border opacity-0 group-hover:opacity-100 mb-0.5">
-                    {n.name}
-                  </div>
-                )}
-                <div className={`w-10 h-12 rounded-t-full flex items-end justify-center pb-1
-                  ${n.type === 'vendor' ? 'bg-blue-500/80' : n.type === 'quest' ? 'bg-amber-500/80' : 'bg-red-500/80'}
-                  border-2 ${close ? 'border-primary' : 'border-white/50'} shadow-lg`}>
-                  <Icon className="w-4 h-4 text-white" />
-                </div>
-                <div className="w-2 h-2 rounded-full bg-black/40" />
-              </button>
-            );
-          })}
+                {/* NPCs in world coords (px) */}
+                {npcs.map(n => {
+                  const Icon = n.type === 'vendor' ? Store : n.type === 'quest' ? ScrollText : Skull;
+                  const close = interactable?.id === n.id;
+                  return (
+                    <button
+                      key={n.id}
+                      onClick={(e) => { e.stopPropagation(); openNpc(n); }}
+                      style={{ left: n.position_x, top: n.position_y, position: 'absolute' }}
+                      className="-translate-x-1/2 -translate-y-full flex flex-col items-center group"
+                    >
+                      {close && (
+                        <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 animate-pulse">
+                          [E] {n.name}
+                        </div>
+                      )}
+                      {!close && (
+                        <div className="text-[10px] font-orbitron px-1 py-0.5 rounded bg-card/90 border border-border opacity-0 group-hover:opacity-100 mb-0.5">
+                          {n.name}
+                        </div>
+                      )}
+                      <div className={`w-14 h-16 rounded-t-full flex items-end justify-center pb-1
+                        ${n.type === 'vendor' ? 'bg-blue-500/80' : n.type === 'quest' ? 'bg-amber-500/80' : 'bg-red-500/80'}
+                        border-2 ${close ? 'border-primary' : 'border-white/50'} shadow-lg`}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="w-3 h-3 rounded-full bg-black/50 blur-[1px]" />
+                    </button>
+                  );
+                })}
 
-          {nearby.map(p => {
-            const sx = (p.x_position / zone.width) * 100;
-            const sy = (p.y_position / zone.height) * 100;
-            const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
-            return (
-              <div key={p.user_id}
-                style={{ left: `${sx}%`, top: `${sy}%` }}
-                className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
-              >
-                <div className="text-[9px] px-1 rounded bg-card/80 border border-secondary/50 mb-0.5">
-                  {p.display_name} L{p.character_level}
+                {/* Other players */}
+                {nearby.map(p => {
+                  const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
+                  return (
+                    <div key={p.user_id}
+                      style={{ left: p.x_position, top: p.y_position, position: 'absolute' }}
+                      className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
+                    >
+                      <div className="text-[10px] px-1.5 py-0.5 rounded bg-card/85 border border-secondary/50 mb-0.5">
+                        {p.display_name} L{p.character_level}
+                      </div>
+                      <PlayerSprite
+                        direction={dir}
+                        state="idle"
+                        armorVariant={p.equipped_armor_variant}
+                        weaponVariant={p.equipped_weapon_variant}
+                        scale={0.9}
+                      />
+                    </div>
+                  );
+                })}
+
+                {/* Player */}
+                <div
+                  style={{ left: pos.x, top: pos.y, position: 'absolute' }}
+                  className="-translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none"
+                >
+                  <div className="text-[11px] font-orbitron px-2 py-0.5 rounded bg-primary text-primary-foreground mb-1 drop-shadow">
+                    {characterName}
+                  </div>
+                  <PlayerSprite
+                    direction={direction}
+                    state={moving ? 'walk' : 'idle'}
+                    armorVariant={loadout.armorVariant}
+                    weaponVariant={loadout.weaponVariant}
+                    rarity="rare"
+                    scale={1}
+                  />
                 </div>
-                <PlayerSprite
-                  direction={dir}
-                  state="idle"
-                  armorVariant={p.equipped_armor_variant}
-                  weaponVariant={p.equipped_weapon_variant}
-                  scale={0.85}
-                />
-                <div className="w-6 h-1.5 rounded-full bg-black/40 -mt-1 blur-[1px]" />
               </div>
             );
-          })}
-
-          <div
-            style={{
-              left: `${(pos.x / zone.width) * 100}%`,
-              top: `${(pos.y / zone.height) * 100}%`,
-            }}
-            className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none transition-none"
-          >
-            <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 drop-shadow">
-              {characterName}
-            </div>
-            <PlayerSprite
-              direction={direction}
-              state={moving ? 'walk' : 'idle'}
-              armorVariant={loadout.armorVariant}
-              weaponVariant={loadout.weaponVariant}
-              scale={1}
-              className="drop-shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
-            />
-            <div className="w-8 h-2 rounded-full bg-black/50 -mt-1 blur-[1px]" />
-          </div>
+          })()}
         </div>
       </div>
 
