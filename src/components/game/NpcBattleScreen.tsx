@@ -226,6 +226,24 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
             <Button disabled={!myTurn || submitting} variant="secondary" onClick={() => doAction('defend')}>
               <Shield className="w-4 h-4 mr-1" /> Defend
             </Button>
+            <Button
+              disabled={!myTurn || submitting || potions.hp <= 0 || me.hp >= me.max_hp}
+              variant="outline"
+              size="sm"
+              onClick={() => doAction('use_item', undefined, 'hp_potion')}
+              title={potions.hp <= 0 ? 'No HP Potions' : me.hp >= me.max_hp ? 'HP already full' : 'Restores 50% HP'}
+            >
+              ❤ HP Potion ×{potions.hp}
+            </Button>
+            <Button
+              disabled={!myTurn || submitting || potions.mp <= 0 || me.energy >= me.max_energy}
+              variant="outline"
+              size="sm"
+              onClick={() => doAction('use_item', undefined, 'mp_potion')}
+              title={potions.mp <= 0 ? 'No MP Potions' : me.energy >= me.max_energy ? 'MP already full' : 'Restores 50% MP'}
+            >
+              ⚡ MP Potion ×{potions.mp}
+            </Button>
             <Button disabled={submitting} variant="destructive" size="sm" onClick={() => doAction('forfeit')}>
               <Flag className="w-4 h-4 mr-1" /> Forfeit
             </Button>
@@ -234,18 +252,18 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
             {skills.map(s => {
               const learned = (me.snapshot.skill_levels?.[s.slug] ?? 0) >= 1;
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
-              const lowEnergy = me.energy < s.energy_cost;
+              const lowMp = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
-              const disabled = !myTurn || submitting || !learned || onCd || lowEnergy || lowLvl;
+              const disabled = !myTurn || submitting || !learned || onCd || lowMp || lowLvl;
               return (
                 <Button key={s.slug} disabled={disabled} variant="outline" size="sm"
                   onClick={() => doAction('skill', s.slug)}
-                  title={`${s.description} | ⚡${s.energy_cost} | CD ${s.cooldown}${!learned ? ' | NOT LEARNED' : ''}`}
+                  title={`${s.description} | MP ${s.energy_cost} | CD ${s.cooldown}${!learned ? ' | NOT LEARNED' : ''}`}
                   className="flex flex-col h-auto py-1 px-2"
                 >
                   <span className="font-orbitron text-[10px]">{s.name}</span>
                   <span className="text-[9px] text-muted-foreground">
-                    {onCd ? `CD ${me.cooldowns[s.slug]}` : `⚡${s.energy_cost}`}
+                    {onCd ? `CD ${me.cooldowns[s.slug]}` : `MP ${s.energy_cost}`}
                     {!learned && ' 🔒'}
                   </span>
                 </Button>
