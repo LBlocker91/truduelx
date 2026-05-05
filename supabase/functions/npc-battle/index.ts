@@ -57,7 +57,14 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
   const playerSnap = await buildPlayerSnapshot(admin, characterId, userId);
   if (!playerSnap) return j({ error: 'character not found' }, 404);
 
-  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level);
+  // Pull bonus_max_hp / bonus_max_mp directly from character row
+  const { data: charForBonus } = await admin.from('characters')
+    .select('bonus_max_hp, bonus_max_mp').eq('id', characterId).maybeSingle();
+  const bonusHp = charForBonus?.bonus_max_hp ?? 0;
+  const bonusMp = charForBonus?.bonus_max_mp ?? 0;
+
+  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp;
+  const playerMp = 100 + bonusMp;
   const enemyHp = calcMaxHp(enemy.strength, enemy.level);
 
   const enemySnap: CharacterSnapshot = {
