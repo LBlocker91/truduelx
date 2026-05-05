@@ -243,3 +243,28 @@ const Stat = ({
     </Button>
   </div>
 );
+
+const BarSpend = ({
+  icon, label, value, max, color, plusLabel, onPlus, disabled, busy,
+}: {
+  icon: React.ReactNode; label: string; value: number; max: number; color: string;
+  plusLabel: string; onPlus: () => void; disabled: boolean; busy: boolean;
+}) => {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="mb-2 last:mb-0">
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="flex items-center gap-1.5 text-foreground">{icon} {label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">{value} / {max}</span>
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" disabled={disabled} onClick={onPlus}>
+            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : plusLabel}
+          </Button>
+        </div>
+      </div>
+      <div className="h-2 rounded bg-muted overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+};
