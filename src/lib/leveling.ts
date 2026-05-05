@@ -3,10 +3,14 @@ import { Character } from '@/types/game';
 // --- Max level ---
 export const MAX_LEVEL = 100;
 
-// --- XP required per level: 100 × Level² + 500 × Level ---
+// --- XP required per level (must match supabase/functions/_shared/leveling.ts) ---
 export function xpForLevel(level: number): number {
-  return 100 * level * level + 500 * level;
+  if (level < 1) return 200;
+  if (level <= 20) return 100 + level * 100;
+  if (level <= 50) return 1500 + (level - 20) * (level - 20) * 25 + (level - 20) * 200;
+  return 25_000 + (level - 50) * (level - 50) * 200 + (level - 50) * 1_500;
 }
+
 
 // --- Stat points per level ---
 export function statPointsForLevel(level: number): number {
