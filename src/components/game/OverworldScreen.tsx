@@ -61,6 +61,7 @@ export const OverworldScreen = ({
   const [myQuests, setMyQuests] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
+  const [debug, setDebug] = useState(false);
   const posRef = useRef(pos);
   posRef.current = pos;
   const dirRef = useRef<SpriteDirection>('right');
