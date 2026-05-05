@@ -141,16 +141,35 @@ export const OverworldScreen = ({
   );
   const ClassIcon = getClassIcon(characterClass);
 
-  // Track stage size for camera math
+  // Track stage size for camera math — recompute on resize, orientation change,
+  // fullscreen transitions, and any DOM size change. This guarantees the camera
+  // viewport always fills the available space across 16:9, 4:3, ultrawide, and
+  // mobile portrait/landscape with no letterboxing.
   useEffect(() => {
     if (!stageRef.current) return;
     const el = stageRef.current;
-    const ro = new ResizeObserver(() => {
-      setStageSize({ w: el.clientWidth, h: el.clientHeight });
-    });
+    const measure = () => {
+      // Use rAF so we read sizes after the browser has applied layout changes
+      // (e.g. orientation change, fullscreen entry/exit).
+      requestAnimationFrame(() => {
+        setStageSize({ w: el.clientWidth, h: el.clientHeight });
+      });
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setStageSize({ w: el.clientWidth, h: el.clientHeight });
-    return () => ro.disconnect();
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    document.addEventListener('fullscreenchange', measure);
+    // iOS Safari visualViewport (handles URL bar show/hide)
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+      document.removeEventListener('fullscreenchange', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
   }, []);
 
   useEffect(() => {
