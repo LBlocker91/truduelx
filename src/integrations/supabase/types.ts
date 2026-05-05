@@ -127,6 +127,7 @@ export type Database = {
           finished_at: string | null
           id: string
           mode: Database["public"]["Enums"]["battle_mode"]
+          npc_id: string | null
           seed: number
           status: Database["public"]["Enums"]["battle_status"]
           turn_deadline: string | null
@@ -140,6 +141,7 @@ export type Database = {
           finished_at?: string | null
           id?: string
           mode: Database["public"]["Enums"]["battle_mode"]
+          npc_id?: string | null
           seed?: number
           status?: Database["public"]["Enums"]["battle_status"]
           turn_deadline?: string | null
@@ -153,6 +155,7 @@ export type Database = {
           finished_at?: string | null
           id?: string
           mode?: Database["public"]["Enums"]["battle_mode"]
+          npc_id?: string | null
           seed?: number
           status?: Database["public"]["Enums"]["battle_status"]
           turn_deadline?: string | null
@@ -160,7 +163,15 @@ export type Database = {
           updated_at?: string
           winner_user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "battles_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       characters: {
         Row: {
@@ -332,6 +343,195 @@ export type Database = {
           },
         ]
       }
+      npc_enemies: {
+        Row: {
+          class: Database["public"]["Enums"]["character_class"]
+          defense: number
+          dexterity: number
+          level: number
+          npc_id: string
+          skill_slugs: string[]
+          strength: number
+          support: number
+          technology: number
+          weapon_max: number
+          weapon_min: number
+          xp_reward: number
+        }
+        Insert: {
+          class: Database["public"]["Enums"]["character_class"]
+          defense?: number
+          dexterity?: number
+          level?: number
+          npc_id: string
+          skill_slugs?: string[]
+          strength?: number
+          support?: number
+          technology?: number
+          weapon_max?: number
+          weapon_min?: number
+          xp_reward?: number
+        }
+        Update: {
+          class?: Database["public"]["Enums"]["character_class"]
+          defense?: number
+          dexterity?: number
+          level?: number
+          npc_id?: string
+          skill_slugs?: string[]
+          strength?: number
+          support?: number
+          technology?: number
+          weapon_max?: number
+          weapon_min?: number
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_enemies_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: true
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      npcs: {
+        Row: {
+          created_at: string
+          dialogue: string | null
+          id: string
+          name: string
+          position_x: number
+          position_y: number
+          sprite: string | null
+          type: Database["public"]["Enums"]["npc_type"]
+          zone_id: string
+        }
+        Insert: {
+          created_at?: string
+          dialogue?: string | null
+          id: string
+          name: string
+          position_x: number
+          position_y: number
+          sprite?: string | null
+          type: Database["public"]["Enums"]["npc_type"]
+          zone_id: string
+        }
+        Update: {
+          created_at?: string
+          dialogue?: string | null
+          id?: string
+          name?: string
+          position_x?: number
+          position_y?: number
+          sprite?: string | null
+          type?: Database["public"]["Enums"]["npc_type"]
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npcs_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_quests: {
+        Row: {
+          claimed: boolean
+          completed: boolean
+          id: string
+          progress: Json
+          quest_id: string
+          started_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          claimed?: boolean
+          completed?: boolean
+          id?: string
+          progress?: Json
+          quest_id: string
+          started_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          claimed?: boolean
+          completed?: boolean
+          id?: string
+          progress?: Json
+          quest_id?: string
+          started_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_quests_quest_id_fkey"
+            columns: ["quest_id"]
+            isOneToOne: false
+            referencedRelation: "quests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_state: {
+        Row: {
+          character_class: Database["public"]["Enums"]["character_class"] | null
+          character_level: number
+          display_name: string | null
+          facing: string
+          is_in_battle: boolean
+          updated_at: string
+          user_id: string
+          x_position: number
+          y_position: number
+          zone_id: string
+        }
+        Insert: {
+          character_class?:
+            | Database["public"]["Enums"]["character_class"]
+            | null
+          character_level?: number
+          display_name?: string | null
+          facing?: string
+          is_in_battle?: boolean
+          updated_at?: string
+          user_id: string
+          x_position?: number
+          y_position?: number
+          zone_id?: string
+        }
+        Update: {
+          character_class?:
+            | Database["public"]["Enums"]["character_class"]
+            | null
+          character_level?: number
+          display_name?: string | null
+          facing?: string
+          is_in_battle?: boolean
+          updated_at?: string
+          user_id?: string
+          x_position?: number
+          y_position?: number
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_state_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -370,6 +570,44 @@ export type Database = {
           wins?: number
         }
         Relationships: []
+      }
+      quests: {
+        Row: {
+          created_at: string
+          description: string | null
+          giver_npc_id: string | null
+          id: string
+          name: string
+          objectives: Json
+          rewards: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          giver_npc_id?: string | null
+          id: string
+          name: string
+          objectives?: Json
+          rewards?: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          giver_npc_id?: string | null
+          id?: string
+          name?: string
+          objectives?: Json
+          rewards?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quests_giver_npc_id_fkey"
+            columns: ["giver_npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       skills: {
         Row: {
@@ -428,18 +666,104 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_items: {
+        Row: {
+          id: string
+          item_id: string
+          npc_id: string
+          price: number
+        }
+        Insert: {
+          id?: string
+          item_id: string
+          npc_id: string
+          price?: number
+        }
+        Update: {
+          id?: string
+          item_id?: string
+          npc_id?: string
+          price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_items_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zones: {
+        Row: {
+          background_url: string | null
+          created_at: string
+          description: string | null
+          height: number
+          id: string
+          name: string
+          spawn_x: number
+          spawn_y: number
+          width: number
+        }
+        Insert: {
+          background_url?: string | null
+          created_at?: string
+          description?: string | null
+          height?: number
+          id: string
+          name: string
+          spawn_x?: number
+          spawn_y?: number
+          width?: number
+        }
+        Update: {
+          background_url?: string | null
+          created_at?: string
+          description?: string | null
+          height?: number
+          id?: string
+          name?: string
+          spawn_x?: number
+          spawn_y?: number
+          width?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_zone_players: {
+        Args: { _zone_id: string }
+        Returns: {
+          character_class: Database["public"]["Enums"]["character_class"]
+          character_level: number
+          display_name: string
+          facing: string
+          is_in_battle: boolean
+          updated_at: string
+          user_id: string
+          x_position: number
+          y_position: number
+        }[]
+      }
       is_battle_participant: {
         Args: { _battle_id: string; _user_id: string }
         Returns: boolean
       }
     }
     Enums: {
-      battle_mode: "pve" | "pvp"
+      battle_mode: "pve" | "pvp" | "pve_npc"
       battle_status: "pending" | "active" | "finished" | "abandoned"
       character_class:
         | "mercenary"
@@ -459,6 +783,7 @@ export type Database = {
         | "gloves"
         | "boots"
         | "accessory"
+      npc_type: "vendor" | "quest" | "enemy"
       scale_stat: "strength" | "dexterity" | "technology" | "support"
       skill_effect:
         | "none"
@@ -607,7 +932,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      battle_mode: ["pve", "pvp"],
+      battle_mode: ["pve", "pvp", "pve_npc"],
       battle_status: ["pending", "active", "finished", "abandoned"],
       character_class: [
         "mercenary",
@@ -622,6 +947,7 @@ export const Constants = {
       ],
       item_rarity: ["common", "uncommon", "rare", "epic", "legendary"],
       item_slot: ["weapon", "armor", "helmet", "gloves", "boots", "accessory"],
+      npc_type: ["vendor", "quest", "enemy"],
       scale_stat: ["strength", "dexterity", "technology", "support"],
       skill_effect: [
         "none",
