@@ -31,6 +31,10 @@ interface OverworldScreenProps {
   onEnterNpcBattle: (battleId: string) => void;
   onJoinPvpQueue: () => void;
   onExit: () => void;
+  /** When true, the GameHud owns the chrome — hide internal header / zone bar / footer. */
+  hideChrome?: boolean;
+  /** Bump this number to force the overworld to re-fetch the equipped loadout. */
+  loadoutBust?: number;
 }
 
 const MOVE_SPEED = 6.5;            // faster on a much larger map
@@ -75,6 +79,7 @@ const variantToRarity = (armor: string | null, weapon: string | null): SpriteRar
 export const OverworldScreen = ({
   characterId, characterName, characterClass, characterLevel,
   onEnterNpcBattle, onJoinPvpQueue, onExit,
+  hideChrome = false, loadoutBust = 0,
 }: OverworldScreenProps) => {
   const [zones, setZones] = useState<Zone[]>([]);
   const [zone, setZone] = useState<Zone | null>(null);
@@ -276,14 +281,14 @@ export const OverworldScreen = ({
     return () => { clearInterval(hb); clearInterval(np); };
   }, [zone]);
 
-  // Load equipped loadout once and publish to presence so others can see it
+  // Load equipped loadout (and refresh whenever loadoutBust changes)
   useEffect(() => {
     (async () => {
       const lo = await fetchMyLoadout(characterId);
       setLoadout(lo);
       await publishLoadout(lo);
     })();
-  }, [characterId]);
+  }, [characterId, loadoutBust]);
 
   useEffect(() => { (async () => {
     const { data } = await import('@/integrations/supabase/client').then(m => m.supabase.auth.getUser());
