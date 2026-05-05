@@ -686,7 +686,7 @@ export const OverworldScreen = ({
                       try {
                         const { buyVendorItem } = await import('@/lib/overworld');
                         await buyVendorItem(characterId, vi.id, 1);
-                        setLoadoutBust(b => b + 1);
+                        // Inventory + credits will refresh on next panel open
                         // Refresh vendor list (no quantity change but for UX consistency)
                         // and re-fetch player credits via parent reload mechanism.
                         const { toast } = await import('sonner');
