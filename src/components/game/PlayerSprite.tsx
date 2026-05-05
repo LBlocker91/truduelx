@@ -190,7 +190,7 @@ const PlayerSpriteImpl = ({
 
       {/* Sprite stack — bobs / leans, but the shadow above stays put */}
       <div
-        className="absolute inset-0"
+        className={`absolute inset-0 ${state === 'idle' ? 'idle-micro' : ''}`}
         style={{ transform: flip, transformOrigin: 'center bottom' }}
       >
         <div className={`relative w-full h-full ${animClass}`}>
