@@ -420,6 +420,19 @@ export const OverworldScreen = ({
               </div>
             );
           })()}
+
+          {debug && (
+            <div className="absolute top-2 left-2 z-20 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
+              <div>player: x={pos.x.toFixed(0)} y={pos.y.toFixed(0)} dir={direction} {moving ? 'walk' : 'idle'}</div>
+              <div>world: {zone.width}×{zone.height}</div>
+              <div>viewport: {stageSize.w}×{stageSize.h}</div>
+              <div>camera: tx={cameraRef.current.tx.toFixed(0)} ty={cameraRef.current.ty.toFixed(0)} scale={cameraRef.current.scale.toFixed(2)}</div>
+              <div className="text-emerald-500/70">[`] toggle debug</div>
+            </div>
+          )}
+          {!debug && (
+            <div className="absolute top-2 right-2 z-20 text-[10px] text-white/40 font-mono pointer-events-none">[`] debug</div>
+          )}
         </div>
       </div>
 
