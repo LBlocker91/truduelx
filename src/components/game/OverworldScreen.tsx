@@ -46,7 +46,7 @@ interface OverworldScreenProps {
 // ---------- Hub-mode tuning ----------
 const HEARTBEAT_MS = 400;
 const NEARBY_POLL_MS = 1500;
-const INTERACTION_RADIUS_PCT = 14;     // distance in % space to allow [E] interact
+const INTERACTION_RADIUS_PCT = 18;     // distance in % space to allow [E] interact
 const MOVE_SPEED_PCT = 0.65;           // % per frame at 60fps
 const MOVE_ACCEL = 0.2;
 
