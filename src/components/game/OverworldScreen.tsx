@@ -442,7 +442,30 @@ export const OverworldScreen = ({
                     scale={1}
                   />
                 </div>
-              </div>
+                </div>
+
+                {/* === FOREGROUND LAYER (vignette + ambient lighting, viewport-fixed) === */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      'radial-gradient(ellipse 80% 70% at 50% 55%, transparent 40%, rgba(0,0,0,0.55) 100%)',
+                  }}
+                />
+                {/* Ambient color tint — zone mood */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      zone.id === 'neon-district'
+                        ? 'linear-gradient(180deg, hsl(280 70% 30% / 0.18), hsl(190 80% 30% / 0.18))'
+                        : zone.id === 'wasteland'
+                        ? 'linear-gradient(180deg, hsl(30 60% 35% / 0.22), hsl(15 50% 25% / 0.18))'
+                        : 'linear-gradient(180deg, hsl(210 50% 25% / 0.18), hsl(220 40% 15% / 0.18))',
+                    mixBlendMode: 'soft-light',
+                  }}
+                />
+              </>
             );
           })()}
 
