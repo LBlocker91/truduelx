@@ -73,37 +73,25 @@ const variantToRarity = (armor: string | null, weapon: string | null): SpriteRar
   return 'rare';
 };
 
-// Per-zone normalized NPC layouts (xPercent, yPercent). Names match seeded NPCs.
-const NPC_HUB_LAYOUT: Record<string, Record<string, { x: number; y: number }>> = {
-  'station-hub': {
-    'Scout Junko':       { x: 18, y: 60 },
-    'Quartermaster Vex': { x: 32, y: 72 },
-    'Commander Hale':    { x: 52, y: 50 },
-    'Doc Circuits':      { x: 70, y: 62 },
-    'Tinker Mira':       { x: 86, y: 52 },
-  },
-  'wasteland': {
-    'Scrapper Drone':     { x: 18, y: 65 },
-    'Stranded Survivor':  { x: 36, y: 75 },
-    'Wasteland Marauder': { x: 52, y: 58 },
-    'Rogue War-Mech':     { x: 70, y: 62 },
-    'Wasteland Overlord': { x: 88, y: 55 },
-  },
-  'neon-district': {
-    'Whisper':            { x: 16, y: 62 },
-    'Cyber-Doc Riku':     { x: 34, y: 72 },
-    'Neon Gangster':      { x: 52, y: 56 },
-    'Syndicate Enforcer': { x: 70, y: 64 },
-    'The Fixer':          { x: 88, y: 50 },
-  },
+// Per-NPC placement (visual + interaction) is now defined in zone-walkable.ts.
+// We resolve a placement for each seeded NPC by name; if not present, we fall
+// back to an evenly spaced spot inside the zone's walkable polygon.
+const fallbackNpcSpot = (zoneId: string, idx: number, total: number) => {
+  const wk = walkableFor(zoneId);
+  // Evenly spread across the front edge of the polygon.
+  const front = wk.polygon.reduce((a, b) => (b.y > a.y ? b : a), wk.polygon[0]);
+  const back = wk.polygon.reduce((a, b) => (b.y < a.y ? b : a), wk.polygon[0]);
+  const y = back.y + (front.y - back.y) * 0.65;
+  const minX = Math.min(...wk.polygon.map(p => p.x));
+  const maxX = Math.max(...wk.polygon.map(p => p.x));
+  const x = minX + ((maxX - minX) * (idx + 1)) / (total + 1);
+  const spot = { x, y };
+  return { visual: spot, interaction: spot };
 };
-const fallbackNpcSpot = (idx: number, total: number) => {
-  const span = PLAYER_X_MAX - PLAYER_X_MIN;
-  const x = PLAYER_X_MIN + (span * (idx + 1)) / (total + 1);
-  return { x, y: 60 };
+const npcPlacement = (zoneId: string, name: string, idx: number, total: number) => {
+  const wk = walkableFor(zoneId);
+  return wk.npcs[name] ?? fallbackNpcSpot(zoneId, idx, total);
 };
-const npcSpot = (zoneId: string, name: string, idx: number, total: number) =>
-  NPC_HUB_LAYOUT[zoneId]?.[name] ?? fallbackNpcSpot(idx, total);
 
 // Map any legacy world-pixel coordinate (~0..5000) into normalized %.
 // Players moving in another tab may still be writing world-px values — clamp to hub.
