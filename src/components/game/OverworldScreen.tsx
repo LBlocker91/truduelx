@@ -32,10 +32,13 @@ interface OverworldScreenProps {
   onExit: () => void;
 }
 
-const MOVE_SPEED = 4;
+const MOVE_SPEED = 4.5;
+const MOVE_ACCEL = 0.25; // easing factor 0..1 (lerp toward target velocity)
 const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
-const INTERACTION_RADIUS = 60;
+const INTERACTION_RADIUS = 90;
+const CAMERA_ZOOM = 1.6; // makes player ~12-18% of screen
+const CAMERA_LERP = 0.14;
 
 export const OverworldScreen = ({
   characterId, characterName, characterClass, characterLevel,
