@@ -247,7 +247,9 @@ export const OverworldScreen = ({
         y = clamped.y;
 
         const speed = Math.hypot(v.vx, v.vy);
-        const isMoving = speed > 0.04;
+        // Use the *target* (not just current velocity) so click-to-move plays
+        // the walk anim even during the brief acceleration ramp-up.
+        const isMoving = speed > 0.015 || !!targetRef.current || klen > 0;
         if (Math.abs(v.vx) > 0.02) {
           const nd: SpriteDirection = v.vx < 0 ? 'left' : 'right';
           if (dirRef.current !== nd) setDirection(nd);
