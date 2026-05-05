@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       return await startBattle(admin, user.id, body.npcId, body.characterId);
     }
     if (body.action === 'act') {
-      return await processAction(admin, user.id, body.battleId, body.playerAction, body.skillSlug);
+      return await processAction(admin, user.id, body.battleId, body.playerAction, body.skillSlug, body.itemSubtype);
     }
     return j({ error: 'invalid action' }, 400);
   } catch (e) {
@@ -57,7 +57,14 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
   const playerSnap = await buildPlayerSnapshot(admin, characterId, userId);
   if (!playerSnap) return j({ error: 'character not found' }, 404);
 
-  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level);
+  // Pull bonus_max_hp / bonus_max_mp directly from character row
+  const { data: charForBonus } = await admin.from('characters')
+    .select('bonus_max_hp, bonus_max_mp').eq('id', characterId).maybeSingle();
+  const bonusHp = charForBonus?.bonus_max_hp ?? 0;
+  const bonusMp = charForBonus?.bonus_max_mp ?? 0;
+
+  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp;
+  const playerMp = 100 + bonusMp;
   const enemyHp = calcMaxHp(enemy.strength, enemy.level);
 
   const enemySnap: CharacterSnapshot = {
@@ -89,7 +96,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 
   await admin.from('battle_participants').insert([
     { battle_id: battle.id, user_id: userId, character_id: characterId, slot: 0,
-      hp: playerHp, max_hp: playerHp, energy: 100, max_energy: 100,
+      hp: playerHp, max_hp: playerHp, energy: playerMp, max_energy: playerMp,
       snapshot: { ...playerSnap, max_hp: playerHp }, is_bot: false },
     { battle_id: battle.id, user_id: null, character_id: null, slot: 1, is_bot: true,
       hp: enemyHp, max_hp: enemyHp, energy: 100, max_energy: 100,
@@ -100,7 +107,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 }
 
 // ----- ACT -----
-async function processAction(admin: any, userId: string, battleId: string, playerAction: string, skillSlug?: string) {
+async function processAction(admin: any, userId: string, battleId: string, playerAction: string, skillSlug?: string, itemSubtype?: string) {
   const { data: battle } = await admin.from('battles').select('*').eq('id', battleId).maybeSingle();
   if (!battle) return j({ error: 'battle not found' }, 404);
   if (battle.mode !== 'pve_npc') return j({ error: 'not a pve battle' }, 400);
@@ -109,13 +116,14 @@ async function processAction(admin: any, userId: string, battleId: string, playe
 
   const { data: parts } = await admin.from('battle_participants').select('*').eq('battle_id', battleId).order('slot');
   if (!parts || parts.length < 2) return j({ error: 'invalid battle' }, 400);
-  const player = parts[0] as ParticipantState;
+  const player = parts[0] as ParticipantState & { character_id: string | null };
   const bot = parts[1] as ParticipantState;
 
   // ---- PLAYER TURN ----
   const playerResult = await executeTurn({
     admin, battle, actor: player, target: bot,
-    action: playerAction, skillSlug, isBot: false,
+    action: playerAction, skillSlug, itemSubtype, isBot: false,
+    characterId: (player as any).character_id ?? null,
   });
   if (playerResult.error) return j({ error: playerResult.error }, 400);
 
@@ -180,7 +188,8 @@ async function executeTurn({
   admin, battle, actor, target, action, skillSlug, isBot,
 }: {
   admin: any; battle: any; actor: ParticipantState; target: ParticipantState;
-  action: string; skillSlug?: string; isBot: boolean;
+  action: string; skillSlug?: string; itemSubtype?: string; isBot: boolean;
+  characterId?: string | null;
 }): Promise<{ result: any; error?: string }> {
   if (isStunned(actor)) {
     tickStatusEffects(actor); tickCooldowns(actor);
@@ -193,7 +202,43 @@ async function executeTurn({
     actor.hp = 0;
     return { result: { forfeit: true } };
   }
-  if (action === 'defend') {
+  if (action === 'use_item') {
+    if (isBot || !characterId) return { result: {}, error: 'cannot use item' };
+    if (!itemSubtype || (itemSubtype !== 'hp_potion' && itemSubtype !== 'mp_potion')) {
+      return { result: {}, error: 'invalid item' };
+    }
+    // Look up the item + inventory row owned by this character
+    const { data: invRow } = await admin.from('inventory')
+      .select('id, quantity, items!inner(id, subtype, consumable, name)')
+      .eq('character_id', characterId)
+      .eq('items.subtype', itemSubtype)
+      .maybeSingle();
+    if (!invRow || !invRow.items?.consumable) return { result: {}, error: 'item not in inventory' };
+    if ((invRow.quantity ?? 0) <= 0) return { result: {}, error: 'out of potions' };
+
+    if (itemSubtype === 'hp_potion') {
+      if (actor.hp >= actor.max_hp) return { result: {}, error: 'HP already full' };
+      const restore = Math.floor(actor.max_hp * 0.5);
+      const before = actor.hp;
+      actor.hp = Math.min(actor.max_hp, actor.hp + restore);
+      result.heal = actor.hp - before;
+      result.item = 'hp_potion';
+    } else {
+      if (actor.energy >= actor.max_energy) return { result: {}, error: 'MP already full' };
+      const restore = Math.floor(actor.max_energy * 0.5);
+      const before = actor.energy;
+      actor.energy = Math.min(actor.max_energy, actor.energy + restore);
+      result.mpHeal = actor.energy - before;
+      result.item = 'mp_potion';
+    }
+
+    const newQty = (invRow.quantity ?? 1) - 1;
+    if (newQty <= 0) {
+      await admin.from('inventory').delete().eq('id', invRow.id);
+    } else {
+      await admin.from('inventory').update({ quantity: newQty }).eq('id', invRow.id);
+    }
+  } else if (action === 'defend') {
     actor.energy = Math.min(actor.max_energy, actor.energy + 15);
     result.defending = true;
   } else if (action === 'attack') {

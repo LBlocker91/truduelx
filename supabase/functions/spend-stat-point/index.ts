@@ -1,5 +1,5 @@
 // Spend 1 stat point on an attribute. Validates ownership + available points.
-// POST { characterId, stat: 'strength'|'dexterity'|'technology'|'support' }
+// POST { characterId, stat: 'strength'|'dexterity'|'technology'|'support'|'defense'|'resistance'|'max_hp'|'max_energy' }
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
@@ -7,7 +7,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const ALLOWED = new Set(['strength', 'dexterity', 'technology', 'support', 'defense', 'resistance']);
+const ATTR_STATS = new Set(['strength', 'dexterity', 'technology', 'support', 'defense', 'resistance']);
+const HP_STAT = 'max_hp';
+const MP_STAT = 'max_energy';
+const HP_GAIN = 5;
+const MP_GAIN = 3;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -25,7 +29,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const characterId = String(body.characterId ?? '');
     const stat = String(body.stat ?? '');
-    if (!characterId || !ALLOWED.has(stat)) return j({ error: 'invalid input' }, 400);
+    const valid = ATTR_STATS.has(stat) || stat === HP_STAT || stat === MP_STAT;
+    if (!characterId || !valid) return j({ error: 'invalid input' }, 400);
 
     const admin = createClient(url, service);
     const { data: ch } = await admin.from('characters').select('*').eq('id', characterId).maybeSingle();
@@ -34,12 +39,41 @@ Deno.serve(async (req) => {
 
     const updates: Record<string, number> = {
       stat_points: (ch.stat_points ?? 0) - 1,
-      [stat]: (ch[stat] ?? 0) + 1,
     };
+
+    if (ATTR_STATS.has(stat)) {
+      updates[stat] = (ch[stat] ?? 0) + 1;
+    } else if (stat === HP_STAT) {
+      updates.bonus_max_hp = (ch.bonus_max_hp ?? 0) + HP_GAIN;
+    } else if (stat === MP_STAT) {
+      updates.bonus_max_mp = (ch.bonus_max_mp ?? 0) + MP_GAIN;
+    }
 
     const { data: updated, error } = await admin.from('characters')
       .update(updates).eq('id', characterId).select('*').single();
     if (error) return j({ error: error.message }, 500);
+
+    // If we increased max HP/MP and there are active battle participants for this
+    // character, also bump their max & current resource by the same delta (capped).
+    if (stat === HP_STAT || stat === MP_STAT) {
+      const { data: parts } = await admin.from('battle_participants')
+        .select('id, hp, max_hp, energy, max_energy, battle_id')
+        .eq('character_id', characterId);
+      const inActive = parts ?? [];
+      for (const p of inActive) {
+        const { data: b } = await admin.from('battles').select('status').eq('id', p.battle_id).maybeSingle();
+        if (b?.status !== 'active') continue;
+        if (stat === HP_STAT) {
+          const newMax = p.max_hp + HP_GAIN;
+          const newHp = Math.min(newMax, p.hp + HP_GAIN);
+          await admin.from('battle_participants').update({ max_hp: newMax, hp: newHp }).eq('id', p.id);
+        } else {
+          const newMax = p.max_energy + MP_GAIN;
+          const newEn = Math.min(newMax, p.energy + MP_GAIN);
+          await admin.from('battle_participants').update({ max_energy: newMax, energy: newEn }).eq('id', p.id);
+        }
+      }
+    }
 
     return j({ ok: true, character: updated });
   } catch (e) {

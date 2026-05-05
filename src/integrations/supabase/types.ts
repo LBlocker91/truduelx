@@ -207,6 +207,8 @@ export type Database = {
       }
       characters: {
         Row: {
+          bonus_max_hp: number
+          bonus_max_mp: number
           class: Database["public"]["Enums"]["character_class"]
           created_at: string
           credits: number
@@ -232,6 +234,8 @@ export type Database = {
           xp: number
         }
         Insert: {
+          bonus_max_hp?: number
+          bonus_max_mp?: number
           class: Database["public"]["Enums"]["character_class"]
           created_at?: string
           credits?: number
@@ -257,6 +261,8 @@ export type Database = {
           xp?: number
         }
         Update: {
+          bonus_max_hp?: number
+          bonus_max_mp?: number
           class?: Database["public"]["Enums"]["character_class"]
           created_at?: string
           credits?: number
@@ -290,6 +296,7 @@ export type Database = {
           equipped: boolean
           id: string
           item_id: string
+          quantity: number
         }
         Insert: {
           acquired_at?: string
@@ -297,6 +304,7 @@ export type Database = {
           equipped?: boolean
           id?: string
           item_id: string
+          quantity?: number
         }
         Update: {
           acquired_at?: string
@@ -304,6 +312,7 @@ export type Database = {
           equipped?: boolean
           id?: string
           item_id?: string
+          quantity?: number
         }
         Relationships: [
           {
@@ -325,6 +334,7 @@ export type Database = {
       items: {
         Row: {
           class_req: Database["public"]["Enums"]["character_class"] | null
+          consumable: boolean
           created_at: string
           defense: number
           description: string | null
@@ -338,9 +348,11 @@ export type Database = {
           sprite_layer: string | null
           sprite_variant: string | null
           stat_modifiers: Json
+          subtype: string | null
         }
         Insert: {
           class_req?: Database["public"]["Enums"]["character_class"] | null
+          consumable?: boolean
           created_at?: string
           defense?: number
           description?: string | null
@@ -354,9 +366,11 @@ export type Database = {
           sprite_layer?: string | null
           sprite_variant?: string | null
           stat_modifiers?: Json
+          subtype?: string | null
         }
         Update: {
           class_req?: Database["public"]["Enums"]["character_class"] | null
+          consumable?: boolean
           created_at?: string
           defense?: number
           description?: string | null
@@ -370,6 +384,7 @@ export type Database = {
           sprite_layer?: string | null
           sprite_variant?: string | null
           stat_modifiers?: Json
+          subtype?: string | null
         }
         Relationships: []
       }
@@ -862,6 +877,7 @@ export type Database = {
         | "gloves"
         | "boots"
         | "accessory"
+        | "consumable"
       npc_type: "vendor" | "quest" | "enemy"
       scale_stat: "strength" | "dexterity" | "technology" | "support"
       skill_effect:
@@ -1025,7 +1041,15 @@ export const Constants = {
         "cyber-warden",
       ],
       item_rarity: ["common", "uncommon", "rare", "epic", "legendary"],
-      item_slot: ["weapon", "armor", "helmet", "gloves", "boots", "accessory"],
+      item_slot: [
+        "weapon",
+        "armor",
+        "helmet",
+        "gloves",
+        "boots",
+        "accessory",
+        "consumable",
+      ],
       npc_type: ["vendor", "quest", "enemy"],
       scale_stat: ["strength", "dexterity", "technology", "support"],
       skill_effect: [

@@ -4,12 +4,13 @@ export interface InventoryItem {
   id: string; // inventory row id
   item_id: string;
   equipped: boolean;
+  quantity: number;
   acquired_at: string;
   item: {
     id: string;
     name: string;
     description: string | null;
-    slot: 'weapon' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory';
+    slot: 'weapon' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable';
     rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
     level_req: number;
     min_damage: number | null;
@@ -18,6 +19,8 @@ export interface InventoryItem {
     sprite_layer: string | null;
     sprite_variant: string | null;
     stat_modifiers: Record<string, number>;
+    consumable: boolean;
+    subtype: string | null;
   };
 }
 
@@ -26,7 +29,7 @@ export async function fetchInventory(characterId: string): Promise<InventoryItem
   const { data, error } = await supabase
     .from('inventory')
     .select(`
-      id, item_id, equipped, acquired_at,
+      id, item_id, equipped, quantity, acquired_at,
       item:items(*)
     `)
     .eq('character_id', characterId)

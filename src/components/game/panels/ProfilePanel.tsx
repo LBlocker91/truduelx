@@ -30,6 +30,8 @@ interface CharRow {
   support: number;
   defense: number;
   resistance: number;
+  bonus_max_hp: number;
+  bonus_max_mp: number;
   equipped_weapon_id: string | null;
   equipped_armor_id: string | null;
 }
@@ -90,7 +92,11 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
       const r = await spendStatPoint(characterId, stat);
       setC(r.character as CharRow);
       onProgressionChange?.(null);
-      toast.success(`+1 ${stat}`);
+      const labels: Record<string, string> = {
+        strength: '+1 Strength', dexterity: '+1 Dexterity', technology: '+1 Tech', support: '+1 Support',
+        defense: '+1 Defense', resistance: '+1 Resistance', max_hp: '+5 Max HP', max_energy: '+3 Max MP',
+      };
+      toast.success(labels[stat] ?? `+1 ${stat}`);
     } catch (e: any) {
       toast.error(e.message ?? String(e));
     } finally {
@@ -103,8 +109,9 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
   }
 
   const meta = (CLASS_META as any)[c.class];
-  const maxHp = Math.floor(100 + c.strength * 8 + c.level * 12);
-  const maxEnergy = 100 + c.technology * 2;
+  const maxHp = Math.floor(100 + c.strength * 8 + c.level * 12) + (c.bonus_max_hp ?? 0);
+  const maxMp = 100 + c.technology * 2 + (c.bonus_max_mp ?? 0);
+  const canSpend = c.stat_points > 0;
 
   return (
     <div className="space-y-4">
@@ -141,9 +148,18 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
       </div>
 
       <div className="game-card rounded-lg p-4">
-        <h3 className="font-orbitron text-sm text-muted-foreground mb-2">VITALS</h3>
-        <Bar icon={<Heart className="w-4 h-4 text-health" />} label="Max Health" value={maxHp} max={maxHp} color="bg-health" />
-        <Bar icon={<Zap className="w-4 h-4 text-energy" />} label="Max Energy" value={maxEnergy} max={maxEnergy} color="bg-energy" />
+        <h3 className="font-orbitron text-sm text-muted-foreground mb-2 flex items-center justify-between">
+          <span>VITALS</span>
+          {canSpend && <span className="text-[10px] text-secondary">Tap + to spend</span>}
+        </h3>
+        <BarSpend
+          icon={<Heart className="w-4 h-4 text-health" />} label="Max HP" value={maxHp} max={maxHp} color="bg-health"
+          plusLabel="+5" onPlus={() => handleSpend('max_hp')} disabled={!canSpend || busy === 'max_hp'} busy={busy === 'max_hp'}
+        />
+        <BarSpend
+          icon={<Zap className="w-4 h-4 text-energy" />} label="Max MP" value={maxMp} max={maxMp} color="bg-energy"
+          plusLabel="+3" onPlus={() => handleSpend('max_energy')} disabled={!canSpend || busy === 'max_energy'} busy={busy === 'max_energy'}
+        />
       </div>
 
       <div className="game-card rounded-lg p-4">
@@ -227,3 +243,28 @@ const Stat = ({
     </Button>
   </div>
 );
+
+const BarSpend = ({
+  icon, label, value, max, color, plusLabel, onPlus, disabled, busy,
+}: {
+  icon: React.ReactNode; label: string; value: number; max: number; color: string;
+  plusLabel: string; onPlus: () => void; disabled: boolean; busy: boolean;
+}) => {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="mb-2 last:mb-0">
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="flex items-center gap-1.5 text-foreground">{icon} {label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">{value} / {max}</span>
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" disabled={disabled} onClick={onPlus}>
+            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : plusLabel}
+          </Button>
+        </div>
+      </div>
+      <div className="h-2 rounded bg-muted overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+};

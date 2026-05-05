@@ -65,12 +65,28 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [actions, setActions] = useState<ActionRow[]>([]);
   const [skills, setSkills] = useState<SkillCatalog[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [potions, setPotions] = useState<{ hp: number; mp: number }>({ hp: 0, mp: 0 });
+  const [characterId, setCharacterId] = useState<string | null>(null);
 
   const me = participants.find(p => p.user_id === myUserId);
   const enemy = participants.find(p => p.is_bot);
   const finished = battle?.status === 'finished';
   const won = finished && battle?.winner_user_id === myUserId;
   const myTurn = !finished && battle?.current_turn === myUserId;
+
+  const refreshPotions = useCallback(async (charId: string) => {
+    const { data } = await supabase
+      .from('inventory')
+      .select('quantity, items!inner(subtype, consumable)')
+      .eq('character_id', charId)
+      .eq('items.consumable', true);
+    let hp = 0, mp = 0;
+    for (const row of (data ?? []) as any[]) {
+      if (row.items?.subtype === 'hp_potion') hp += row.quantity ?? 0;
+      else if (row.items?.subtype === 'mp_potion') mp += row.quantity ?? 0;
+    }
+    setPotions({ hp, mp });
+  }, []);
 
   const refresh = useCallback(async () => {
     const [b, p, a] = await Promise.all([
@@ -79,9 +95,16 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       supabase.from('battle_actions').select('*').eq('battle_id', battleId).order('created_at', { ascending: false }).limit(20),
     ]);
     if (b.data) setBattle(b.data as any);
-    if (p.data) setParticipants(p.data as any);
+    if (p.data) {
+      setParticipants(p.data as any);
+      const myRow = (p.data as any[]).find(r => r.user_id === myUserId);
+      if (myRow?.character_id) {
+        setCharacterId(myRow.character_id);
+        refreshPotions(myRow.character_id);
+      }
+    }
     if (a.data) setActions(a.data as any);
-  }, [battleId]);
+  }, [battleId, myUserId, refreshPotions]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -108,11 +131,20 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [rewards, setRewards] = useState<{ xpGained: number; creditsGained: number } | null>(null);
   const [pendingLevel, setPendingLevel] = useState<LevelUpInfo | null>(null);
 
-  const doAction = async (action: 'attack'|'defend'|'forfeit'|'skill', skillSlug?: string) => {
+  const doAction = async (
+    action: 'attack'|'defend'|'forfeit'|'skill'|'use_item',
+    skillSlug?: string,
+    itemSubtype?: 'hp_potion'|'mp_potion',
+  ) => {
     if (submitting || !myTurn) return;
     setSubmitting(true);
     try {
-      const r = await submitNpcAction(battleId, action, skillSlug);
+      const r = await submitNpcAction(battleId, action, skillSlug, itemSubtype);
+      if (r?.error) {
+        const { toast } = await import('sonner');
+        toast.error(r.error);
+      }
+      if (action === 'use_item' && characterId) await refreshPotions(characterId);
       if (r?.finished) {
         await setInBattle(false);
         if (r.won) {
@@ -194,6 +226,24 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
             <Button disabled={!myTurn || submitting} variant="secondary" onClick={() => doAction('defend')}>
               <Shield className="w-4 h-4 mr-1" /> Defend
             </Button>
+            <Button
+              disabled={!myTurn || submitting || potions.hp <= 0 || me.hp >= me.max_hp}
+              variant="outline"
+              size="sm"
+              onClick={() => doAction('use_item', undefined, 'hp_potion')}
+              title={potions.hp <= 0 ? 'No HP Potions' : me.hp >= me.max_hp ? 'HP already full' : 'Restores 50% HP'}
+            >
+              ❤ HP Potion ×{potions.hp}
+            </Button>
+            <Button
+              disabled={!myTurn || submitting || potions.mp <= 0 || me.energy >= me.max_energy}
+              variant="outline"
+              size="sm"
+              onClick={() => doAction('use_item', undefined, 'mp_potion')}
+              title={potions.mp <= 0 ? 'No MP Potions' : me.energy >= me.max_energy ? 'MP already full' : 'Restores 50% MP'}
+            >
+              ⚡ MP Potion ×{potions.mp}
+            </Button>
             <Button disabled={submitting} variant="destructive" size="sm" onClick={() => doAction('forfeit')}>
               <Flag className="w-4 h-4 mr-1" /> Forfeit
             </Button>
@@ -202,18 +252,18 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
             {skills.map(s => {
               const learned = (me.snapshot.skill_levels?.[s.slug] ?? 0) >= 1;
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
-              const lowEnergy = me.energy < s.energy_cost;
+              const lowMp = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
-              const disabled = !myTurn || submitting || !learned || onCd || lowEnergy || lowLvl;
+              const disabled = !myTurn || submitting || !learned || onCd || lowMp || lowLvl;
               return (
                 <Button key={s.slug} disabled={disabled} variant="outline" size="sm"
                   onClick={() => doAction('skill', s.slug)}
-                  title={`${s.description} | ⚡${s.energy_cost} | CD ${s.cooldown}${!learned ? ' | NOT LEARNED' : ''}`}
+                  title={`${s.description} | MP ${s.energy_cost} | CD ${s.cooldown}${!learned ? ' | NOT LEARNED' : ''}`}
                   className="flex flex-col h-auto py-1 px-2"
                 >
                   <span className="font-orbitron text-[10px]">{s.name}</span>
                   <span className="text-[9px] text-muted-foreground">
-                    {onCd ? `CD ${me.cooldowns[s.slug]}` : `⚡${s.energy_cost}`}
+                    {onCd ? `CD ${me.cooldowns[s.slug]}` : `MP ${s.energy_cost}`}
                     {!learned && ' 🔒'}
                   </span>
                 </Button>
@@ -241,7 +291,7 @@ function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: 
           <Progress value={hpPct} className="h-2" />
         </div>
         <div>
-          <div className="flex justify-between text-[10px] font-rajdhani"><span>ENERGY</span><span>{p.energy}/{p.max_energy}</span></div>
+          <div className="flex justify-between text-[10px] font-rajdhani"><span>MP</span><span>{p.energy}/{p.max_energy}</span></div>
           <Progress value={enPct} className="h-1.5" />
         </div>
         <div className="flex gap-1 mt-1 flex-wrap min-h-[16px]">
@@ -260,6 +310,11 @@ function describeAction(a: ActionRow): string {
   if (a.action_type === 'forfeit') return 'forfeited.';
   if (a.action_type === 'defend') return 'braced for impact.';
   if (a.action_type === 'stunned') return 'is stunned!';
+  if (a.action_type === 'use_item') {
+    if (a.result?.item === 'hp_potion') return `used HP Potion. Restored ${a.result.heal ?? 0} HP.`;
+    if (a.result?.item === 'mp_potion') return `used MP Potion. Restored ${a.result.mpHeal ?? 0} MP.`;
+    return 'used an item.';
+  }
   const hits = a.result?.hits ?? [];
   const total = hits.reduce((s: number, h: any) => s + (h.damage ?? 0), 0);
   const crit = hits.some((h: any) => h.crit);
