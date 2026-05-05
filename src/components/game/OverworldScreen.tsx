@@ -16,6 +16,9 @@ import {
 } from '@/lib/overworld';
 import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
 import { NpcMarker } from './NpcMarker';
+import {
+  walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
+} from '@/lib/zone-walkable';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
 import neonDistrict from '@/assets/zones/neon-district.jpg';
@@ -46,8 +49,6 @@ const NEARBY_POLL_MS = 1500;
 const INTERACTION_RADIUS_PCT = 14;     // distance in % space to allow [E] interact
 const MOVE_SPEED_PCT = 0.65;           // % per frame at 60fps
 const MOVE_ACCEL = 0.2;
-const PLAYER_X_MIN = 5,  PLAYER_X_MAX = 95;
-const PLAYER_Y_MIN = 15, PLAYER_Y_MAX = 92;
 
 // Class → icon for nameplates
 const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -72,37 +73,25 @@ const variantToRarity = (armor: string | null, weapon: string | null): SpriteRar
   return 'rare';
 };
 
-// Per-zone normalized NPC layouts (xPercent, yPercent). Names match seeded NPCs.
-const NPC_HUB_LAYOUT: Record<string, Record<string, { x: number; y: number }>> = {
-  'station-hub': {
-    'Scout Junko':       { x: 18, y: 60 },
-    'Quartermaster Vex': { x: 32, y: 72 },
-    'Commander Hale':    { x: 52, y: 50 },
-    'Doc Circuits':      { x: 70, y: 62 },
-    'Tinker Mira':       { x: 86, y: 52 },
-  },
-  'wasteland': {
-    'Scrapper Drone':     { x: 18, y: 65 },
-    'Stranded Survivor':  { x: 36, y: 75 },
-    'Wasteland Marauder': { x: 52, y: 58 },
-    'Rogue War-Mech':     { x: 70, y: 62 },
-    'Wasteland Overlord': { x: 88, y: 55 },
-  },
-  'neon-district': {
-    'Whisper':            { x: 16, y: 62 },
-    'Cyber-Doc Riku':     { x: 34, y: 72 },
-    'Neon Gangster':      { x: 52, y: 56 },
-    'Syndicate Enforcer': { x: 70, y: 64 },
-    'The Fixer':          { x: 88, y: 50 },
-  },
+// Per-NPC placement (visual + interaction) is now defined in zone-walkable.ts.
+// We resolve a placement for each seeded NPC by name; if not present, we fall
+// back to an evenly spaced spot inside the zone's walkable polygon.
+const fallbackNpcSpot = (zoneId: string, idx: number, total: number) => {
+  const wk = walkableFor(zoneId);
+  // Evenly spread across the front edge of the polygon.
+  const front = wk.polygon.reduce((a, b) => (b.y > a.y ? b : a), wk.polygon[0]);
+  const back = wk.polygon.reduce((a, b) => (b.y < a.y ? b : a), wk.polygon[0]);
+  const y = back.y + (front.y - back.y) * 0.65;
+  const minX = Math.min(...wk.polygon.map(p => p.x));
+  const maxX = Math.max(...wk.polygon.map(p => p.x));
+  const x = minX + ((maxX - minX) * (idx + 1)) / (total + 1);
+  const spot = { x, y };
+  return { visual: spot, interaction: spot };
 };
-const fallbackNpcSpot = (idx: number, total: number) => {
-  const span = PLAYER_X_MAX - PLAYER_X_MIN;
-  const x = PLAYER_X_MIN + (span * (idx + 1)) / (total + 1);
-  return { x, y: 60 };
+const npcPlacement = (zoneId: string, name: string, idx: number, total: number) => {
+  const wk = walkableFor(zoneId);
+  return wk.npcs[name] ?? fallbackNpcSpot(zoneId, idx, total);
 };
-const npcSpot = (zoneId: string, name: string, idx: number, total: number) =>
-  NPC_HUB_LAYOUT[zoneId]?.[name] ?? fallbackNpcSpot(idx, total);
 
 // Map any legacy world-pixel coordinate (~0..5000) into normalized %.
 // Players moving in another tab may still be writing world-px values — clamp to hub.
@@ -194,7 +183,10 @@ export const OverworldScreen = ({
     const ns = await fetchNpcs(zoneId);
     setZone(z);
     setNpcs(ns);
-    setPos({ x: 50, y: 78 });
+    // Always spawn at the zone's safe floor spawn point. If a saved/legacy
+    // position is invalid, this guarantees we land on the floor.
+    const wk = walkableFor(zoneId);
+    setPos({ ...wk.spawn });
     targetRef.current = null;
   }, [zones]);
 
@@ -245,8 +237,14 @@ export const OverworldScreen = ({
         if (Math.abs(v.vx) < 0.01) v.vx = 0;
         if (Math.abs(v.vy) < 0.01) v.vy = 0;
 
-        x = Math.max(PLAYER_X_MIN, Math.min(PLAYER_X_MAX, x + v.vx));
-        y = Math.max(PLAYER_Y_MIN, Math.min(PLAYER_Y_MAX, y + v.vy));
+        const candidate = { x: x + v.vx, y: y + v.vy };
+        const wk = walkableFor(zone!.id);
+        const clamped = clampToWalkable(candidate, wk.polygon);
+        // If we hit a wall, kill velocity in the rejected axes so we don't shudder.
+        if (clamped.x !== candidate.x) v.vx = 0;
+        if (clamped.y !== candidate.y) v.vy = 0;
+        x = clamped.x;
+        y = clamped.y;
 
         const speed = Math.hypot(v.vx, v.vy);
         const isMoving = speed > 0.04;
@@ -296,8 +294,12 @@ export const OverworldScreen = ({
   // ---------- Interaction ----------
   const npcsWithPos = useMemo(() => {
     return npcs.map((n, i) => {
-      const spot = npcSpot(zone?.id ?? '', n.name, i, npcs.length);
-      return { ...n, _x: spot.x, _y: spot.y };
+      const place = npcPlacement(zone?.id ?? '', n.name, i, npcs.length);
+      return {
+        ...n,
+        _vx: place.visual.x, _vy: place.visual.y,           // visual anchor
+        _ix: place.interaction.x, _iy: place.interaction.y, // floor interaction point
+      };
     });
   }, [npcs, zone?.id]);
 
@@ -305,7 +307,8 @@ export const OverworldScreen = ({
     let best: (typeof npcsWithPos)[number] | null = null;
     let bestD = Infinity;
     for (const n of npcsWithPos) {
-      const d = Math.hypot(n._x - pos.x, n._y - pos.y);
+      // Distance is measured against the floor interaction point, not the visual.
+      const d = Math.hypot(n._ix - pos.x, n._iy - pos.y);
       if (d < bestD && d <= INTERACTION_RADIUS_PCT) { best = n; bestD = d; }
     }
     return best;
@@ -355,15 +358,20 @@ export const OverworldScreen = ({
   };
 
   // Click-to-move within hub: convert click → normalized %.
+  // Clicks that land outside the walkable floor are ignored entirely so the
+  // player can't path into walls / sky / windows.
   const handleStageClick = (e: React.MouseEvent) => {
     if (!rootRef.current || !zone) return;
     const rect = rootRef.current.getBoundingClientRect();
     const xp = ((e.clientX - rect.left) / rect.width) * 100;
     const yp = ((e.clientY - rect.top) / rect.height) * 100;
-    targetRef.current = {
-      x: Math.max(PLAYER_X_MIN, Math.min(PLAYER_X_MAX, xp)),
-      y: Math.max(PLAYER_Y_MIN, Math.min(PLAYER_Y_MAX, yp)),
-    };
+    const wk = walkableFor(zone.id);
+    if (!pointInPolygon({ x: xp, y: yp }, wk.polygon)) {
+      // Out-of-floor click → don't queue movement.
+      targetRef.current = null;
+      return;
+    }
+    targetRef.current = { x: xp, y: yp };
   };
 
   // ---------- Render ----------
@@ -474,8 +482,8 @@ export const OverworldScreen = ({
                 onClick={(e) => { e.stopPropagation(); openNpc(n); }}
                 className="absolute group"
                 style={{
-                  left: `${n._x}%`,
-                  top: `${n._y}%`,
+                  left: `${n._vx}%`,
+                  top: `${n._vy}%`,
                   transform: 'translate(-50%, -100%)',
                   height: 'clamp(55px, 9vh, 100px)',
                 }}
@@ -491,8 +499,10 @@ export const OverworldScreen = ({
 
           {/* Other players */}
           {nearby.map(p => {
-            const xp = toPct(p.x_position);
-            const yp = toPct(p.y_position);
+            const wkOther = walkableFor(zone.id);
+            const raw = { x: toPct(p.x_position), y: toPct(p.y_position) };
+            const safe = clampToWalkable(raw, wkOther.polygon);
+            const xp = safe.x, yp = safe.y;
             const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
             const otherRarity = variantToRarity(p.equipped_armor_variant, p.equipped_weapon_variant);
             const OtherIcon = getClassIcon(p.character_class ?? '');
@@ -560,17 +570,46 @@ export const OverworldScreen = ({
             />
           </div>
 
-          {/* Debug overlay */}
-          {debug && (
-            <div className="absolute top-2 right-2 z-40 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
-              <div>rootSize: {rootSize.w}×{rootSize.h}</div>
-              <div>player: x={pos.x.toFixed(1)}% y={pos.y.toFixed(1)}% dir={direction} {moving ? 'walk' : 'idle'}</div>
-              <div>fitMode: cover-fixed</div>
-              <div>backgroundPosition: center center</div>
-              <div>noCameraMode: true</div>
-              <div className="text-emerald-500/70">[`] toggle debug</div>
-            </div>
-          )}
+          {/* Debug overlay — walkable polygon + interaction points */}
+          {debug && (() => {
+            const wk = walkableFor(zone.id);
+            return (
+              <>
+                <svg
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-40"
+                >
+                  <path
+                    d={polygonToSvgPath(wk.polygon)}
+                    fill="hsl(150 100% 50% / 0.10)"
+                    stroke="hsl(150 100% 60%)"
+                    strokeWidth={0.3}
+                  />
+                  {/* Spawn point */}
+                  <circle cx={wk.spawn.x} cy={wk.spawn.y} r={0.9} fill="hsl(50 100% 60%)" />
+                  {/* NPC visual + interaction points */}
+                  {npcsWithPos.map(n => (
+                    <g key={`dbg-${n.id}`}>
+                      <circle cx={n._vx} cy={n._vy} r={0.7} fill="hsl(0 0% 100%)" />
+                      <circle cx={n._ix} cy={n._iy} r={0.9} fill="hsl(200 100% 60%)" />
+                      <line x1={n._vx} y1={n._vy} x2={n._ix} y2={n._iy}
+                        stroke="hsl(200 100% 60% / 0.6)" strokeWidth={0.15} strokeDasharray="0.5 0.5" />
+                    </g>
+                  ))}
+                  {/* Player */}
+                  <circle cx={pos.x} cy={pos.y} r={1.0} fill="hsl(0 100% 60%)" />
+                </svg>
+                <div className="absolute top-2 right-2 z-40 bg-black/75 text-[11px] font-mono text-emerald-300 px-2 py-1.5 rounded border border-emerald-500/40 leading-tight pointer-events-none space-y-0.5">
+                  <div>rootSize: {rootSize.w}×{rootSize.h}</div>
+                  <div>player: x={pos.x.toFixed(1)}% y={pos.y.toFixed(1)}% dir={direction} {moving ? 'walk' : 'idle'}</div>
+                  <div>zone: {zone.id} · npcs: {npcsWithPos.length}</div>
+                  <div className="text-emerald-400">green=floor · yellow=spawn · blue=interact · white=visual</div>
+                  <div className="text-emerald-500/70">[`] toggle debug</div>
+                </div>
+              </>
+            );
+          })()}
           {!debug && (
             <div className="absolute bottom-2 right-2 z-30 text-[10px] text-white/40 font-mono pointer-events-none">[`] debug</div>
           )}
