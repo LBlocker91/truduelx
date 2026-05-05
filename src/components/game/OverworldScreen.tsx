@@ -312,6 +312,7 @@ export const OverworldScreen = ({
           {nearby.map(p => {
             const sx = (p.x_position / zone.width) * 100;
             const sy = (p.y_position / zone.height) * 100;
+            const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
             return (
               <div key={p.user_id}
                 style={{ left: `${sx}%`, top: `${sy}%` }}
@@ -320,7 +321,14 @@ export const OverworldScreen = ({
                 <div className="text-[9px] px-1 rounded bg-card/80 border border-secondary/50 mb-0.5">
                   {p.display_name} L{p.character_level}
                 </div>
-                <div className="w-8 h-10 rounded-t-full bg-secondary/70 border-2 border-secondary" />
+                <PlayerSprite
+                  direction={dir}
+                  state="idle"
+                  armorVariant={p.equipped_armor_variant}
+                  weaponVariant={p.equipped_weapon_variant}
+                  scale={0.85}
+                />
+                <div className="w-6 h-1.5 rounded-full bg-black/40 -mt-1 blur-[1px]" />
               </div>
             );
           })}
@@ -332,12 +340,24 @@ export const OverworldScreen = ({
             }}
             className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none transition-none"
           >
-            <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5">
+            <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 drop-shadow">
               {characterName}
             </div>
-            <div className="w-9 h-12 rounded-t-full bg-primary border-2 border-primary-foreground shadow-[0_0_20px_hsl(var(--primary))]" />
-            <div className="w-3 h-3 rounded-full bg-black/50" />
+            <PlayerSprite
+              direction={direction}
+              state={moving ? 'walk' : 'idle'}
+              armorVariant={loadout.armorVariant}
+              weaponVariant={loadout.weaponVariant}
+              scale={1}
+              className="drop-shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
+            />
+            <div className="w-8 h-2 rounded-full bg-black/50 -mt-1 blur-[1px]" />
           </div>
+        </div>
+      </div>
+
+      <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
+        <span>WASD or click to move · [E] to interact</span>
         </div>
       </div>
 
