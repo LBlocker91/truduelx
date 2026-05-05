@@ -446,39 +446,40 @@ export const OverworldScreen = ({
           {(() => {
             const viewportWidth = Math.max(stageSize.w, 1);
             const viewportHeight = Math.max(stageSize.h, 1);
-            // Ensure world always fully covers viewport (no black bars on any screen size).
-            const coverZoom = Math.max(viewportWidth / zone.width, viewportHeight / zone.height);
+            // Slight overscan avoids 1px gaps from sub-pixel rounding during resize /
+            // fullscreen transitions on some aspect ratios.
+            const overscanPx = 4;
+            const coverZoom = Math.max(
+              (viewportWidth + overscanPx) / zone.width,
+              (viewportHeight + overscanPx) / zone.height,
+            );
             const preferredZoom = Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, CAMERA_ZOOM));
             const zoom = Math.max(coverZoom, preferredZoom);
             const halfVisibleWorldWidth = viewportWidth / (2 * zoom);
             const halfVisibleWorldHeight = viewportHeight / (2 * zoom);
+            const scaledWorldWidth = zone.width * zoom;
+            const scaledWorldHeight = zone.height * zoom;
 
             const clamp = (value: number, min: number, max: number) => {
               if (min > max) return (min + max) / 2;
               return Math.min(max, Math.max(min, value));
             };
 
-            const worldFitsHorizontally = zone.width * zoom <= viewportWidth;
-            const worldFitsVertically = zone.height * zoom <= viewportHeight;
-
             const minCameraX = halfVisibleWorldWidth;
             const maxCameraX = zone.width - halfVisibleWorldWidth;
             const minCameraY = halfVisibleWorldHeight;
             const maxCameraY = zone.height - halfVisibleWorldHeight;
 
-            const cameraX = worldFitsHorizontally
-              ? zone.width / 2
-              : clamp(camPos.x, minCameraX, maxCameraX);
-            const cameraY = worldFitsVertically
-              ? zone.height / 2
-              : clamp(camPos.y, minCameraY, maxCameraY);
+            const cameraX = clamp(camPos.x, minCameraX, maxCameraX);
+            const cameraY = clamp(camPos.y, minCameraY, maxCameraY);
 
-            const worldTranslateX = worldFitsHorizontally
-              ? (viewportWidth - zone.width * zoom) / 2
-              : viewportWidth / 2 - cameraX * zoom;
-            const worldTranslateY = worldFitsVertically
-              ? (viewportHeight - zone.height * zoom) / 2
-              : viewportHeight / 2 - cameraY * zoom;
+            const minTranslateX = viewportWidth - scaledWorldWidth;
+            const maxTranslateX = 0;
+            const minTranslateY = viewportHeight - scaledWorldHeight;
+            const maxTranslateY = 0;
+
+            const worldTranslateX = clamp(viewportWidth / 2 - cameraX * zoom, minTranslateX, maxTranslateX);
+            const worldTranslateY = clamp(viewportHeight / 2 - cameraY * zoom, minTranslateY, maxTranslateY);
 
             cameraRef.current = {
               tx: worldTranslateX,
@@ -495,13 +496,14 @@ export const OverworldScreen = ({
             return (
               <>
                 <div
-                  className="absolute top-0 left-0 origin-top-left"
+                    className="absolute top-0 left-0 origin-top-left"
                   style={{
                     width: zone.width,
                     height: zone.height,
                     transform: `translate3d(${worldTranslateX}px, ${worldTranslateY}px, 0) scale(${zoom})`,
                     transformOrigin: '0 0',
                     willChange: 'transform',
+                      backgroundColor: 'hsl(var(--background))',
                   }}
                 >
                   <div
@@ -698,7 +700,7 @@ export const OverworldScreen = ({
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
-                      'radial-gradient(ellipse 80% 70% at 50% 55%, transparent 40%, rgba(0,0,0,0.55) 100%)',
+                      'radial-gradient(ellipse 88% 80% at 50% 55%, transparent 50%, rgba(0,0,0,0.14) 78%, rgba(0,0,0,0.24) 100%)',
                   }}
                 />
                 {/* Ambient color tint — zone mood */}
