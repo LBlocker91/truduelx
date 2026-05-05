@@ -165,7 +165,9 @@ export async function claimQuestReward(characterId: string, questId: string) {
   return data;
 }
 
-export async function spendStatPoint(characterId: string, stat: 'strength'|'dexterity'|'technology'|'support') {
+export type SpendableStat = 'strength'|'dexterity'|'technology'|'support'|'defense'|'resistance';
+
+export async function spendStatPoint(characterId: string, stat: SpendableStat) {
   const { data, error } = await supabase.functions.invoke('spend-stat-point', {
     body: { characterId, stat },
   });

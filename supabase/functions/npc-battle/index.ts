@@ -72,7 +72,8 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
     support: enemy.support,
     weapon_min: enemy.weapon_min,
     weapon_max: enemy.weapon_max,
-    defense: enemy.defense,
+    defense: enemy.defense ?? 0,
+    resistance: enemy.resistance ?? 0,
     skill_levels: Object.fromEntries((enemy.skill_slugs ?? []).map((s: string) => [s, 5])),
   };
 
@@ -339,25 +340,29 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   const { data: char } = await admin.from('characters').select('*').eq('id', characterId).eq('user_id', userId).maybeSingle();
   if (!char) return null;
   const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
-  let weaponMin = 80, weaponMax = 100, defense = 0;
+  let weaponMin = 80, weaponMax = 100, defenseGear = 0, resistanceGear = 0;
   let strBonus = 0, dexBonus = 0, techBonus = 0, supBonus = 0;
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
     if (it.slot === 'weapon' && it.min_damage && it.max_damage) { weaponMin = it.min_damage; weaponMax = it.max_damage; }
-    defense += it.defense ?? 0;
+    defenseGear += it.defense ?? 0;
     const m = it.stat_modifiers ?? {};
     strBonus += m.strength ?? 0; dexBonus += m.dexterity ?? 0;
     techBonus += m.technology ?? 0; supBonus += m.support ?? 0;
+    resistanceGear += m.resistance ?? 0;
+    defenseGear += m.defense ?? 0;
   }
   return {
     user_id: userId, character_id: characterId,
     name: char.name, class: char.class, level: char.level,
-    strength: char.strength + strBonus,
-    dexterity: char.dexterity + dexBonus,
-    technology: char.technology + techBonus,
-    support: char.support + supBonus,
-    weapon_min: weaponMin, weapon_max: weaponMax, defense,
+    strength: (char.strength ?? 10) + strBonus,
+    dexterity: (char.dexterity ?? 10) + dexBonus,
+    technology: (char.technology ?? 10) + techBonus,
+    support: (char.support ?? 10) + supBonus,
+    weapon_min: weaponMin, weapon_max: weaponMax,
+    defense: (char.defense ?? 5) + defenseGear,
+    resistance: (char.resistance ?? 5) + resistanceGear,
     skill_levels: char.skill_levels ?? {},
   };
 }
