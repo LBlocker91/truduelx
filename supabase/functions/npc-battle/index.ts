@@ -107,7 +107,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 }
 
 // ----- ACT -----
-async function processAction(admin: any, userId: string, battleId: string, playerAction: string, skillSlug?: string) {
+async function processAction(admin: any, userId: string, battleId: string, playerAction: string, skillSlug?: string, itemSubtype?: string) {
   const { data: battle } = await admin.from('battles').select('*').eq('id', battleId).maybeSingle();
   if (!battle) return j({ error: 'battle not found' }, 404);
   if (battle.mode !== 'pve_npc') return j({ error: 'not a pve battle' }, 400);
@@ -116,13 +116,14 @@ async function processAction(admin: any, userId: string, battleId: string, playe
 
   const { data: parts } = await admin.from('battle_participants').select('*').eq('battle_id', battleId).order('slot');
   if (!parts || parts.length < 2) return j({ error: 'invalid battle' }, 400);
-  const player = parts[0] as ParticipantState;
+  const player = parts[0] as ParticipantState & { character_id: string | null };
   const bot = parts[1] as ParticipantState;
 
   // ---- PLAYER TURN ----
   const playerResult = await executeTurn({
     admin, battle, actor: player, target: bot,
-    action: playerAction, skillSlug, isBot: false,
+    action: playerAction, skillSlug, itemSubtype, isBot: false,
+    characterId: (player as any).character_id ?? null,
   });
   if (playerResult.error) return j({ error: playerResult.error }, 400);
 
