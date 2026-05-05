@@ -7,10 +7,11 @@ interface TitleScreenProps {
   onStart: () => void;
   onContinue?: () => void;
   onPvp?: () => void;
+  onOverworld?: () => void;
   saveData?: SaveData | null;
 }
 
-export const TitleScreen = ({ onStart, onContinue, onPvp, saveData }: TitleScreenProps) => {
+export const TitleScreen = ({ onStart, onContinue, onPvp, onOverworld, saveData }: TitleScreenProps) => {
   return (
     <div 
       className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
@@ -71,6 +72,16 @@ export const TitleScreen = ({ onStart, onContinue, onPvp, saveData }: TitleScree
           >
             {saveData ? 'NEW GAME' : 'PLAY NOW (PvE)'}
           </Button>
+
+          {onOverworld && saveData && (
+            <Button
+              onClick={onOverworld}
+              size="lg"
+              className="text-xl px-12 py-6 rounded-lg w-full max-w-xs btn-neon text-primary-foreground"
+            >
+              ENTER OVERWORLD
+            </Button>
+          )}
 
           {onPvp && saveData && (
             <Button
