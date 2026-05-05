@@ -100,32 +100,47 @@ export const OverworldScreen = ({
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
   });
 
+  // Velocity-based movement with easing (no instant start/stop)
+  const velRef = useRef({ vx: 0, vy: 0 });
   useEffect(() => {
     if (!zone) return;
     let raf = 0;
     const loop = () => {
       setPos(prev => {
         let { x, y } = prev;
-        let dx = 0, dy = 0;
+        let tdx = 0, tdy = 0;
         const k = keysRef.current;
-        if (k.has('a') || k.has('arrowleft')) dx -= MOVE_SPEED;
-        if (k.has('d') || k.has('arrowright')) dx += MOVE_SPEED;
-        if (k.has('w') || k.has('arrowup')) dy -= MOVE_SPEED;
-        if (k.has('s') || k.has('arrowdown')) dy += MOVE_SPEED;
+        if (k.has('a') || k.has('arrowleft')) tdx -= 1;
+        if (k.has('d') || k.has('arrowright')) tdx += 1;
+        if (k.has('w') || k.has('arrowup')) tdy -= 1;
+        if (k.has('s') || k.has('arrowdown')) tdy += 1;
+        // Normalize keyboard direction
+        const klen = Math.hypot(tdx, tdy);
+        if (klen > 0) { tdx = (tdx / klen) * MOVE_SPEED; tdy = (tdy / klen) * MOVE_SPEED; }
+
         const t = targetRef.current;
-        if (!dx && !dy && t) {
-          const tdx = t.x - x, tdy = t.y - y;
-          const dist = Math.hypot(tdx, tdy);
-          if (dist < MOVE_SPEED) { x = t.x; y = t.y; targetRef.current = null; }
-          else { dx = (tdx / dist) * MOVE_SPEED; dy = (tdy / dist) * MOVE_SPEED; }
+        if (!tdx && !tdy && t) {
+          const ddx = t.x - x, ddy = t.y - y;
+          const dist = Math.hypot(ddx, ddy);
+          if (dist < 2) { targetRef.current = null; }
+          else { tdx = (ddx / dist) * MOVE_SPEED; tdy = (ddy / dist) * MOVE_SPEED; }
         }
-        x += dx; y += dy;
+
+        // Ease velocity toward target
+        const v = velRef.current;
+        v.vx += (tdx - v.vx) * MOVE_ACCEL;
+        v.vy += (tdy - v.vy) * MOVE_ACCEL;
+        if (Math.abs(v.vx) < 0.05) v.vx = 0;
+        if (Math.abs(v.vy) < 0.05) v.vy = 0;
+
+        x += v.vx; y += v.vy;
         x = Math.max(40, Math.min(zone.width - 40, x));
         y = Math.max(zone.height * 0.55, Math.min(zone.height - 40, y));
-        const isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
-        // Update direction & moving via refs avoids per-frame React re-render unless changed
-        if (Math.abs(dx) > 0.01) {
-          const nd: SpriteDirection = dx < 0 ? 'left' : 'right';
+
+        const speed = Math.hypot(v.vx, v.vy);
+        const isMoving = speed > 0.4;
+        if (Math.abs(v.vx) > 0.1) {
+          const nd: SpriteDirection = v.vx < 0 ? 'left' : 'right';
           if (dirRef.current !== nd) setDirection(nd);
         }
         setMoving(prevMoving => prevMoving === isMoving ? prevMoving : isMoving);
