@@ -109,8 +109,9 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
   }
 
   const meta = (CLASS_META as any)[c.class];
-  const maxHp = Math.floor(100 + c.strength * 8 + c.level * 12);
-  const maxEnergy = 100 + c.technology * 2;
+  const maxHp = Math.floor(100 + c.strength * 8 + c.level * 12) + (c.bonus_max_hp ?? 0);
+  const maxMp = 100 + c.technology * 2 + (c.bonus_max_mp ?? 0);
+  const canSpend = c.stat_points > 0;
 
   return (
     <div className="space-y-4">
@@ -147,9 +148,18 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
       </div>
 
       <div className="game-card rounded-lg p-4">
-        <h3 className="font-orbitron text-sm text-muted-foreground mb-2">VITALS</h3>
-        <Bar icon={<Heart className="w-4 h-4 text-health" />} label="Max Health" value={maxHp} max={maxHp} color="bg-health" />
-        <Bar icon={<Zap className="w-4 h-4 text-energy" />} label="Max Energy" value={maxEnergy} max={maxEnergy} color="bg-energy" />
+        <h3 className="font-orbitron text-sm text-muted-foreground mb-2 flex items-center justify-between">
+          <span>VITALS</span>
+          {canSpend && <span className="text-[10px] text-secondary">Tap + to spend</span>}
+        </h3>
+        <BarSpend
+          icon={<Heart className="w-4 h-4 text-health" />} label="Max HP" value={maxHp} max={maxHp} color="bg-health"
+          plusLabel="+5" onPlus={() => handleSpend('max_hp')} disabled={!canSpend || busy === 'max_hp'} busy={busy === 'max_hp'}
+        />
+        <BarSpend
+          icon={<Zap className="w-4 h-4 text-energy" />} label="Max MP" value={maxMp} max={maxMp} color="bg-energy"
+          plusLabel="+3" onPlus={() => handleSpend('max_energy')} disabled={!canSpend || busy === 'max_energy'} busy={busy === 'max_energy'}
+        />
       </div>
 
       <div className="game-card rounded-lg p-4">
