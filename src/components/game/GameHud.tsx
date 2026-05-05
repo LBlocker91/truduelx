@@ -11,7 +11,9 @@ import { ProfilePanel } from './panels/ProfilePanel';
 import { InventoryPanel } from './panels/InventoryPanel';
 import { QuestsPanel } from './panels/QuestsPanel';
 import { PvpPanel } from './panels/PvpPanel';
+import { SkillsPanel } from './panels/SkillsPanel';
 import { xpForLevel } from '@/lib/leveling';
+import type { LevelUpInfo } from '@/pages/Index';
 
 type PanelKey = 'profile' | 'inventory' | 'quests' | 'map' | 'pvp' | 'skills' | 'shop' | 'settings' | null;
 
@@ -23,9 +25,11 @@ interface GameHudProps {
   characterXp: number;
   credits: number;
   isPremium: boolean;
+  refreshTick: number;
   onEnterNpcBattle: (battleId: string) => void;
   onJoinPvpQueue: () => void;
   onExitToSlots: () => void;
+  onProgressionChange: (level?: LevelUpInfo | null) => void;
 }
 
 export const GameHud = (props: GameHudProps) => {
@@ -36,7 +40,6 @@ export const GameHud = (props: GameHudProps) => {
 
   const close = () => setPanel(null);
 
-  // Track fullscreen state so the icon stays in sync if user presses Esc
   useEffect(() => {
     const sync = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', sync);
@@ -50,9 +53,7 @@ export const GameHud = (props: GameHudProps) => {
       } else {
         await document.exitFullscreen?.();
       }
-    } catch {
-      /* ignore — some browsers block without user gesture */
-    }
+    } catch { /* ignore */ }
   };
 
   const items: { key: PanelKey; icon: React.ReactNode; label: string }[] = [
@@ -66,9 +67,13 @@ export const GameHud = (props: GameHudProps) => {
     { key: 'settings',  icon: <SettingsIcon className="w-4 h-4" />, label: 'Settings' },
   ];
 
+  // xpForLevel client formula is approximate vs server pacing curve, used only
+  // for the HUD bar fill. Numerical values come from the DB row directly.
+  const need = xpForLevel(props.characterLevel);
+  const pct = Math.min(100, Math.round((props.characterXp / need) * 100));
+
   return (
     <div ref={rootRef} className="relative grid h-[100dvh] w-screen grid-rows-[auto_minmax(0,1fr)] bg-black overflow-hidden">
-      {/* Top bar */}
       <header className="flex items-center justify-between gap-3 px-3 py-2 bg-card/85 backdrop-blur border-b border-border z-20">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <span className="font-orbitron text-sm truncate">{props.characterName}</span>
@@ -80,22 +85,15 @@ export const GameHud = (props: GameHudProps) => {
               <Crown className="w-3 h-3" /> PREMIUM
             </span>
           )}
-          {/* XP bar */}
-          {(() => {
-            const need = xpForLevel(props.characterLevel);
-            const pct = Math.min(100, Math.round((props.characterXp / need) * 100));
-            return (
-              <div className="hidden sm:flex items-center gap-2 min-w-[140px] max-w-[260px] flex-1">
-                <span className="text-[10px] text-muted-foreground font-orbitron">XP</span>
-                <div className="h-2 flex-1 bg-muted rounded overflow-hidden">
-                  <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {props.characterXp}/{need}
-                </span>
-              </div>
-            );
-          })()}
+          <div className="hidden sm:flex items-center gap-2 min-w-[140px] max-w-[260px] flex-1">
+            <span className="text-[10px] text-muted-foreground font-orbitron">XP</span>
+            <div className="h-2 flex-1 bg-muted rounded overflow-hidden">
+              <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-[10px] text-muted-foreground font-mono">
+              {props.characterXp}/{need}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-shield font-orbitron flex items-center gap-1">
@@ -113,7 +111,6 @@ export const GameHud = (props: GameHudProps) => {
         </div>
       </header>
 
-      {/* Game viewport (overworld) */}
       <div className="relative min-h-0 h-full overflow-hidden">
         <OverworldScreen
           characterId={props.characterId}
@@ -127,7 +124,6 @@ export const GameHud = (props: GameHudProps) => {
           loadoutBust={loadoutBust}
         />
 
-        {/* Vertical dock (right side) */}
         <nav className="absolute top-3 right-3 z-30 flex flex-col gap-1 bg-card/85 backdrop-blur border border-border rounded-lg p-1.5">
           {items.map((it) => (
             <Button
@@ -145,18 +141,17 @@ export const GameHud = (props: GameHudProps) => {
         </nav>
       </div>
 
-      {/* Side panel */}
       <Sheet open={panel !== null} onOpenChange={(o) => !o && close()}>
         <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="font-orbitron capitalize">{panel}</SheetTitle>
           </SheetHeader>
           <div className="mt-4">
-            {panel === 'profile'   && <ProfilePanel characterId={props.characterId} />}
+            {panel === 'profile'   && <ProfilePanel characterId={props.characterId} refreshTick={props.refreshTick} onProgressionChange={props.onProgressionChange} />}
             {panel === 'inventory' && <InventoryPanel characterId={props.characterId} onLoadoutChanged={() => setLoadoutBust((n) => n + 1)} />}
-            {panel === 'quests'    && <QuestsPanel characterId={props.characterId} />}
+            {panel === 'quests'    && <QuestsPanel characterId={props.characterId} refreshTick={props.refreshTick} onProgressionChange={props.onProgressionChange} />}
             {panel === 'pvp'       && <PvpPanel onJoinRanked={() => { close(); props.onJoinPvpQueue(); }} />}
-            {panel === 'skills'    && <Placeholder text="Skills tree — open from Profile to spend skill points (coming soon: dedicated tree view)." />}
+            {panel === 'skills'    && <SkillsPanel characterId={props.characterId} refreshTick={props.refreshTick} onProgressionChange={props.onProgressionChange} />}
             {panel === 'map'       && <Placeholder text="Use the zone selector in the overworld to travel. Full minimap coming soon." />}
             {panel === 'shop'      && <Placeholder text="Walk up to a vendor NPC in the overworld to trade." />}
             {panel === 'settings'  && <Placeholder text="Settings — sound and graphics options coming soon." />}
