@@ -33,13 +33,15 @@ interface OverworldScreenProps {
   onExit: () => void;
 }
 
-const MOVE_SPEED = 4.5;
-const MOVE_ACCEL = 0.25; // easing factor 0..1 (lerp toward target velocity)
+const MOVE_SPEED = 6.5;            // faster on a much larger map
+const MOVE_ACCEL = 0.18;           // softer start/stop easing
 const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
-const INTERACTION_RADIUS = 90;
-const CAMERA_ZOOM = 1.85; // ~15% larger player + tighter framing
-const CAMERA_LERP = 0.22; // snappier follow, still smooth
+const INTERACTION_RADIUS = 110;
+const CAMERA_ZOOM = 1.05;          // zoomed OUT — more visible world
+const CAMERA_LERP = 0.10;          // slightly delayed, smooth follow
+const RENDER_RADIUS = 1400;        // only render players within this world distance
+const FADE_RADIUS  = 900;          // distant players fade out softly
 
 // Map class name → icon for the nameplate
 const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
