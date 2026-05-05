@@ -253,6 +253,24 @@ const Index = () => {
           onExit={handleBackToTitle}
         />
       )}
+      {screen === 'overworld' && cloudCharacterId && saveData && (
+        <OverworldScreen
+          characterId={cloudCharacterId}
+          characterName={saveData.player.name}
+          characterClass={saveData.player.class}
+          characterLevel={saveData.player.level}
+          onEnterNpcBattle={handleEnterNpcBattle}
+          onJoinPvpQueue={handleOverworldPvp}
+          onExit={handleBackToTitle}
+        />
+      )}
+      {screen === 'npc-battle' && npcBattleId && user && (
+        <NpcBattleScreen
+          battleId={npcBattleId}
+          myUserId={user.id}
+          onExit={handleNpcBattleEnd}
+        />
+      )}
     </div>
   );
 };
