@@ -1,48 +1,75 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { User } from '@supabase/supabase-js';
+import { lovable } from '@/integrations/lovable';
+import type { User, Session } from '@supabase/supabase-js';
 
-/**
- * Ensures the user is signed in (anonymously if needed).
- * Returns the current user once available.
- */
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-
-    // Listen first
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
       if (!mounted) return;
-      setUser(session?.user ?? null);
+      setSession(s);
+      setUser(s?.user ?? null);
     });
-
-    // Bootstrap session
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
-      if (data.session?.user) {
-        setUser(data.session.user);
-        setReady(true);
-        return;
-      }
-      // Sign in anonymously
-      const { data: anon, error } = await supabase.auth.signInAnonymously();
-      if (error) {
-        console.error('Anonymous sign-in failed', error);
-      } else if (mounted) {
-        setUser(anon.user);
-      }
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
       setReady(true);
     })();
-
-    return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
-    };
+    return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
 
-  return { user, ready };
+  const signIn = useCallback(
+    (email: string, password: string) =>
+      supabase.auth.signInWithPassword({ email, password }),
+    [],
+  );
+
+  const signUp = useCallback(
+    (email: string, password: string, displayName?: string) =>
+      supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: displayName ? { display_name: displayName } : undefined,
+        },
+      }),
+    [],
+  );
+
+  const signInWithGoogle = useCallback(async () => {
+    return lovable.auth.signInWithOAuth('google', {
+      redirect_uri: window.location.origin,
+    });
+  }, []);
+
+  const signInAsGuest = useCallback(() => supabase.auth.signInAnonymously(), []);
+
+  const sendPasswordReset = useCallback(
+    (email: string) =>
+      supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      }),
+    [],
+  );
+
+  const updatePassword = useCallback(
+    (password: string) => supabase.auth.updateUser({ password }),
+    [],
+  );
+
+  const signOut = useCallback(() => supabase.auth.signOut(), []);
+
+  return {
+    user, session, ready,
+    signIn, signUp, signInWithGoogle, signInAsGuest,
+    sendPasswordReset, updatePassword, signOut,
+  };
 }
