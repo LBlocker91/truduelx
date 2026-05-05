@@ -156,14 +156,31 @@ export async function acceptQuest(userId: string, questId: string) {
   }, { onConflict: 'user_id,quest_id' });
 }
 
-export async function claimQuestReward(playerQuestId: string, characterId: string, xpReward: number) {
-  await supabase.from('player_quests').update({ claimed: true }).eq('id', playerQuestId);
-  if (xpReward > 0 && characterId) {
-    const { data: ch } = await supabase.from('characters').select('xp').eq('id', characterId).maybeSingle();
-    if (ch) {
-      await supabase.from('characters').update({ xp: (ch.xp ?? 0) + xpReward }).eq('id', characterId);
-    }
-  }
+export async function claimQuestReward(characterId: string, questId: string) {
+  const { data, error } = await supabase.functions.invoke('claim-quest-reward', {
+    body: { characterId, questId },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? 'claim failed');
+  return data;
+}
+
+export async function spendStatPoint(characterId: string, stat: 'strength'|'dexterity'|'technology'|'support') {
+  const { data, error } = await supabase.functions.invoke('spend-stat-point', {
+    body: { characterId, stat },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? 'spend failed');
+  return data;
+}
+
+export async function unlockClassSkill(characterId: string, skillSlug: string) {
+  const { data, error } = await supabase.functions.invoke('unlock-skill', {
+    body: { characterId, skillSlug },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? 'unlock failed');
+  return data;
 }
 
 // ---- NPC Battle ----
