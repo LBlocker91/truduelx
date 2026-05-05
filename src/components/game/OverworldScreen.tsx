@@ -177,13 +177,18 @@ export const OverworldScreen = ({
     if (data?.user) setMyQuests(await fetchPlayerQuests(data.user.id));
   })(); }, [activeNpc]);
 
+  // Camera offset (in viewport CSS px) — kept in a ref so click handler can invert it
+  const cameraRef = useRef({ tx: 0, ty: 0, scale: 1 });
+
   const handleStageClick = (e: React.MouseEvent) => {
     if (!zone || !stageRef.current) return;
     const rect = stageRef.current.getBoundingClientRect();
-    const scaleX = zone.width / rect.width;
-    const scaleY = zone.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const cam = cameraRef.current;
+    // viewport px → world px (inverse of: world * scale + tx)
+    const vx = e.clientX - rect.left;
+    const vy = e.clientY - rect.top;
+    const x = (vx - cam.tx) / cam.scale;
+    const y = (vy - cam.ty) / cam.scale;
     targetRef.current = {
       x: Math.max(40, Math.min(zone.width - 40, x)),
       y: Math.max(zone.height * 0.55, Math.min(zone.height - 40, y)),
