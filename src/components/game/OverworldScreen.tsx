@@ -11,7 +11,7 @@ import {
   startNpcBattle,
   fetchMyLoadout, publishLoadout, EquippedLoadout,
 } from '@/lib/overworld';
-import { PlayerSprite, SpriteDirection } from './PlayerSprite';
+import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
 import { NpcMarker } from './NpcMarker';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
