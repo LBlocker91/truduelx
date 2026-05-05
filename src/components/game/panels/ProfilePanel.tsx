@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown, Plus } from 'lucide-react';
+import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown, Plus, Shield, ShieldCheck } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { spendStatPoint } from '@/lib/overworld';
+import { spendStatPoint, type SpendableStat } from '@/lib/overworld';
 import { CLASS_META } from '@/data/class-definitions';
 import type { LevelUpInfo } from '@/pages/Index';
 
@@ -28,6 +28,8 @@ interface CharRow {
   dexterity: number;
   technology: number;
   support: number;
+  defense: number;
+  resistance: number;
   equipped_weapon_id: string | null;
   equipped_armor_id: string | null;
 }
@@ -41,8 +43,8 @@ interface EquippedItem {
   defense: number;
 }
 
-const STAT_KEYS = ['strength', 'dexterity', 'technology', 'support'] as const;
-type StatKey = typeof STAT_KEYS[number];
+const STAT_KEYS = ['strength', 'dexterity', 'technology', 'support', 'defense', 'resistance'] as const;
+type StatKey = SpendableStat;
 
 export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: ProfilePanelProps) => {
   const [c, setC] = useState<CharRow | null>(null);
@@ -154,10 +156,16 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
                 onPlus={() => handleSpend('strength')} disabled={c.stat_points <= 0 || busy === 'strength'} busy={busy === 'strength'} />
           <Stat icon={<Brain className="w-4 h-4 text-primary" />} label="Dexterity" value={c.dexterity}
                 onPlus={() => handleSpend('dexterity')} disabled={c.stat_points <= 0 || busy === 'dexterity'} busy={busy === 'dexterity'} />
-          <Stat icon={<Cpu className="w-4 h-4 text-neon-purple" />} label="Technology" value={c.technology}
+          <Stat icon={<Cpu className="w-4 h-4 text-neon-purple" />} label="Tech" value={c.technology}
                 onPlus={() => handleSpend('technology')} disabled={c.stat_points <= 0 || busy === 'technology'} busy={busy === 'technology'} />
           <Stat icon={<Users className="w-4 h-4 text-neon-green" />} label="Support" value={c.support}
                 onPlus={() => handleSpend('support')} disabled={c.stat_points <= 0 || busy === 'support'} busy={busy === 'support'} />
+          <Stat icon={<Shield className="w-4 h-4 text-shield" />} label="Defense" value={c.defense}
+                onPlus={() => handleSpend('defense')} disabled={c.stat_points <= 0 || busy === 'defense'} busy={busy === 'defense'}
+                hint="Reduces physical damage" />
+          <Stat icon={<ShieldCheck className="w-4 h-4 text-energy" />} label="Resistance" value={c.resistance}
+                onPlus={() => handleSpend('resistance')} disabled={c.stat_points <= 0 || busy === 'resistance'} busy={busy === 'resistance'}
+                hint="Reduces energy damage" />
         </div>
       </div>
 
@@ -205,11 +213,14 @@ const Bar = ({ icon, label, value, max, color }: { icon: React.ReactNode; label:
 };
 
 const Stat = ({
-  icon, label, value, onPlus, disabled, busy,
-}: { icon: React.ReactNode; label: string; value: number; onPlus: () => void; disabled: boolean; busy: boolean }) => (
+  icon, label, value, onPlus, disabled, busy, hint,
+}: { icon: React.ReactNode; label: string; value: number; onPlus: () => void; disabled: boolean; busy: boolean; hint?: string }) => (
   <div className="flex items-center gap-2 bg-muted/30 rounded px-2 py-1.5">
     {icon}
-    <span className="text-xs text-muted-foreground flex-1">{label}</span>
+    <div className="flex-1 min-w-0">
+      <div className="text-xs text-muted-foreground truncate">{label}</div>
+      {hint && <div className="text-[10px] text-muted-foreground/70 truncate">{hint}</div>}
+    </div>
     <span className="font-orbitron text-sm w-8 text-right">{value}</span>
     <Button size="icon" variant="outline" className="h-7 w-7" disabled={disabled} onClick={onPlus}>
       {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
