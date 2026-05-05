@@ -211,6 +211,7 @@ export type Database = {
           created_at: string
           credits: number
           current_zone_id: string | null
+          defense: number
           dexterity: number
           equipped_armor_id: string | null
           equipped_weapon_id: string | null
@@ -219,6 +220,7 @@ export type Database = {
           last_y: number | null
           level: number
           name: string
+          resistance: number
           skill_levels: Json
           skill_points: number
           stat_points: number
@@ -234,6 +236,7 @@ export type Database = {
           created_at?: string
           credits?: number
           current_zone_id?: string | null
+          defense?: number
           dexterity?: number
           equipped_armor_id?: string | null
           equipped_weapon_id?: string | null
@@ -242,6 +245,7 @@ export type Database = {
           last_y?: number | null
           level?: number
           name: string
+          resistance?: number
           skill_levels?: Json
           skill_points?: number
           stat_points?: number
@@ -257,6 +261,7 @@ export type Database = {
           created_at?: string
           credits?: number
           current_zone_id?: string | null
+          defense?: number
           dexterity?: number
           equipped_armor_id?: string | null
           equipped_weapon_id?: string | null
@@ -265,6 +270,7 @@ export type Database = {
           last_y?: number | null
           level?: number
           name?: string
+          resistance?: number
           skill_levels?: Json
           skill_points?: number
           stat_points?: number
@@ -407,6 +413,7 @@ export type Database = {
           dexterity: number
           level: number
           npc_id: string
+          resistance: number
           skill_slugs: string[]
           strength: number
           support: number
@@ -422,6 +429,7 @@ export type Database = {
           dexterity?: number
           level?: number
           npc_id: string
+          resistance?: number
           skill_slugs?: string[]
           strength?: number
           support?: number
@@ -437,6 +445,7 @@ export type Database = {
           dexterity?: number
           level?: number
           npc_id?: string
+          resistance?: number
           skill_slugs?: string[]
           strength?: number
           support?: number
