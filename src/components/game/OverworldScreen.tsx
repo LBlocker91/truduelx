@@ -630,7 +630,7 @@ export const OverworldScreen = ({
                         armorVariant={loadout.armorVariant}
                         weaponVariant={loadout.weaponVariant}
                         rarity={playerRarity}
-                        scale={1.15}
+                        scale={0.78}
                       />
                       {/* Interaction flash — re-mounts on each E press via key */}
                       {flashKey > 0 && (
