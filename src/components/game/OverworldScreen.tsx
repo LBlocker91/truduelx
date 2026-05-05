@@ -678,6 +678,7 @@ export const OverworldScreen = ({
                         boxShadow: `0 0 ${p.size * 2}px hsl(${p.hue} 100% 70% / 0.5)`,
                         animationDuration: `${p.duration}s`,
                         animationDelay: `${p.delay}s`,
+                        ['--drift-x' as any]: `${p.drift}px`,
                       }}
                     />
                   ))}
