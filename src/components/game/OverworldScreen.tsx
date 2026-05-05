@@ -39,7 +39,34 @@ const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
 const INTERACTION_RADIUS = 90;
 const CAMERA_ZOOM = 1.6; // makes player ~12-18% of screen
-const CAMERA_LERP = 0.14;
+const CAMERA_LERP = 0.2; // slightly snappier follow
+
+// Map class name → icon for the nameplate
+const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  warrior: Swords, soldier: Crosshair, mercenary: Shield, tactician: Cpu,
+  hunter: Target, technician: Wrench, mage: Sparkles, pyromancer: Flame,
+  cyber: Zap, ghost: Ghost,
+};
+const getClassIcon = (cls: string) => {
+  const key = cls?.toLowerCase?.() ?? '';
+  return CLASS_ICON[key] ?? Shield;
+};
+
+// Rarity → display color (HSL components)
+const RARITY_HSL: Record<string, string> = {
+  common: '210 10% 70%',
+  uncommon: '150 100% 55%',
+  rare: '210 100% 60%',
+  epic: '280 100% 65%',
+  legendary: '40 100% 60%',
+};
+const variantToRarity = (armor: string | null, weapon: string | null): keyof typeof RARITY_HSL => {
+  if (!armor && !weapon) return 'common';
+  if (armor?.startsWith('heavy_')) return (weapon === 'staff' || weapon === 'axe') ? 'legendary' : 'epic';
+  if (armor?.startsWith('medium_')) return 'rare';
+  if (armor?.startsWith('light_')) return 'uncommon';
+  return 'rare';
+};
 
 export const OverworldScreen = ({
   characterId, characterName, characterClass, characterLevel,
