@@ -98,6 +98,34 @@ export const OverworldScreen = ({
   const dirRef = useRef<SpriteDirection>('right');
   dirRef.current = direction;
 
+  // Movement trail puffs (small list, auto-pruned)
+  const [trail, setTrail] = useState<{ id: number; x: number; y: number }[]>([]);
+  const trailIdRef = useRef(0);
+  const lastTrailRef = useRef(0);
+
+  // Interaction flash (player-centered burst)
+  const [flashKey, setFlashKey] = useState(0);
+  // Camera nudge trigger (re-triggers .camera-nudge animation by key change)
+  const [nudgeKey, setNudgeKey] = useState(0);
+
+  // Ambient particles (positions in viewport-relative %)
+  const ambientParticles = useMemo(
+    () => Array.from({ length: 18 }, (_, i) => ({
+      left: (i * 53) % 100,
+      delay: (i * 0.83) % 14,
+      duration: 11 + ((i * 7) % 8),
+      size: 2 + (i % 3),
+      hue: 180 + ((i * 37) % 120),
+    })),
+    []
+  );
+
+  const playerRarity = useMemo(
+    () => variantToRarity(loadout.armorVariant, loadout.weaponVariant),
+    [loadout.armorVariant, loadout.weaponVariant]
+  );
+  const ClassIcon = getClassIcon(characterClass);
+
   // Track stage size for camera math
   useEffect(() => {
     if (!stageRef.current) return;
