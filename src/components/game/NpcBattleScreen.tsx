@@ -291,7 +291,7 @@ function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: 
           <Progress value={hpPct} className="h-2" />
         </div>
         <div>
-          <div className="flex justify-between text-[10px] font-rajdhani"><span>ENERGY</span><span>{p.energy}/{p.max_energy}</span></div>
+          <div className="flex justify-between text-[10px] font-rajdhani"><span>MP</span><span>{p.energy}/{p.max_energy}</span></div>
           <Progress value={enPct} className="h-1.5" />
         </div>
         <div className="flex gap-1 mt-1 flex-wrap min-h-[16px]">
@@ -310,6 +310,11 @@ function describeAction(a: ActionRow): string {
   if (a.action_type === 'forfeit') return 'forfeited.';
   if (a.action_type === 'defend') return 'braced for impact.';
   if (a.action_type === 'stunned') return 'is stunned!';
+  if (a.action_type === 'use_item') {
+    if (a.result?.item === 'hp_potion') return `used HP Potion. Restored ${a.result.heal ?? 0} HP.`;
+    if (a.result?.item === 'mp_potion') return `used MP Potion. Restored ${a.result.mpHeal ?? 0} MP.`;
+    return 'used an item.';
+  }
   const hits = a.result?.hits ?? [];
   const total = hits.reduce((s: number, h: any) => s + (h.damage ?? 0), 0);
   const crit = hits.some((h: any) => h.crit);
