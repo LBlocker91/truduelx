@@ -268,18 +268,32 @@ async function awardRewards(admin: any, battleId: string): Promise<any> {
   const { data: b } = await admin.from('battles').select('npc_id, winner_user_id').eq('id', battleId).maybeSingle();
   if (!b?.npc_id || !b.winner_user_id) return null;
   const { data: en } = await admin.from('npc_enemies')
-    .select('xp_reward, credit_reward').eq('npc_id', b.npc_id).maybeSingle();
-  const xpGained = en?.xp_reward ?? 50;
-  const creditsGained = en?.credit_reward ?? 10;
+    .select('xp_reward, credit_reward, level').eq('npc_id', b.npc_id).maybeSingle();
+  const baseXp = en?.xp_reward ?? 50;
+  const baseCredits = en?.credit_reward ?? 10;
+  const enemyLevel = en?.level ?? 1;
 
   const { data: parts } = await admin.from('battle_participants')
     .select('character_id').eq('battle_id', battleId).eq('user_id', b.winner_user_id).maybeSingle();
 
   let updatedCharacter: any = null;
   let level: any = null;
+  let xpGained = baseXp;
+  let creditsGained = baseCredits;
   if (parts?.character_id) {
     const { data: ch } = await admin.from('characters').select('*').eq('id', parts.character_id).maybeSingle();
     if (ch) {
+      // Level-scaled rewards: scale up base by effective enemy level (max of
+      // enemy.level, player.level) so low-level starter mobs stay relevant.
+      // Apply soft efficiency falloff if player is significantly above enemy.
+      const playerLevel = ch.level ?? 1;
+      const effectiveLevel = Math.max(enemyLevel, playerLevel);
+      const scaledXp = baseXp + effectiveLevel * 10;
+      const scaledCredits = baseCredits + effectiveLevel * 4;
+      const efficiency = Math.max(0.25, Math.min(1, 1 - (playerLevel - enemyLevel) * 0.05));
+      xpGained = Math.max(1, Math.floor(scaledXp * efficiency));
+      creditsGained = Math.max(1, Math.floor(scaledCredits * efficiency));
+
       const lvl = applyXp({
         xp: ch.xp ?? 0, level: ch.level ?? 1,
         statPoints: ch.stat_points ?? 0, skillPoints: ch.skill_points ?? 0,

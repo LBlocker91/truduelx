@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.is_battle_participant(uuid, uuid) TO authenticated;
