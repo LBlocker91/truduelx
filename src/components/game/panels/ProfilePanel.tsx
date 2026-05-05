@@ -1,15 +1,35 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown } from 'lucide-react';
+import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown, Plus } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { loadCharacter } from '@/lib/characters-db';
-import { xpForLevel } from '@/lib/leveling';
+import { spendStatPoint } from '@/lib/overworld';
 import { CLASS_META } from '@/data/class-definitions';
-import type { Character } from '@/types/game';
+import type { LevelUpInfo } from '@/pages/Index';
 
 interface ProfilePanelProps {
   characterId: string;
+  refreshTick?: number;
+  onProgressionChange?: (level?: LevelUpInfo | null) => void;
+}
+
+interface CharRow {
+  id: string;
+  name: string;
+  class: string;
+  level: number;
+  xp: number;
+  credits: number;
+  stat_points: number;
+  skill_points: number;
+  strength: number;
+  dexterity: number;
+  technology: number;
+  support: number;
+  equipped_weapon_id: string | null;
+  equipped_armor_id: string | null;
 }
 
 interface EquippedItem {
@@ -21,52 +41,68 @@ interface EquippedItem {
   defense: number;
 }
 
-export const ProfilePanel = ({ characterId }: ProfilePanelProps) => {
-  const [c, setC] = useState<Character | null>(null);
-  const [credits, setCredits] = useState(0);
-  const [isPremium, setIsPremium] = useState(false);
+const STAT_KEYS = ['strength', 'dexterity', 'technology', 'support'] as const;
+type StatKey = typeof STAT_KEYS[number];
+
+export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: ProfilePanelProps) => {
+  const [c, setC] = useState<CharRow | null>(null);
   const [equipped, setEquipped] = useState<EquippedItem[]>([]);
+  const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<StatKey | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const [character, charRow, profile] = await Promise.all([
-          loadCharacter(characterId),
-          supabase.from('characters').select('credits, equipped_weapon_id, equipped_armor_id').eq('id', characterId).maybeSingle(),
-          supabase.auth.getUser().then(async ({ data }) => {
-            if (!data.user) return null;
-            return (await supabase.from('profiles').select('is_premium').eq('user_id', data.user.id).maybeSingle()).data;
-          }),
-        ]);
-        setC(character);
-        setCredits(charRow.data?.credits ?? 0);
-        setIsPremium(!!profile?.is_premium);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data: charRow } = await supabase.from('characters').select('*').eq('id', characterId).maybeSingle();
+      if (!charRow) return;
+      setC(charRow as CharRow);
 
-        const ids = [charRow.data?.equipped_weapon_id, charRow.data?.equipped_armor_id].filter(Boolean) as string[];
-        if (ids.length) {
-          const { data: items } = await supabase
-            .from('items')
-            .select('name, rarity, slot, min_damage, max_damage, defense')
-            .in('id', ids);
-          setEquipped(items ?? []);
-        } else {
-          setEquipped([]);
-        }
-      } finally {
-        setLoading(false);
+      const { data: u } = await supabase.auth.getUser();
+      if (u?.user) {
+        const { data: prof } = await supabase.from('profiles').select('is_premium').eq('user_id', u.user.id).maybeSingle();
+        setIsPremium(!!prof?.is_premium);
       }
-    })();
-  }, [characterId]);
+
+      const ids = [charRow.equipped_weapon_id, charRow.equipped_armor_id].filter(Boolean) as string[];
+      if (ids.length) {
+        const { data: items } = await supabase
+          .from('items')
+          .select('name, rarity, slot, min_damage, max_damage, defense')
+          .in('id', ids);
+        setEquipped((items ?? []) as EquippedItem[]);
+      } else {
+        setEquipped([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [characterId, refreshTick]);
+
+  const handleSpend = async (stat: StatKey) => {
+    if (!c || c.stat_points <= 0 || busy) return;
+    setBusy(stat);
+    try {
+      const r = await spendStatPoint(characterId, stat);
+      setC(r.character as CharRow);
+      onProgressionChange?.(null);
+      toast.success(`+1 ${stat}`);
+    } catch (e: any) {
+      toast.error(e.message ?? String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   if (loading || !c) {
     return <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   }
 
-  const meta = CLASS_META[c.class];
-  const xpNeeded = xpForLevel(c.level);
-  const xpPct = Math.min(100, Math.round((c.xp / xpNeeded) * 100));
+  const meta = (CLASS_META as any)[c.class];
+  const maxHp = Math.floor(100 + c.strength * 8 + c.level * 12);
+  const maxEnergy = 100 + c.technology * 2;
 
   return (
     <div className="space-y-4">
@@ -74,7 +110,7 @@ export const ProfilePanel = ({ characterId }: ProfilePanelProps) => {
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className={`font-orbitron text-xl font-bold ${meta?.color ?? ''}`}>{c.name}</h2>
-            <p className="text-sm text-muted-foreground">Lv {c.level} {meta?.name ?? c.class}</p>
+            <p className="text-sm text-muted-foreground capitalize">Lv {c.level} {meta?.name ?? c.class}</p>
           </div>
           {isPremium && (
             <Badge variant="outline" className="text-shield border-shield/50">
@@ -85,22 +121,18 @@ export const ProfilePanel = ({ characterId }: ProfilePanelProps) => {
 
         <div className="mt-3 space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>XP</span>
-            <span>{c.xp.toLocaleString()} / {xpNeeded.toLocaleString()}</span>
+            <span>XP</span><span>{c.xp.toLocaleString()}</span>
           </div>
-          <Progress value={xpPct} className="h-2" />
-          <p className="text-[10px] text-muted-foreground">
-            {(xpNeeded - c.xp).toLocaleString()} XP to next level
-          </p>
+          <Progress value={Math.min(100, (c.xp / Math.max(1, c.xp + 100)) * 100)} className="h-2" />
         </div>
 
-        {(c.statPoints > 0 || c.skillPoints > 0) && (
+        {(c.stat_points > 0 || c.skill_points > 0) && (
           <div className="mt-3 flex gap-2 flex-wrap">
-            {c.statPoints > 0 && (
-              <Badge className="bg-secondary/80"><Award className="w-3 h-3 mr-1" /> {c.statPoints} stat pts</Badge>
+            {c.stat_points > 0 && (
+              <Badge className="bg-secondary/80"><Award className="w-3 h-3 mr-1" /> {c.stat_points} stat pts</Badge>
             )}
-            {c.skillPoints > 0 && (
-              <Badge className="bg-primary/80"><Award className="w-3 h-3 mr-1" /> {c.skillPoints} skill pts</Badge>
+            {c.skill_points > 0 && (
+              <Badge className="bg-primary/80"><Award className="w-3 h-3 mr-1" /> {c.skill_points} skill pts</Badge>
             )}
           </div>
         )}
@@ -108,17 +140,24 @@ export const ProfilePanel = ({ characterId }: ProfilePanelProps) => {
 
       <div className="game-card rounded-lg p-4">
         <h3 className="font-orbitron text-sm text-muted-foreground mb-2">VITALS</h3>
-        <Bar icon={<Heart className="w-4 h-4 text-health" />} label="Health" value={c.stats.health} max={c.stats.maxHealth} color="bg-health" />
-        <Bar icon={<Zap className="w-4 h-4 text-energy" />} label="Energy" value={c.stats.energy} max={c.stats.maxEnergy} color="bg-energy" />
+        <Bar icon={<Heart className="w-4 h-4 text-health" />} label="Max Health" value={maxHp} max={maxHp} color="bg-health" />
+        <Bar icon={<Zap className="w-4 h-4 text-energy" />} label="Max Energy" value={maxEnergy} max={maxEnergy} color="bg-energy" />
       </div>
 
       <div className="game-card rounded-lg p-4">
-        <h3 className="font-orbitron text-sm text-muted-foreground mb-2">ATTRIBUTES</h3>
-        <div className="grid grid-cols-2 gap-2">
-          <Stat icon={<Sword className="w-4 h-4 text-secondary" />} label="Strength" value={c.stats.strength} />
-          <Stat icon={<Brain className="w-4 h-4 text-primary" />} label="Dexterity" value={c.stats.dexterity} />
-          <Stat icon={<Cpu className="w-4 h-4 text-neon-purple" />} label="Technology" value={c.stats.technology} />
-          <Stat icon={<Users className="w-4 h-4 text-neon-green" />} label="Support" value={c.stats.support} />
+        <h3 className="font-orbitron text-sm text-muted-foreground mb-2 flex items-center justify-between">
+          <span>ATTRIBUTES</span>
+          {c.stat_points > 0 && <span className="text-[10px] text-secondary">Tap + to spend</span>}
+        </h3>
+        <div className="grid grid-cols-1 gap-2">
+          <Stat icon={<Sword className="w-4 h-4 text-secondary" />} label="Strength" value={c.strength}
+                onPlus={() => handleSpend('strength')} disabled={c.stat_points <= 0 || busy === 'strength'} busy={busy === 'strength'} />
+          <Stat icon={<Brain className="w-4 h-4 text-primary" />} label="Dexterity" value={c.dexterity}
+                onPlus={() => handleSpend('dexterity')} disabled={c.stat_points <= 0 || busy === 'dexterity'} busy={busy === 'dexterity'} />
+          <Stat icon={<Cpu className="w-4 h-4 text-neon-purple" />} label="Technology" value={c.technology}
+                onPlus={() => handleSpend('technology')} disabled={c.stat_points <= 0 || busy === 'technology'} busy={busy === 'technology'} />
+          <Stat icon={<Users className="w-4 h-4 text-neon-green" />} label="Support" value={c.support}
+                onPlus={() => handleSpend('support')} disabled={c.stat_points <= 0 || busy === 'support'} busy={busy === 'support'} />
         </div>
       </div>
 
@@ -144,15 +183,13 @@ export const ProfilePanel = ({ characterId }: ProfilePanelProps) => {
         <span className="font-orbitron text-sm text-muted-foreground flex items-center gap-2">
           <Coins className="w-4 h-4 text-shield" /> CREDITS
         </span>
-        <span className="font-orbitron text-lg text-shield">{credits.toLocaleString()}</span>
+        <span className="font-orbitron text-lg text-shield">{c.credits.toLocaleString()}</span>
       </div>
     </div>
   );
 };
 
-const Bar = ({
-  icon, label, value, max, color,
-}: { icon: React.ReactNode; label: string; value: number; max: number; color: string }) => {
+const Bar = ({ icon, label, value, max, color }: { icon: React.ReactNode; label: string; value: number; max: number; color: string }) => {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div className="mb-2 last:mb-0">
@@ -167,10 +204,15 @@ const Bar = ({
   );
 };
 
-const Stat = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) => (
+const Stat = ({
+  icon, label, value, onPlus, disabled, busy,
+}: { icon: React.ReactNode; label: string; value: number; onPlus: () => void; disabled: boolean; busy: boolean }) => (
   <div className="flex items-center gap-2 bg-muted/30 rounded px-2 py-1.5">
     {icon}
     <span className="text-xs text-muted-foreground flex-1">{label}</span>
-    <span className="font-orbitron text-sm">{value}</span>
+    <span className="font-orbitron text-sm w-8 text-right">{value}</span>
+    <Button size="icon" variant="outline" className="h-7 w-7" disabled={disabled} onClick={onPlus}>
+      {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+    </Button>
   </div>
 );

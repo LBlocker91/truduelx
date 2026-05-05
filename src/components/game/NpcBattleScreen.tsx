@@ -9,6 +9,7 @@ import { setInBattle } from '@/lib/overworld';
 interface LevelUpInfo {
   oldLevel: number;
   newLevel: number;
+  levelsGained: number;
   statPointsGained: number;
   skillPointsGained: number;
   maxHpGained: number;
