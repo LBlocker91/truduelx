@@ -226,15 +226,9 @@ const PlayerSpriteImpl = ({
               mixBlendMode: 'screen',
             }}
           />
-          {/* Bottom contact darkening */}
-          <div
-            className="absolute inset-x-0 bottom-0 pointer-events-none"
-            style={{
-              height: '14%',
-              background:
-                'linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0))',
-            }}
-          />
+          {/* NOTE: Removed bottom contact darkening gradient — it produced a
+              visible black strip beneath the sprite during walk because the
+              rotating bob layer tilted the gradient out from behind the body. */}
         </div>
       </div>
 
