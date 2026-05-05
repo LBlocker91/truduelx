@@ -130,8 +130,8 @@ async function processAction(admin: any, userId: string, battleId: string, playe
   // win check after player turn
   if (bot.hp <= 0) {
     await finishBattle(admin, battle.id, userId, true);
-    const xp = await awardXp(admin, battleId);
-    return j({ ok: true, finished: true, won: true, xp });
+    const rewards = await awardRewards(admin, battleId);
+    return j({ ok: true, finished: true, won: true, ...rewards });
   }
   if (player.hp <= 0) {
     await finishBattle(admin, battle.id, null, false);
@@ -161,8 +161,8 @@ async function processAction(admin: any, userId: string, battleId: string, playe
   }
   if (bot.hp <= 0) {
     await finishBattle(admin, battle.id, userId, true);
-    const xp = await awardXp(admin, battleId);
-    return j({ ok: true, finished: true, won: true, xp });
+    const rewards = await awardRewards(admin, battleId);
+    return j({ ok: true, finished: true, won: true, ...rewards });
   }
 
   await admin.from('battles').update({
@@ -264,34 +264,61 @@ async function finishBattle(admin: any, battleId: string, winnerUserId: string |
   }).eq('id', battleId);
 }
 
-async function awardXp(admin: any, battleId: string): Promise<number> {
+async function awardRewards(admin: any, battleId: string): Promise<any> {
   const { data: b } = await admin.from('battles').select('npc_id, winner_user_id').eq('id', battleId).maybeSingle();
-  if (!b?.npc_id || !b.winner_user_id) return 0;
-  const { data: en } = await admin.from('npc_enemies').select('xp_reward').eq('npc_id', b.npc_id).maybeSingle();
-  const xp = en?.xp_reward ?? 50;
-  // Add XP to the player's character (find latest character)
-  const { data: parts } = await admin.from('battle_participants').select('character_id').eq('battle_id', battleId).eq('user_id', b.winner_user_id).maybeSingle();
+  if (!b?.npc_id || !b.winner_user_id) return null;
+  const { data: en } = await admin.from('npc_enemies')
+    .select('xp_reward, credit_reward').eq('npc_id', b.npc_id).maybeSingle();
+  const xpGained = en?.xp_reward ?? 50;
+  const creditsGained = en?.credit_reward ?? 10;
+
+  const { data: parts } = await admin.from('battle_participants')
+    .select('character_id').eq('battle_id', battleId).eq('user_id', b.winner_user_id).maybeSingle();
+
+  let updatedCharacter: any = null;
+  let level: any = null;
   if (parts?.character_id) {
-    const { data: ch } = await admin.from('characters').select('xp, level').eq('id', parts.character_id).maybeSingle();
+    const { data: ch } = await admin.from('characters').select('*').eq('id', parts.character_id).maybeSingle();
     if (ch) {
-      await admin.from('characters').update({ xp: (ch.xp ?? 0) + xp }).eq('id', parts.character_id);
+      const lvl = applyXp({
+        xp: ch.xp ?? 0, level: ch.level ?? 1,
+        statPoints: ch.stat_points ?? 0, skillPoints: ch.skill_points ?? 0,
+        strength: ch.strength ?? 10,
+      }, xpGained);
+      const { data: u } = await admin.from('characters').update({
+        xp: lvl.xp,
+        level: lvl.level,
+        stat_points: lvl.statPoints,
+        skill_points: lvl.skillPoints,
+        credits: (ch.credits ?? 0) + creditsGained,
+      }).eq('id', parts.character_id).select('*').single();
+      updatedCharacter = u;
+      level = {
+        oldLevel: lvl.oldLevel, newLevel: lvl.newLevel, levelsGained: lvl.levelsGained,
+        statPointsGained: lvl.statPointsGained, skillPointsGained: lvl.skillPointsGained,
+        maxHpGained: lvl.maxHpGained,
+      };
     }
   }
+
   // Quest progress: increment "defeat.<npc_id>" counter on any in-progress quests
-  const { data: pqs } = await admin.from('player_quests').select('*').eq('user_id', b.winner_user_id).eq('completed', false);
+  const { data: pqs } = await admin.from('player_quests')
+    .select('*').eq('user_id', b.winner_user_id).eq('completed', false);
   for (const pq of pqs ?? []) {
     const { data: q } = await admin.from('quests').select('*').eq('id', pq.quest_id).maybeSingle();
     const obj = q?.objectives?.defeat ?? {};
     if (obj[b.npc_id]) {
       const prog = pq.progress ?? {};
-      prog[b.npc_id] = (prog[b.npc_id] ?? 0) + 1;
-      const completed = Object.entries(obj).every(([k, v]: any) => (prog[k] ?? 0) >= v);
+      const defeat = prog.defeat ?? {};
+      defeat[b.npc_id] = (defeat[b.npc_id] ?? 0) + 1;
+      prog.defeat = defeat;
+      const completed = Object.entries(obj).every(([k, v]: any) => (defeat[k] ?? 0) >= v);
       await admin.from('player_quests').update({
         progress: prog, completed, updated_at: new Date().toISOString(),
       }).eq('id', pq.id);
     }
   }
-  return xp;
+  return { xpGained, creditsGained, updatedCharacter, level };
 }
 
 async function buildPlayerSnapshot(admin: any, characterId: string, userId: string): Promise<CharacterSnapshot | null> {
