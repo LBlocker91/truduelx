@@ -1,109 +1,86 @@
-import { useState, useCallback, useEffect } from 'react';
-import { GameState, CharacterClass, Character } from '@/types/game';
-import { createCharacter, createEnemy } from '@/data/characters';
-import { calcBattleXp, applyXp } from '@/lib/leveling';
-import { saveGame, loadGame, SaveData } from '@/lib/save-game';
+import { useCallback, useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { syncCharacterToCloud } from '@/lib/cloud-pvp';
-import { TitleScreen } from '@/components/game/TitleScreen';
+import { AuthScreen } from '@/components/game/AuthScreen';
+import { CharacterSlots } from '@/components/game/CharacterSlots';
 import { CharacterSelect } from '@/components/game/CharacterSelect';
-import { BattleArena } from '@/components/game/BattleArena';
-import { ResultScreen } from '@/components/game/ResultScreen';
-import { LevelUpScreen } from '@/components/game/LevelUpScreen';
+import { GameHud } from '@/components/game/GameHud';
 import { MatchmakingScreen } from '@/components/game/MatchmakingScreen';
 import { PvpBattleScreen } from '@/components/game/PvpBattleScreen';
-import { OverworldScreen } from '@/components/game/OverworldScreen';
 import { NpcBattleScreen } from '@/components/game/NpcBattleScreen';
-import { toast } from 'sonner';
+import {
+  createNewCharacter,
+  getMaxSlots,
+  listMyCharacters,
+  CharacterSummary,
+} from '@/lib/characters-db';
+import type { CharacterClass } from '@/types/game';
+import { supabase } from '@/integrations/supabase/client';
 
-type Screen = GameState['screen'] | 'pvp-queue' | 'pvp-battle' | 'overworld' | 'npc-battle';
-
-const INITIAL_STATE: GameState = {
-  screen: 'title',
-  player: null,
-  enemy: null,
-  battleState: null,
-  pendingXp: 0,
-  unlockedPremiumClasses: [],
-};
+type Screen = 'slots' | 'create' | 'game' | 'pvp-queue' | 'pvp-battle' | 'npc-battle';
 
 const Index = () => {
-  const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
-  const [screen, setScreen] = useState<Screen>('title');
-  const [saveData, setSaveData] = useState<SaveData | null>(null);
-  const [pvpCharacterId, setPvpCharacterId] = useState<string | null>(null);
+  const { user, ready } = useAuth();
+  const [screen, setScreen] = useState<Screen>('slots');
+  const [activeCharId, setActiveCharId] = useState<string | null>(null);
+  const [activeChar, setActiveChar] = useState<CharacterSummary | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
   const [pvpBattleId, setPvpBattleId] = useState<string | null>(null);
   const [npcBattleId, setNpcBattleId] = useState<string | null>(null);
-  const [cloudCharacterId, setCloudCharacterId] = useState<string | null>(null);
-  const { user, ready } = useAuth();
 
+  // Load premium flag whenever the user changes
   useEffect(() => {
-    setSaveData(loadGame());
+    if (!user) { setIsPremium(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from('profiles').select('is_premium').eq('user_id', user.id).maybeSingle();
+      setIsPremium(!!data?.is_premium);
+    })();
+  }, [user]);
+
+  const reloadActiveChar = useCallback(async (id: string) => {
+    const all = await listMyCharacters();
+    const found = all.find(c => c.id === id) ?? null;
+    setActiveChar(found);
   }, []);
 
-  const autoSave = useCallback((player: Character, premiumClasses?: CharacterClass[]) => {
-    const classes = premiumClasses ?? gameState.unlockedPremiumClasses;
-    saveGame(player, classes);
-    setSaveData({ player, unlockedPremiumClasses: classes, savedAt: Date.now() });
-    // Also push to cloud (best-effort, don't block)
-    syncCharacterToCloud(player).catch(err => console.warn('cloud sync failed', err));
-  }, [gameState.unlockedPremiumClasses]);
+  const handlePlayCharacter = useCallback(async (id: string) => {
+    setActiveCharId(id);
+    await reloadActiveChar(id);
+    setScreen('game');
+  }, [reloadActiveChar]);
 
-  const handleStart = useCallback(() => {
-    setScreen('character-select');
-    setGameState(prev => ({ ...prev, screen: 'character-select' }));
+  const handleExitToSlots = useCallback(() => {
+    setActiveCharId(null);
+    setActiveChar(null);
+    setScreen('slots');
   }, []);
 
-  const handleContinue = useCallback(() => {
-    const saved = loadGame();
-    if (!saved) return;
-    const player = saved.player;
-    const resetPlayer: Character = {
-      ...player,
-      stats: { ...player.stats, health: player.stats.maxHealth, energy: player.stats.maxEnergy },
-      abilities: player.abilities.map(a => ({ ...a, currentCooldown: 0 })),
-      rage: 0, isDefending: false, statusEffects: [],
-    };
-    const enemy = createEnemy(resetPlayer.level);
-    setScreen('battle');
-    setGameState({
-      screen: 'battle', player: resetPlayer, enemy, battleState: null, pendingXp: 0,
-      unlockedPremiumClasses: saved.unlockedPremiumClasses,
-    });
-  }, []);
-
-  const handleBackToTitle = useCallback(() => {
-    setSaveData(loadGame());
-    setScreen('title');
-    setGameState(prev => ({ ...INITIAL_STATE, unlockedPremiumClasses: prev.unlockedPremiumClasses, player: prev.player }));
-  }, []);
-
-  const handlePvp = useCallback(async () => {
-    if (!user) { toast.error('Connecting…'); return; }
-    if (!saveData) { toast.error('Create a character first'); return; }
-    try {
-      toast('Syncing character to cloud…');
-      const synced = await syncCharacterToCloud(saveData.player);
-      if (!synced?.id) throw new Error('sync failed');
-      setPvpCharacterId(synced.id);
-      setScreen('pvp-queue');
-    } catch (e: any) {
-      toast.error(`PvP unavailable: ${e.message ?? e}`);
+  const handleOpenCreate = useCallback(async () => {
+    const slots = await getMaxSlots();
+    const list = await listMyCharacters();
+    if (list.length >= slots) {
+      toast.error('All character slots are full');
+      return;
     }
-  }, [user, saveData]);
+    setScreen('create');
+  }, []);
 
-  const handleOverworld = useCallback(async () => {
-    if (!user) { toast.error('Connecting…'); return; }
-    if (!saveData) { toast.error('Create a character first'); return; }
+  const handleCreateCharacter = useCallback(async (cls: CharacterClass, name: string) => {
     try {
-      const synced = await syncCharacterToCloud(saveData.player);
-      if (!synced?.id) throw new Error('sync failed');
-      setCloudCharacterId(synced.id);
-      setScreen('overworld');
+      const id = await createNewCharacter(cls, name);
+      toast.success(`${name} created`);
+      await handlePlayCharacter(id);
     } catch (e: any) {
-      toast.error(`Overworld unavailable: ${e.message ?? e}`);
+      toast.error(`Couldn't create character: ${e.message ?? e}`);
     }
-  }, [user, saveData]);
+  }, [handlePlayCharacter]);
+
+  const handleJoinPvp = useCallback(() => {
+    if (!activeCharId) return;
+    setScreen('pvp-queue');
+  }, [activeCharId]);
 
   const handleMatched = useCallback((battleId: string) => {
     setPvpBattleId(battleId);
@@ -115,162 +92,91 @@ const Index = () => {
     setScreen('npc-battle');
   }, []);
 
-  const handleNpcBattleEnd = useCallback(() => {
-    setNpcBattleId(null);
-    setScreen('overworld');
-  }, []);
+  // ---- Render ----
 
-  const handleOverworldPvp = useCallback(async () => {
-    if (!cloudCharacterId) return;
-    setPvpCharacterId(cloudCharacterId);
-    setScreen('pvp-queue');
-  }, [cloudCharacterId]);
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const handleCharacterSelect = useCallback((characterClass: CharacterClass, name: string) => {
-    const player = createCharacter(characterClass, name, 'player');
-    const enemy = createEnemy(player.level);
-    autoSave(player);
-    setScreen('battle');
-    setGameState(prev => ({ ...prev, screen: 'battle', player, enemy, battleState: null, pendingXp: 0 }));
-  }, [autoSave]);
+  // A. Not authenticated
+  if (!user) return <AuthScreen />;
 
-  const handleBattleEnd = useCallback((winner: 'player' | 'enemy') => {
-    setGameState(prev => {
-      const playerLevel = prev.player?.level ?? 1;
-      const enemyLevel = prev.enemy?.level ?? 1;
-      const xp = calcBattleXp(playerLevel, enemyLevel, winner === 'player');
-      const next = winner === 'player' ? 'victory' as const : 'defeat' as const;
-      setScreen(next);
-      return { ...prev, screen: next, pendingXp: xp };
-    });
-  }, []);
+  // B. Authenticated but no character chosen → slot select / create
+  if (screen === 'slots') {
+    return (
+      <CharacterSlots
+        onPlay={handlePlayCharacter}
+        onCreateNew={handleOpenCreate}
+      />
+    );
+  }
 
-  const handleResultContinue = useCallback(() => {
-    if (!gameState.player) return;
-    const updated = applyXp(gameState.player, gameState.pendingXp);
-    autoSave(updated);
-    if (updated.statPoints > 0 || updated.skillPoints > 0) {
-      setScreen('level-up');
-      setGameState(prev => ({ ...prev, screen: 'level-up', player: updated }));
-    } else {
-      const resetPlayer: Character = {
-        ...updated,
-        stats: { ...updated.stats, health: updated.stats.maxHealth, energy: updated.stats.maxEnergy },
-        abilities: updated.abilities.map(a => ({ ...a, currentCooldown: 0 })),
-        rage: 0, isDefending: false, statusEffects: [],
-      };
-      const newEnemy = createEnemy(resetPlayer.level);
-      setScreen('battle');
-      setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));
-    }
-  }, [gameState.player, gameState.pendingXp, autoSave]);
+  if (screen === 'create') {
+    return (
+      <CharacterSelect
+        onSelect={handleCreateCharacter}
+        onBack={() => setScreen('slots')}
+        playerLevel={1}
+        unlockedPremiumClasses={[]}
+      />
+    );
+  }
 
-  const handleLevelUpComplete = useCallback((updatedPlayer: Character) => {
-    autoSave(updatedPlayer);
-    const newEnemy = createEnemy(updatedPlayer.level);
-    const resetPlayer: Character = {
-      ...updatedPlayer,
-      stats: { ...updatedPlayer.stats, health: updatedPlayer.stats.maxHealth, energy: updatedPlayer.stats.maxEnergy },
-      abilities: updatedPlayer.abilities.map(a => ({ ...a, currentCooldown: 0 })),
-      rage: 0, isDefending: false, statusEffects: [],
-    };
-    setScreen('battle');
-    setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));
-  }, [autoSave]);
+  // PvP queue & battles
+  if (screen === 'pvp-queue' && activeCharId) {
+    return (
+      <MatchmakingScreen
+        characterId={activeCharId}
+        onMatched={handleMatched}
+        onCancel={() => setScreen('game')}
+      />
+    );
+  }
 
-  const handlePlayAgain = useCallback(() => {
-    if (!gameState.player) return;
-    const updated = applyXp(gameState.player, gameState.pendingXp);
-    autoSave(updated);
-    const resetPlayer: Character = {
-      ...updated,
-      stats: { ...updated.stats, health: updated.stats.maxHealth, energy: updated.stats.maxEnergy },
-      abilities: updated.abilities.map(a => ({ ...a, currentCooldown: 0 })),
-      rage: 0, isDefending: false, statusEffects: [],
-    };
-    if (updated.statPoints > 0 || updated.skillPoints > 0) {
-      setScreen('level-up');
-      setGameState(prev => ({ ...prev, screen: 'level-up', player: updated, pendingXp: gameState.pendingXp }));
-    } else {
-      const newEnemy = createEnemy(resetPlayer.level);
-      setScreen('battle');
-      setGameState(prev => ({ ...prev, screen: 'battle', player: resetPlayer, enemy: newEnemy, battleState: null, pendingXp: 0 }));
-    }
-  }, [gameState.player, gameState.pendingXp, autoSave]);
+  if (screen === 'pvp-battle' && pvpBattleId && user) {
+    return (
+      <PvpBattleScreen
+        battleId={pvpBattleId}
+        myUserId={user.id}
+        onExit={() => setScreen('game')}
+      />
+    );
+  }
 
-  const playerLevel = gameState.player?.level ?? 0;
+  if (screen === 'npc-battle' && npcBattleId && user) {
+    return (
+      <NpcBattleScreen
+        battleId={npcBattleId}
+        myUserId={user.id}
+        onExit={() => setScreen('game')}
+      />
+    );
+  }
+
+  // C. In game with HUD
+  if (screen === 'game' && activeCharId && activeChar) {
+    return (
+      <GameHud
+        characterId={activeCharId}
+        characterName={activeChar.name}
+        characterClass={activeChar.class}
+        characterLevel={activeChar.level}
+        credits={activeChar.credits ?? 0}
+        isPremium={isPremium}
+        onEnterNpcBattle={handleEnterNpcBattle}
+        onJoinPvpQueue={handleJoinPvp}
+        onExitToSlots={handleExitToSlots}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen">
-      {screen === 'title' && (
-        <TitleScreen
-          onStart={handleStart}
-          onContinue={saveData ? handleContinue : undefined}
-          onPvp={ready ? handlePvp : undefined}
-          onOverworld={ready ? handleOverworld : undefined}
-          saveData={saveData}
-        />
-      )}
-      {screen === 'character-select' && (
-        <CharacterSelect
-          onSelect={handleCharacterSelect}
-          onBack={handleBackToTitle}
-          playerLevel={playerLevel}
-          unlockedPremiumClasses={gameState.unlockedPremiumClasses}
-        />
-      )}
-      {screen === 'battle' && gameState.player && gameState.enemy && (
-        <BattleArena player={gameState.player} enemy={gameState.enemy} onBattleEnd={handleBattleEnd} />
-      )}
-      {(screen === 'victory' || screen === 'defeat') && gameState.player && (
-        <ResultScreen
-          isVictory={screen === 'victory'}
-          playerName={gameState.player.name}
-          xpGained={gameState.pendingXp}
-          onPlayAgain={handlePlayAgain}
-          onMainMenu={handleBackToTitle}
-          onContinue={handleResultContinue}
-        />
-      )}
-      {screen === 'level-up' && gameState.player && (
-        <LevelUpScreen
-          player={gameState.player}
-          xpGained={gameState.pendingXp}
-          onComplete={handleLevelUpComplete}
-        />
-      )}
-      {screen === 'pvp-queue' && pvpCharacterId && (
-        <MatchmakingScreen
-          characterId={pvpCharacterId}
-          onMatched={handleMatched}
-          onCancel={handleBackToTitle}
-        />
-      )}
-      {screen === 'pvp-battle' && pvpBattleId && user && (
-        <PvpBattleScreen
-          battleId={pvpBattleId}
-          myUserId={user.id}
-          onExit={handleBackToTitle}
-        />
-      )}
-      {screen === 'overworld' && cloudCharacterId && saveData && (
-        <OverworldScreen
-          characterId={cloudCharacterId}
-          characterName={saveData.player.name}
-          characterClass={saveData.player.class}
-          characterLevel={saveData.player.level}
-          onEnterNpcBattle={handleEnterNpcBattle}
-          onJoinPvpQueue={handleOverworldPvp}
-          onExit={handleBackToTitle}
-        />
-      )}
-      {screen === 'npc-battle' && npcBattleId && user && (
-        <NpcBattleScreen
-          battleId={npcBattleId}
-          myUserId={user.id}
-          onExit={handleNpcBattleEnd}
-        />
-      )}
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
     </div>
   );
 };
