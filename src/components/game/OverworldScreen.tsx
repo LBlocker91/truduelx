@@ -38,8 +38,8 @@ const MOVE_ACCEL = 0.25; // easing factor 0..1 (lerp toward target velocity)
 const HEARTBEAT_MS = 300;
 const NEARBY_POLL_MS = 1500;
 const INTERACTION_RADIUS = 90;
-const CAMERA_ZOOM = 1.6; // makes player ~12-18% of screen
-const CAMERA_LERP = 0.2; // slightly snappier follow
+const CAMERA_ZOOM = 1.85; // ~15% larger player + tighter framing
+const CAMERA_LERP = 0.22; // snappier follow, still smooth
 
 // Map class name → icon for the nameplate
 const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -110,13 +110,19 @@ export const OverworldScreen = ({
 
   // Ambient particles (positions in viewport-relative %)
   const ambientParticles = useMemo(
-    () => Array.from({ length: 18 }, (_, i) => ({
-      left: (i * 53) % 100,
-      delay: (i * 0.83) % 14,
-      duration: 11 + ((i * 7) % 8),
-      size: 2 + (i % 3),
-      hue: 180 + ((i * 37) % 120),
-    })),
+    () => Array.from({ length: 28 }, (_, i) => {
+      const r1 = ((i * 9301 + 49297) % 233280) / 233280;
+      const r2 = ((i * 1103 + 12345) % 233280) / 233280;
+      const r3 = ((i * 7919 + 6151) % 233280) / 233280;
+      return {
+        left: r1 * 100,
+        delay: r2 * 14,
+        duration: 9 + r3 * 9,
+        size: 1.5 + r1 * 3,
+        hue: 170 + (r3 * 140),
+        drift: -20 + r2 * 40, // horizontal drift offset (px)
+      };
+    }),
     []
   );
 
@@ -496,17 +502,24 @@ export const OverworldScreen = ({
                   />
                 </div>
 
-                {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) === */}
+                {/* === MIDGROUND LAYER (world + actors, true 1:1 with player) ===
+                    The camera transform lives on the OUTER div and must NEVER be
+                    overwritten by an animation. The nudge is applied to a nested
+                    wrapper so it composes with (not replaces) the camera matrix. */}
                 <div
-                  key={`world-${nudgeKey}`}
-                  className="absolute top-0 left-0 origin-top-left camera-nudge"
+                  className="absolute top-0 left-0 origin-top-left"
                   style={{
                     width: zone.width,
                     height: zone.height,
                     transform: `translate3d(${tx}px, ${ty}px, 0) scale(${scale})`,
                     transformOrigin: '0 0',
+                    willChange: 'transform',
                   }}
                 >
+                  <div
+                    key={`nudge-${nudgeKey}`}
+                    className="absolute inset-0 camera-nudge"
+                  >
                   {/* NPCs in world coords (px) */}
                   {npcs.map((n, idx) => {
                     const close = interactable?.id === n.id;
@@ -607,7 +620,7 @@ export const OverworldScreen = ({
                         armorVariant={loadout.armorVariant}
                         weaponVariant={loadout.weaponVariant}
                         rarity={playerRarity}
-                        scale={1}
+                        scale={1.15}
                       />
                       {/* Interaction flash — re-mounts on each E press via key */}
                       {flashKey > 0 && (
@@ -624,6 +637,7 @@ export const OverworldScreen = ({
                         />
                       )}
                     </div>
+                  </div>
                   </div>
                 </div>
 
@@ -664,6 +678,7 @@ export const OverworldScreen = ({
                         boxShadow: `0 0 ${p.size * 2}px hsl(${p.hue} 100% 70% / 0.5)`,
                         animationDuration: `${p.duration}s`,
                         animationDelay: `${p.delay}s`,
+                        ['--drift-x' as any]: `${p.drift}px`,
                       }}
                     />
                   ))}

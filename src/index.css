@@ -441,24 +441,28 @@
   }
   .camera-nudge { animation: camera-nudge 0.32s ease-out; }
 
-  /* Ambient floating particles */
+  /* Ambient floating particles — drifts up with subtle horizontal sway */
   @keyframes particle-drift {
-    0%   { transform: translate3d(0, 0, 0);          opacity: 0; }
+    0%   { transform: translate3d(0, 0, 0);                                    opacity: 0; }
     15%  { opacity: 0.55; }
-    100% { transform: translate3d(20px, -120px, 0);  opacity: 0; }
+    50%  { transform: translate3d(calc(var(--drift-x, 10px) * 0.5), -60px, 0); opacity: 0.6; }
+    100% { transform: translate3d(var(--drift-x, 20px), -140px, 0);            opacity: 0; }
   }
-  .particle-drift { animation: particle-drift 14s linear infinite; }
+  .particle-drift { animation: particle-drift 14s linear infinite; will-change: transform, opacity; }
 
-  /* Background panel flicker */
+  /* Background panel flicker — irregular pattern feels less mechanical */
   @keyframes bg-flicker {
     0%, 100% { opacity: 0.0; }
-    48%      { opacity: 0.0; }
-    50%      { opacity: 0.55; }
-    52%      { opacity: 0.0; }
-    74%      { opacity: 0.35; }
-    76%      { opacity: 0.0; }
+    23%      { opacity: 0.0; }
+    25%      { opacity: 0.5; }
+    27%      { opacity: 0.0; }
+    61%      { opacity: 0.0; }
+    63%      { opacity: 0.35; }
+    64%      { opacity: 0.0; }
+    66%      { opacity: 0.55; }
+    68%      { opacity: 0.0; }
   }
-  .bg-flicker { animation: bg-flicker 6s ease-in-out infinite; }
+  .bg-flicker { animation: bg-flicker 7.3s ease-in-out infinite; }
 
   /* Slow horizontal light strip sweep */
   @keyframes light-sweep {
