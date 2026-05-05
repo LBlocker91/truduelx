@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   User as UserIcon, Backpack, ScrollText, Map as MapIcon, Swords,
   Sparkles, Store, Settings as SettingsIcon, LogOut, Crown, Coins,
+  Maximize2, Minimize2,
 } from 'lucide-react';
 import { OverworldScreen } from './OverworldScreen';
 import { ProfilePanel } from './panels/ProfilePanel';
