@@ -218,7 +218,7 @@ export const OverworldScreen = ({
 
         x += v.vx; y += v.vy;
         x = Math.max(40, Math.min(zone.width - 40, x));
-        y = Math.max(zone.height * 0.55, Math.min(zone.height - 40, y));
+        y = Math.max(zone.height * 0.35, Math.min(zone.height - 40, y));
 
         const speed = Math.hypot(v.vx, v.vy);
         const isMoving = speed > 0.4;
