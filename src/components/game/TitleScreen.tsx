@@ -6,10 +6,11 @@ import { SaveData } from '@/lib/save-game';
 interface TitleScreenProps {
   onStart: () => void;
   onContinue?: () => void;
+  onPvp?: () => void;
   saveData?: SaveData | null;
 }
 
-export const TitleScreen = ({ onStart, onContinue, saveData }: TitleScreenProps) => {
+export const TitleScreen = ({ onStart, onContinue, onPvp, saveData }: TitleScreenProps) => {
   return (
     <div 
       className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
@@ -68,8 +69,20 @@ export const TitleScreen = ({ onStart, onContinue, saveData }: TitleScreenProps)
             size="lg"
             variant={saveData ? 'outline' : 'default'}
           >
-            {saveData ? 'NEW GAME' : 'PLAY NOW'}
+            {saveData ? 'NEW GAME' : 'PLAY NOW (PvE)'}
           </Button>
+
+          {onPvp && saveData && (
+            <Button
+              onClick={onPvp}
+              size="lg"
+              variant="secondary"
+              className="text-xl px-12 py-6 rounded-lg w-full max-w-xs"
+            >
+              <Swords className="w-5 h-5 mr-2" />
+              RANKED PvP
+            </Button>
+          )}
           
           <p className="text-muted-foreground text-sm">
             Choose your class • Master your abilities • Dominate the arena
