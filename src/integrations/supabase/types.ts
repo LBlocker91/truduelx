@@ -177,10 +177,14 @@ export type Database = {
         Row: {
           class: Database["public"]["Enums"]["character_class"]
           created_at: string
+          credits: number
+          current_zone_id: string | null
           dexterity: number
           equipped_armor_id: string | null
           equipped_weapon_id: string | null
           id: string
+          last_x: number | null
+          last_y: number | null
           level: number
           name: string
           skill_levels: Json
@@ -196,10 +200,14 @@ export type Database = {
         Insert: {
           class: Database["public"]["Enums"]["character_class"]
           created_at?: string
+          credits?: number
+          current_zone_id?: string | null
           dexterity?: number
           equipped_armor_id?: string | null
           equipped_weapon_id?: string | null
           id?: string
+          last_x?: number | null
+          last_y?: number | null
           level?: number
           name: string
           skill_levels?: Json
@@ -215,10 +223,14 @@ export type Database = {
         Update: {
           class?: Database["public"]["Enums"]["character_class"]
           created_at?: string
+          credits?: number
+          current_zone_id?: string | null
           dexterity?: number
           equipped_armor_id?: string | null
           equipped_weapon_id?: string | null
           id?: string
+          last_x?: number | null
+          last_y?: number | null
           level?: number
           name?: string
           skill_levels?: Json
@@ -558,6 +570,7 @@ export type Database = {
           elo_rating: number
           id: string
           is_anonymous: boolean
+          is_premium: boolean
           losses: number
           updated_at: string
           user_id: string
@@ -570,6 +583,7 @@ export type Database = {
           elo_rating?: number
           id?: string
           is_anonymous?: boolean
+          is_premium?: boolean
           losses?: number
           updated_at?: string
           user_id: string
@@ -582,6 +596,7 @@ export type Database = {
           elo_rating?: number
           id?: string
           is_anonymous?: boolean
+          is_premium?: boolean
           losses?: number
           updated_at?: string
           user_id?: string
