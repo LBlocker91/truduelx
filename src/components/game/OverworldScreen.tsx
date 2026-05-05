@@ -307,11 +307,15 @@ export const OverworldScreen = ({
         ))}
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-2 overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-2 overflow-hidden bg-black">
         <div
           ref={stageRef}
           onClick={handleStageClick}
-          className="relative w-full max-w-[1400px] aspect-[16/10] bg-black cursor-crosshair border border-border rounded overflow-hidden select-none"
+          className="relative bg-black cursor-crosshair border border-border rounded overflow-hidden select-none"
+          style={{
+            width: 'min(100%, calc((100vh - 140px) * 16 / 10))',
+            aspectRatio: '16 / 10',
+          }}
         >
           {/* Camera-follow world layer (translate + scale around viewport center) */}
           {(() => {
