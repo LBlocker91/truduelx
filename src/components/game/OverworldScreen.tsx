@@ -440,45 +440,59 @@ export const OverworldScreen = ({
         <div
           ref={stageRef}
           onClick={handleStageClick}
-          className="absolute inset-0 bg-black cursor-crosshair overflow-hidden select-none"
+          className="absolute inset-0 cursor-crosshair overflow-hidden select-none"
+          style={{ backgroundColor: 'hsl(var(--background))' }}
         >
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `url(${bg})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'brightness(0.72) saturate(1.02)',
+              transform: 'scale(1.02)',
+            }}
+          />
           {/* Camera-follow world layer */}
           {(() => {
             const viewportWidth = Math.max(stageSize.w, 1);
             const viewportHeight = Math.max(stageSize.h, 1);
-            // Ensure world always fully covers viewport (no black bars on any screen size).
-            const coverZoom = Math.max(viewportWidth / zone.width, viewportHeight / zone.height);
+            const worldWidth = Math.max(Number(zone.width) || 0, 1);
+            const worldHeight = Math.max(Number(zone.height) || 0, 1);
+            // Slight overscan avoids 1px gaps from sub-pixel rounding during resize /
+            // fullscreen transitions on some aspect ratios.
+            const overscanPx = 4;
+            const coverZoom = Math.max(
+              (viewportWidth + overscanPx) / worldWidth,
+              (viewportHeight + overscanPx) / worldHeight,
+            );
             const preferredZoom = Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, CAMERA_ZOOM));
             const zoom = Math.max(coverZoom, preferredZoom);
             const halfVisibleWorldWidth = viewportWidth / (2 * zoom);
             const halfVisibleWorldHeight = viewportHeight / (2 * zoom);
+            const scaledWorldWidth = worldWidth * zoom;
+            const scaledWorldHeight = worldHeight * zoom;
 
             const clamp = (value: number, min: number, max: number) => {
               if (min > max) return (min + max) / 2;
               return Math.min(max, Math.max(min, value));
             };
 
-            const worldFitsHorizontally = zone.width * zoom <= viewportWidth;
-            const worldFitsVertically = zone.height * zoom <= viewportHeight;
-
             const minCameraX = halfVisibleWorldWidth;
-            const maxCameraX = zone.width - halfVisibleWorldWidth;
+            const maxCameraX = worldWidth - halfVisibleWorldWidth;
             const minCameraY = halfVisibleWorldHeight;
-            const maxCameraY = zone.height - halfVisibleWorldHeight;
+            const maxCameraY = worldHeight - halfVisibleWorldHeight;
 
-            const cameraX = worldFitsHorizontally
-              ? zone.width / 2
-              : clamp(camPos.x, minCameraX, maxCameraX);
-            const cameraY = worldFitsVertically
-              ? zone.height / 2
-              : clamp(camPos.y, minCameraY, maxCameraY);
+            const cameraX = clamp(camPos.x, minCameraX, maxCameraX);
+            const cameraY = clamp(camPos.y, minCameraY, maxCameraY);
 
-            const worldTranslateX = worldFitsHorizontally
-              ? (viewportWidth - zone.width * zoom) / 2
-              : viewportWidth / 2 - cameraX * zoom;
-            const worldTranslateY = worldFitsVertically
-              ? (viewportHeight - zone.height * zoom) / 2
-              : viewportHeight / 2 - cameraY * zoom;
+            const minTranslateX = viewportWidth - scaledWorldWidth;
+            const maxTranslateX = 0;
+            const minTranslateY = viewportHeight - scaledWorldHeight;
+            const maxTranslateY = 0;
+
+            const worldTranslateX = clamp(viewportWidth / 2 - cameraX * zoom, minTranslateX, maxTranslateX);
+            const worldTranslateY = clamp(viewportHeight / 2 - cameraY * zoom, minTranslateY, maxTranslateY);
 
             cameraRef.current = {
               tx: worldTranslateX,
@@ -488,20 +502,23 @@ export const OverworldScreen = ({
               y: cameraY,
               viewportWidth,
               viewportHeight,
-              worldWidth: zone.width,
-              worldHeight: zone.height,
+                worldWidth,
+                worldHeight,
             };
 
             return (
               <>
                 <div
-                  className="absolute top-0 left-0 origin-top-left"
+                    className="absolute top-0 left-0 origin-top-left"
                   style={{
-                    width: zone.width,
-                    height: zone.height,
+                      width: `${worldWidth}px`,
+                      height: `${worldHeight}px`,
+                      minWidth: `${worldWidth}px`,
+                      minHeight: `${worldHeight}px`,
                     transform: `translate3d(${worldTranslateX}px, ${worldTranslateY}px, 0) scale(${zoom})`,
                     transformOrigin: '0 0',
                     willChange: 'transform',
+                      backgroundColor: 'hsl(var(--background))',
                   }}
                 >
                   <div
@@ -698,7 +715,7 @@ export const OverworldScreen = ({
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
-                      'radial-gradient(ellipse 80% 70% at 50% 55%, transparent 40%, rgba(0,0,0,0.55) 100%)',
+                      'radial-gradient(ellipse 92% 86% at 50% 55%, transparent 56%, rgba(0,0,0,0.06) 82%, rgba(0,0,0,0.12) 100%)',
                   }}
                 />
                 {/* Ambient color tint — zone mood */}
@@ -707,10 +724,10 @@ export const OverworldScreen = ({
                   style={{
                     background:
                       zone.id === 'neon-district'
-                        ? 'linear-gradient(180deg, hsl(280 70% 30% / 0.18), hsl(190 80% 30% / 0.18))'
+                        ? 'linear-gradient(180deg, hsl(280 70% 30% / 0.12), hsl(190 80% 30% / 0.1))'
                         : zone.id === 'wasteland'
-                        ? 'linear-gradient(180deg, hsl(30 60% 35% / 0.22), hsl(15 50% 25% / 0.18))'
-                        : 'linear-gradient(180deg, hsl(210 50% 25% / 0.18), hsl(220 40% 15% / 0.18))',
+                        ? 'linear-gradient(180deg, hsl(30 60% 35% / 0.12), hsl(15 50% 25% / 0.1))'
+                        : 'linear-gradient(180deg, hsl(210 50% 25% / 0.1), hsl(220 40% 15% / 0.08))',
                     mixBlendMode: 'soft-light',
                   }}
                 />
