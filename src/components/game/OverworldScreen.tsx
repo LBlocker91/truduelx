@@ -16,6 +16,9 @@ import {
 } from '@/lib/overworld';
 import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
 import { NpcMarker } from './NpcMarker';
+import {
+  walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
+} from '@/lib/zone-walkable';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
 import neonDistrict from '@/assets/zones/neon-district.jpg';
@@ -46,8 +49,6 @@ const NEARBY_POLL_MS = 1500;
 const INTERACTION_RADIUS_PCT = 14;     // distance in % space to allow [E] interact
 const MOVE_SPEED_PCT = 0.65;           // % per frame at 60fps
 const MOVE_ACCEL = 0.2;
-const PLAYER_X_MIN = 5,  PLAYER_X_MAX = 95;
-const PLAYER_Y_MIN = 15, PLAYER_Y_MAX = 92;
 
 // Class → icon for nameplates
 const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
