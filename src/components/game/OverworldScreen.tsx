@@ -499,8 +499,10 @@ export const OverworldScreen = ({
 
           {/* Other players */}
           {nearby.map(p => {
-            const xp = toPct(p.x_position);
-            const yp = toPct(p.y_position);
+            const wkOther = walkableFor(zone.id);
+            const raw = { x: toPct(p.x_position), y: toPct(p.y_position) };
+            const safe = clampToWalkable(raw, wkOther.polygon);
+            const xp = safe.x, yp = safe.y;
             const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
             const otherRarity = variantToRarity(p.equipped_armor_variant, p.equipped_weapon_variant);
             const OtherIcon = getClassIcon(p.character_class ?? '');
