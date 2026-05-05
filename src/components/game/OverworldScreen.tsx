@@ -110,13 +110,19 @@ export const OverworldScreen = ({
 
   // Ambient particles (positions in viewport-relative %)
   const ambientParticles = useMemo(
-    () => Array.from({ length: 18 }, (_, i) => ({
-      left: (i * 53) % 100,
-      delay: (i * 0.83) % 14,
-      duration: 11 + ((i * 7) % 8),
-      size: 2 + (i % 3),
-      hue: 180 + ((i * 37) % 120),
-    })),
+    () => Array.from({ length: 28 }, (_, i) => {
+      const r1 = ((i * 9301 + 49297) % 233280) / 233280;
+      const r2 = ((i * 1103 + 12345) % 233280) / 233280;
+      const r3 = ((i * 7919 + 6151) % 233280) / 233280;
+      return {
+        left: r1 * 100,
+        delay: r2 * 14,
+        duration: 9 + r3 * 9,
+        size: 1.5 + r1 * 3,
+        hue: 170 + (r3 * 140),
+        drift: -20 + r2 * 40, // horizontal drift offset (px)
+      };
+    }),
     []
   );
 
