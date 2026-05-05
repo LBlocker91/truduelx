@@ -165,6 +165,7 @@ const Index = () => {
         characterName={activeChar.name}
         characterClass={activeChar.class}
         characterLevel={activeChar.level}
+        characterXp={activeChar.xp ?? 0}
         credits={activeChar.credits ?? 0}
         isPremium={isPremium}
         onEnterNpcBattle={handleEnterNpcBattle}
