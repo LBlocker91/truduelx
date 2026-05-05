@@ -331,3 +331,18 @@
     animation: shadow-pulse 2.2s ease-in-out infinite;
   }
 }
+
+@layer utilities {
+  @keyframes sprite-walk-bob {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    25% { transform: translateY(-2px) rotate(0deg); }
+    50% { transform: translateY(0) rotate(1deg); }
+    75% { transform: translateY(-2px) rotate(0deg); }
+  }
+  @keyframes sprite-idle-breathe {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50% { transform: translateY(-0.5px) scaleY(1.01); }
+  }
+  .sprite-walk { animation: sprite-walk-bob 0.45s ease-in-out infinite; transform-origin: center bottom; }
+  .sprite-idle { animation: sprite-idle-breathe 2.4s ease-in-out infinite; transform-origin: center bottom; }
+}

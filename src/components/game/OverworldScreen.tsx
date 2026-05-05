@@ -9,7 +9,9 @@ import {
   enterZone, heartbeat, setInBattle,
   fetchVendorItems, fetchQuestForNpc, fetchPlayerQuests, acceptQuest,
   startNpcBattle,
+  fetchMyLoadout, publishLoadout, EquippedLoadout,
 } from '@/lib/overworld';
+import { PlayerSprite, SpriteDirection } from './PlayerSprite';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
 import neonDistrict from '@/assets/zones/neon-district.jpg';
@@ -44,6 +46,9 @@ export const OverworldScreen = ({
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [nearby, setNearby] = useState<NearbyPlayer[]>([]);
   const [pos, setPos] = useState({ x: 800, y: 750 });
+  const [direction, setDirection] = useState<SpriteDirection>('right');
+  const [moving, setMoving] = useState(false);
+  const [loadout, setLoadout] = useState<EquippedLoadout>({ armorVariant: null, weaponVariant: null });
   const targetRef = useRef<{ x: number; y: number } | null>(null);
   const keysRef = useRef<Set<string>>(new Set());
   const stageRef = useRef<HTMLDivElement>(null);
@@ -54,6 +59,8 @@ export const OverworldScreen = ({
   const [busy, setBusy] = useState(false);
   const posRef = useRef(pos);
   posRef.current = pos;
+  const dirRef = useRef<SpriteDirection>('right');
+  dirRef.current = direction;
 
   useEffect(() => {
     (async () => {
@@ -96,20 +103,29 @@ export const OverworldScreen = ({
     const loop = () => {
       setPos(prev => {
         let { x, y } = prev;
+        let dx = 0, dy = 0;
         const k = keysRef.current;
-        if (k.has('a') || k.has('arrowleft')) x -= MOVE_SPEED;
-        if (k.has('d') || k.has('arrowright')) x += MOVE_SPEED;
-        if (k.has('w') || k.has('arrowup')) y -= MOVE_SPEED;
-        if (k.has('s') || k.has('arrowdown')) y += MOVE_SPEED;
+        if (k.has('a') || k.has('arrowleft')) dx -= MOVE_SPEED;
+        if (k.has('d') || k.has('arrowright')) dx += MOVE_SPEED;
+        if (k.has('w') || k.has('arrowup')) dy -= MOVE_SPEED;
+        if (k.has('s') || k.has('arrowdown')) dy += MOVE_SPEED;
         const t = targetRef.current;
-        if (t) {
-          const dx = t.x - x, dy = t.y - y;
-          const dist = Math.hypot(dx, dy);
+        if (!dx && !dy && t) {
+          const tdx = t.x - x, tdy = t.y - y;
+          const dist = Math.hypot(tdx, tdy);
           if (dist < MOVE_SPEED) { x = t.x; y = t.y; targetRef.current = null; }
-          else { x += (dx / dist) * MOVE_SPEED; y += (dy / dist) * MOVE_SPEED; }
+          else { dx = (tdx / dist) * MOVE_SPEED; dy = (tdy / dist) * MOVE_SPEED; }
         }
+        x += dx; y += dy;
         x = Math.max(40, Math.min(zone.width - 40, x));
         y = Math.max(zone.height * 0.55, Math.min(zone.height - 40, y));
+        const isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
+        // Update direction & moving via refs avoids per-frame React re-render unless changed
+        if (Math.abs(dx) > 0.01) {
+          const nd: SpriteDirection = dx < 0 ? 'left' : 'right';
+          if (dirRef.current !== nd) setDirection(nd);
+        }
+        setMoving(prevMoving => prevMoving === isMoving ? prevMoving : isMoving);
         return { x, y };
       });
       raf = requestAnimationFrame(loop);
@@ -120,12 +136,23 @@ export const OverworldScreen = ({
 
   useEffect(() => {
     if (!zone) return;
-    const hb = setInterval(() => { heartbeat(zone.id, posRef.current.x, posRef.current.y); }, HEARTBEAT_MS);
+    const hb = setInterval(() => {
+      heartbeat(zone.id, posRef.current.x, posRef.current.y, dirRef.current);
+    }, HEARTBEAT_MS);
     const np = setInterval(async () => {
       try { setNearby(await fetchNearbyPlayers(zone.id)); } catch { }
     }, NEARBY_POLL_MS);
     return () => { clearInterval(hb); clearInterval(np); };
   }, [zone]);
+
+  // Load equipped loadout once and publish to presence so others can see it
+  useEffect(() => {
+    (async () => {
+      const lo = await fetchMyLoadout(characterId);
+      setLoadout(lo);
+      await publishLoadout(lo);
+    })();
+  }, [characterId]);
 
   useEffect(() => { (async () => {
     const { data } = await import('@/integrations/supabase/client').then(m => m.supabase.auth.getUser());
@@ -285,6 +312,7 @@ export const OverworldScreen = ({
           {nearby.map(p => {
             const sx = (p.x_position / zone.width) * 100;
             const sy = (p.y_position / zone.height) * 100;
+            const dir: SpriteDirection = p.facing === 'left' ? 'left' : 'right';
             return (
               <div key={p.user_id}
                 style={{ left: `${sx}%`, top: `${sy}%` }}
@@ -293,7 +321,14 @@ export const OverworldScreen = ({
                 <div className="text-[9px] px-1 rounded bg-card/80 border border-secondary/50 mb-0.5">
                   {p.display_name} L{p.character_level}
                 </div>
-                <div className="w-8 h-10 rounded-t-full bg-secondary/70 border-2 border-secondary" />
+                <PlayerSprite
+                  direction={dir}
+                  state="idle"
+                  armorVariant={p.equipped_armor_variant}
+                  weaponVariant={p.equipped_weapon_variant}
+                  scale={0.85}
+                />
+                <div className="w-6 h-1.5 rounded-full bg-black/40 -mt-1 blur-[1px]" />
               </div>
             );
           })}
@@ -305,14 +340,22 @@ export const OverworldScreen = ({
             }}
             className="absolute -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none transition-none"
           >
-            <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5">
+            <div className="text-[10px] font-orbitron px-1.5 py-0.5 rounded bg-primary text-primary-foreground mb-0.5 drop-shadow">
               {characterName}
             </div>
-            <div className="w-9 h-12 rounded-t-full bg-primary border-2 border-primary-foreground shadow-[0_0_20px_hsl(var(--primary))]" />
-            <div className="w-3 h-3 rounded-full bg-black/50" />
+            <PlayerSprite
+              direction={direction}
+              state={moving ? 'walk' : 'idle'}
+              armorVariant={loadout.armorVariant}
+              weaponVariant={loadout.weaponVariant}
+              scale={1}
+              className="drop-shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
+            />
+            <div className="w-8 h-2 rounded-full bg-black/50 -mt-1 blur-[1px]" />
           </div>
         </div>
       </div>
+
 
       <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
         <span>WASD or click to move · [E] to interact</span>

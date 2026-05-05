@@ -30,6 +30,44 @@ export interface NearbyPlayer {
   y_position: number;
   facing: string;
   is_in_battle: boolean;
+  equipped_armor_variant?: string | null;
+  equipped_weapon_variant?: string | null;
+}
+
+export interface EquippedLoadout {
+  armorVariant: string | null;
+  weaponVariant: string | null;
+}
+
+export async function fetchMyLoadout(characterId: string): Promise<EquippedLoadout> {
+  const { data: ch } = await supabase
+    .from('characters')
+    .select('equipped_armor_id, equipped_weapon_id')
+    .eq('id', characterId)
+    .maybeSingle();
+  if (!ch) return { armorVariant: null, weaponVariant: null };
+  const ids = [ch.equipped_armor_id, ch.equipped_weapon_id].filter(Boolean) as string[];
+  if (ids.length === 0) return { armorVariant: null, weaponVariant: null };
+  const { data: items } = await supabase
+    .from('items')
+    .select('id, sprite_layer, sprite_variant')
+    .in('id', ids);
+  let armorVariant: string | null = null;
+  let weaponVariant: string | null = null;
+  for (const it of items ?? []) {
+    if (it.sprite_layer === 'armor') armorVariant = it.sprite_variant ?? null;
+    if (it.sprite_layer === 'weapon') weaponVariant = it.sprite_variant ?? null;
+  }
+  return { armorVariant, weaponVariant };
+}
+
+export async function publishLoadout(loadout: EquippedLoadout) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u?.user) return;
+  await supabase.from('player_state').update({
+    equipped_armor_variant: loadout.armorVariant,
+    equipped_weapon_variant: loadout.weaponVariant,
+  }).eq('user_id', u.user.id);
 }
 
 export interface VendorItem {

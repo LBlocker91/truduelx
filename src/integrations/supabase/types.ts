@@ -178,6 +178,8 @@ export type Database = {
           class: Database["public"]["Enums"]["character_class"]
           created_at: string
           dexterity: number
+          equipped_armor_id: string | null
+          equipped_weapon_id: string | null
           id: string
           level: number
           name: string
@@ -195,6 +197,8 @@ export type Database = {
           class: Database["public"]["Enums"]["character_class"]
           created_at?: string
           dexterity?: number
+          equipped_armor_id?: string | null
+          equipped_weapon_id?: string | null
           id?: string
           level?: number
           name: string
@@ -212,6 +216,8 @@ export type Database = {
           class?: Database["public"]["Enums"]["character_class"]
           created_at?: string
           dexterity?: number
+          equipped_armor_id?: string | null
+          equipped_weapon_id?: string | null
           id?: string
           level?: number
           name?: string
@@ -279,6 +285,8 @@ export type Database = {
           name: string
           rarity: Database["public"]["Enums"]["item_rarity"]
           slot: Database["public"]["Enums"]["item_slot"]
+          sprite_layer: string | null
+          sprite_variant: string | null
           stat_modifiers: Json
         }
         Insert: {
@@ -293,6 +301,8 @@ export type Database = {
           name: string
           rarity?: Database["public"]["Enums"]["item_rarity"]
           slot: Database["public"]["Enums"]["item_slot"]
+          sprite_layer?: string | null
+          sprite_variant?: string | null
           stat_modifiers?: Json
         }
         Update: {
@@ -307,6 +317,8 @@ export type Database = {
           name?: string
           rarity?: Database["public"]["Enums"]["item_rarity"]
           slot?: Database["public"]["Enums"]["item_slot"]
+          sprite_layer?: string | null
+          sprite_variant?: string | null
           stat_modifiers?: Json
         }
         Relationships: []
@@ -486,6 +498,8 @@ export type Database = {
           character_class: Database["public"]["Enums"]["character_class"] | null
           character_level: number
           display_name: string | null
+          equipped_armor_variant: string | null
+          equipped_weapon_variant: string | null
           facing: string
           is_in_battle: boolean
           updated_at: string
@@ -500,6 +514,8 @@ export type Database = {
             | null
           character_level?: number
           display_name?: string | null
+          equipped_armor_variant?: string | null
+          equipped_weapon_variant?: string | null
           facing?: string
           is_in_battle?: boolean
           updated_at?: string
@@ -514,6 +530,8 @@ export type Database = {
             | null
           character_level?: number
           display_name?: string | null
+          equipped_armor_variant?: string | null
+          equipped_weapon_variant?: string | null
           facing?: string
           is_in_battle?: boolean
           updated_at?: string
@@ -749,6 +767,8 @@ export type Database = {
           character_class: Database["public"]["Enums"]["character_class"]
           character_level: number
           display_name: string
+          equipped_armor_variant: string
+          equipped_weapon_variant: string
           facing: string
           is_in_battle: boolean
           updated_at: string
