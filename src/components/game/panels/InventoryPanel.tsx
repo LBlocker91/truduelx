@@ -66,15 +66,44 @@ export const InventoryPanel = ({ characterId, onLoadoutChanged }: InventoryPanel
     );
   }
 
-  // Group by slot
+  // Group consumables separately from gear
+  const consumables = items.filter(i => i.item.consumable);
+  const gear = items.filter(i => !i.item.consumable);
   const slots = ['weapon', 'armor', 'helmet', 'gloves', 'boots', 'accessory'] as const;
   const grouped = slots.map((slot) => ({
     slot,
-    items: items.filter((i) => i.item.slot === slot),
+    items: gear.filter((i) => i.item.slot === slot),
   })).filter((g) => g.items.length > 0);
 
   return (
     <div className="space-y-4">
+      {consumables.length > 0 && (
+        <div>
+          <h3 className="font-orbitron text-xs text-muted-foreground uppercase mb-2">Consumables</h3>
+          <div className="space-y-2">
+            {consumables.map((it) => (
+              <div key={it.id} className={`game-card rounded-lg p-3 border ${RARITY_COLOR[it.item.rarity] ?? ''}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-orbitron text-sm truncate">{it.item.name}</h4>
+                      <Badge variant="outline" className="text-[10px]">x{it.quantity}</Badge>
+                    </div>
+                    {it.item.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{it.item.description}</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                      {it.item.subtype === 'hp_potion' ? 'Restores 50% HP' : it.item.subtype === 'mp_potion' ? 'Restores 50% MP' : ''}
+                      {' · usable in battle'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {grouped.map(({ slot, items }) => (
         <div key={slot}>
           <h3 className="font-orbitron text-xs text-muted-foreground uppercase mb-2 flex items-center gap-1.5">
