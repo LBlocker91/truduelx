@@ -131,11 +131,20 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [rewards, setRewards] = useState<{ xpGained: number; creditsGained: number } | null>(null);
   const [pendingLevel, setPendingLevel] = useState<LevelUpInfo | null>(null);
 
-  const doAction = async (action: 'attack'|'defend'|'forfeit'|'skill', skillSlug?: string) => {
+  const doAction = async (
+    action: 'attack'|'defend'|'forfeit'|'skill'|'use_item',
+    skillSlug?: string,
+    itemSubtype?: 'hp_potion'|'mp_potion',
+  ) => {
     if (submitting || !myTurn) return;
     setSubmitting(true);
     try {
-      const r = await submitNpcAction(battleId, action, skillSlug);
+      const r = await submitNpcAction(battleId, action, skillSlug, itemSubtype);
+      if (r?.error) {
+        const { toast } = await import('sonner');
+        toast.error(r.error);
+      }
+      if (action === 'use_item' && characterId) await refreshPotions(characterId);
       if (r?.finished) {
         await setInBattle(false);
         if (r.won) {
