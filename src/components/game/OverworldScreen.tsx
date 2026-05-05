@@ -183,7 +183,10 @@ export const OverworldScreen = ({
     const ns = await fetchNpcs(zoneId);
     setZone(z);
     setNpcs(ns);
-    setPos({ x: 50, y: 78 });
+    // Always spawn at the zone's safe floor spawn point. If a saved/legacy
+    // position is invalid, this guarantees we land on the floor.
+    const wk = walkableFor(zoneId);
+    setPos({ ...wk.spawn });
     targetRef.current = null;
   }, [zones]);
 
