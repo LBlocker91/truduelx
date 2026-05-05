@@ -50,6 +50,8 @@ export const ZONE_WALKABLE: Record<string, ZoneWalkable> = {
       'Commander Hale':    { visual: { x: 50, y: 56 }, interaction: { x: 50, y: 66 } },
       'Doc Circuits':      { visual: { x: 70, y: 82 }, interaction: { x: 70, y: 88 } },
       'Tinker Mira':       { visual: { x: 86, y: 60 }, interaction: { x: 82, y: 68 } },
+      // Starter combat dummy — keeps the early loop self-contained in the hub.
+      'Training Drone':    { visual: { x: 42, y: 74 }, interaction: { x: 42, y: 82 } },
     },
   },
 
