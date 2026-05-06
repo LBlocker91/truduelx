@@ -95,7 +95,16 @@ interface DamageOpts {
   skill: SkillDef | null; // null = basic attack
   defending: boolean;
   rng: () => number;
+  isUltimate?: boolean;
 }
+
+/** A skill is treated as an ultimate when its cooldown is high. */
+export function isUltimateSkill(skill: SkillDef | null | undefined): boolean {
+  if (!skill) return false;
+  return (skill.cooldown ?? 0) >= 6;
+}
+
+export const ULTIMATE_CHARGE_REQUIRED = 3;
 
 export interface HitResult {
   damage: number;
