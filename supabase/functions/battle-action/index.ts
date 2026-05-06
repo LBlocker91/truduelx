@@ -101,7 +101,9 @@ Deno.serve(async (req) => {
       target.hp = Math.max(0, target.hp - hit.damage);
       actor.rage = Math.min(100, actor.rage + 10);
       result.hits.push(hit);
-      actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+      if (!hit.dodged) {
+        actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+      }
       result.ultimate_charge = actor.ultimate_charge;
     } else if (action === 'skill') {
       if (!skillSlug) return j({ error: 'skillSlug required' }, 400);
