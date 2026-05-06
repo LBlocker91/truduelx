@@ -55,8 +55,17 @@ export interface CharacterSnapshot {
   weapon_max: number;
   defense: number;
   resistance: number;
+  /** physical | energy | hybrid — basic-attack damage type, comes from equipped weapon */
+  weapon_damage_type?: 'physical' | 'energy' | 'hybrid';
+  /** blade | pistol | rifle | rocket_launcher | tech_staff | heavy | drone | unarmed */
+  weapon_subtype?: string;
+  /** Strongest scaling stat for the equipped weapon's basic attack */
+  weapon_scale_stat?: ScaleStat;
   skill_levels: Record<string, number>;
   equipped?: { weapon_variant: string | null; armor_variant: string | null };
+  /** Cosmetic/passive equipped extras for VFX */
+  equipped_extras?: { wings_variant?: string | null; pet_variant?: string | null };
+  max_hp?: number;
   zone_id?: string;
 }
 
