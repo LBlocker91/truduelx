@@ -14,15 +14,28 @@ const COLOR: Record<NpcKind, { hsl: string; label: string }> = {
   enemy:  { hsl: '0 85% 60%',    label: 'HOSTILE' },
 };
 
+// Simple deterministic hash → 0..1 to vary palette/silhouette per NPC name.
+const hashFloat = (s: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 1000) / 1000;
+};
+
+const skinTones = ['#e8c5a0', '#c89a76', '#a07555', '#8a5a3c', '#7a8b9a', '#cdd9ff'];
+const accentTones = ['#7ad9ff', '#7af0b0', '#ffb04a', '#ff7a3a', '#c79bff', '#ff5050'];
+
 const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
   const c = COLOR[kind];
   const color = `hsl(${c.hsl})`;
   const colorSoft = `hsl(${c.hsl} / 0.45)`;
   const colorFaint = `hsl(${c.hsl} / 0.18)`;
 
+  const seed = hashFloat(name);
+  const skin = skinTones[Math.floor(seed * skinTones.length)];
+  const accent = accentTones[Math.floor((seed * 7.13) % 1 * accentTones.length)];
+
   return (
     <div className="relative flex flex-col items-center" style={{ color }}>
-      {/* Name / interaction prompt */}
       {close ? (
         <div
           className="text-xs font-orbitron px-2.5 py-1 rounded mb-1.5 animate-pulse whitespace-nowrap"
@@ -39,9 +52,7 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
         </div>
       )}
 
-      {/* In-world figure */}
       <div className="relative npc-bob w-full h-full">
-        {/* Interaction ring on hover/proximity — smoother dual-pulse */}
         {close && (
           <>
             <div
@@ -55,80 +66,82 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
           </>
         )}
 
-        {kind === 'enemy' ? (
-          /* Enemy silhouette — ominous standing figure */
-          <svg viewBox="0 0 64 88" className="absolute inset-0 w-full h-full hologram-flicker">
-            <defs>
-              <linearGradient id="enemy-body" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#1a0408" stopOpacity="1" />
-              </linearGradient>
-            </defs>
-            {/* Head */}
-            <ellipse cx="32" cy="14" rx="9" ry="10" fill="url(#enemy-body)" stroke={color} strokeWidth="0.8" />
-            {/* Eyes */}
-            <circle cx="29" cy="13" r="1.4" fill={color} />
-            <circle cx="35" cy="13" r="1.4" fill={color} />
-            {/* Body */}
-            <path d="M20 26 L44 26 L46 58 L40 70 L24 70 L18 58 Z" fill="url(#enemy-body)" stroke={color} strokeWidth="0.8" />
-            {/* Shoulders */}
-            <ellipse cx="20" cy="28" rx="5" ry="3" fill={color} opacity="0.7" />
-            <ellipse cx="44" cy="28" rx="5" ry="3" fill={color} opacity="0.7" />
-            {/* Legs */}
-            <rect x="25" y="68" width="5" height="14" fill="#1a0408" stroke={color} strokeWidth="0.6" />
-            <rect x="34" y="68" width="5" height="14" fill="#1a0408" stroke={color} strokeWidth="0.6" />
-            {/* Chest seam glow */}
-            <line x1="28" y1="40" x2="36" y2="40" stroke={color} strokeWidth="1.2" opacity="0.9" />
-          </svg>
-        ) : (
-          /* Vendor / Quest hologram terminal */
-          <svg viewBox="0 0 64 88" className="absolute inset-0 w-full h-full hologram-flicker">
-            <defs>
-              <linearGradient id={`term-body-${kind}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0a0f18" />
-                <stop offset="100%" stopColor="#1a2230" />
-              </linearGradient>
-              <linearGradient id={`term-screen-${kind}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity="0.85" />
-                <stop offset="100%" stopColor={color} stopOpacity="0.25" />
-              </linearGradient>
-            </defs>
-            {/* Base / pylon */}
-            <rect x="22" y="78" width="20" height="6" fill="#0a0f18" stroke={color} strokeWidth="0.6" rx="1" />
-            <rect x="27" y="64" width="10" height="16" fill={`url(#term-body-${kind})`} stroke={color} strokeWidth="0.6" />
-            {/* Terminal body */}
-            <rect x="14" y="18" width="36" height="48" rx="3" fill={`url(#term-body-${kind})`} stroke={color} strokeWidth="0.9" />
-            {/* Screen */}
-            <rect x="18" y="22" width="28" height="32" rx="1.5" fill={`url(#term-screen-${kind})`} />
-            {/* Scan lines */}
-            <line x1="18" y1="28" x2="46" y2="28" stroke={color} strokeWidth="0.4" opacity="0.5" />
-            <line x1="18" y1="34" x2="46" y2="34" stroke={color} strokeWidth="0.4" opacity="0.5" />
-            <line x1="18" y1="40" x2="46" y2="40" stroke={color} strokeWidth="0.4" opacity="0.5" />
-            <line x1="18" y1="46" x2="46" y2="46" stroke={color} strokeWidth="0.4" opacity="0.5" />
-            {/* Icon glyph */}
-            {kind === 'vendor' ? (
-              <g transform="translate(32 38)" fill="#000" stroke={color} strokeWidth="0.8">
-                <rect x="-7" y="-5" width="14" height="10" rx="1" fill={color} />
-                <rect x="-5" y="-7" width="10" height="3" fill={color} />
-              </g>
-            ) : (
-              <g transform="translate(32 38)" stroke={color} strokeWidth="1.2" fill="none">
-                <path d="M-6 -6 L6 -6 L6 6 L0 8 L-6 6 Z" fill={color} fillOpacity="0.4" />
-                <line x1="-3" y1="-2" x2="3" y2="-2" />
-                <line x1="-3" y1="1"  x2="3" y2="1" />
-              </g>
-            )}
-            {/* Indicator LED */}
-            <circle cx="42" cy="60" r="1.6" fill={color}>
-              <animate attributeName="opacity" values="0.3;1;0.3" dur="1.4s" repeatCount="indefinite" />
-            </circle>
-            {/* Antenna */}
-            <line x1="32" y1="18" x2="32" y2="12" stroke={color} strokeWidth="0.8" />
-            <circle cx="32" cy="11" r="1.2" fill={color} />
-          </svg>
-        )}
+        <svg viewBox="0 0 64 100" className="absolute inset-0 w-full h-full">
+          <defs>
+            <linearGradient id={`body-${kind}-${seed.toFixed(3)}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.95" />
+              <stop offset="100%" stopColor="#0a0f18" stopOpacity="1" />
+            </linearGradient>
+          </defs>
 
-        {/* Holographic ground glow — intensifies in range */}
+          {/* Head */}
+          <ellipse cx="32" cy="14" rx="7" ry="8" fill={skin} stroke="#000" strokeWidth="0.6" />
+          {/* Hair / hood (varies by seed) */}
+          {seed > 0.5 ? (
+            <path d="M25 10 Q32 4 39 10 Q39 14 32 14 Q25 14 25 10 Z" fill={accent} opacity="0.85" />
+          ) : (
+            <path d="M24 12 Q32 2 40 12 L40 18 Q32 16 24 18 Z" fill="#1a2230" opacity="0.9" />
+          )}
+          {/* Eyes */}
+          <circle cx="29" cy="14" r="0.9" fill={kind === 'enemy' ? color : '#000'} />
+          <circle cx="35" cy="14" r="0.9" fill={kind === 'enemy' ? color : '#000'} />
+
+          {/* Body / jacket */}
+          <path d="M22 26 L42 26 L46 60 L40 78 L24 78 L18 60 Z"
+            fill={`url(#body-${kind}-${seed.toFixed(3)})`} stroke="#000" strokeWidth="0.6" />
+          {/* Shoulder pads */}
+          <ellipse cx="22" cy="28" rx="5" ry="3" fill={accent} opacity="0.85" />
+          <ellipse cx="42" cy="28" rx="5" ry="3" fill={accent} opacity="0.85" />
+          {/* Chest seam glow */}
+          <line x1="28" y1="40" x2="36" y2="40" stroke={color} strokeWidth="1.2" opacity="0.9" />
+          {/* Belt */}
+          <rect x="22" y="60" width="20" height="3" fill="#0a0f18" stroke={color} strokeWidth="0.4" />
+          {/* Legs */}
+          <rect x="25" y="78" width="5" height="14" fill="#0a0f18" stroke="#000" strokeWidth="0.4" />
+          <rect x="34" y="78" width="5" height="14" fill="#0a0f18" stroke="#000" strokeWidth="0.4" />
+
+          {/* Role-specific accessories */}
+          {kind === 'vendor' && (
+            <g>
+              {/* Holo-screen above shoulder */}
+              <rect x="44" y="22" width="14" height="12" rx="1" fill={color} fillOpacity="0.35" stroke={color} strokeWidth="0.5" />
+              <line x1="46" y1="26" x2="56" y2="26" stroke={color} strokeWidth="0.4" />
+              <line x1="46" y1="29" x2="56" y2="29" stroke={color} strokeWidth="0.4" />
+              {/* Counter / crate */}
+              <rect x="14" y="84" width="36" height="10" rx="1" fill="#1a2230" stroke={color} strokeWidth="0.5" />
+              <rect x="18" y="86" width="6" height="6" fill={color} fillOpacity="0.6" />
+              <rect x="28" y="86" width="6" height="6" fill={accent} fillOpacity="0.7" />
+              <rect x="38" y="86" width="6" height="6" fill={color} fillOpacity="0.6" />
+            </g>
+          )}
+          {kind === 'quest' && (
+            <g>
+              {/* Floating data-pad */}
+              <rect x="44" y="34" width="12" height="16" rx="1" fill={color} fillOpacity="0.45" stroke={color} strokeWidth="0.6" />
+              <line x1="46" y1="38" x2="54" y2="38" stroke={color} strokeWidth="0.4" />
+              <line x1="46" y1="41" x2="54" y2="41" stroke={color} strokeWidth="0.4" />
+              <line x1="46" y1="44" x2="52" y2="44" stroke={color} strokeWidth="0.4" />
+              {/* Exclamation halo */}
+              <circle cx="32" cy="2" r="2.4" fill={color}>
+                <animate attributeName="r" values="1.6;2.6;1.6" dur="1.2s" repeatCount="indefinite" />
+              </circle>
+              <text x="32" y="3.5" textAnchor="middle" fontSize="3.2" fill="#000" fontWeight="bold">!</text>
+            </g>
+          )}
+          {kind === 'enemy' && (
+            <g>
+              {/* Weapon */}
+              <rect x="44" y="44" width="14" height="3" fill="#3a3f47" stroke="#000" strokeWidth="0.3" />
+              <polygon points="58,42 62,45.5 58,49" fill={color} />
+              {/* Menacing chest light */}
+              <circle cx="32" cy="44" r="1.8" fill={color}>
+                <animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" repeatCount="indefinite" />
+              </circle>
+            </g>
+          )}
+        </svg>
+
+        {/* Ground glow */}
         <div
           className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
           style={{
@@ -144,7 +157,6 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
         />
       </div>
 
-      {/* Type badge */}
       <div
         className="text-[8px] font-orbitron tracking-widest mt-1 px-1 rounded"
         style={{ color, background: 'rgba(0,0,0,0.55)', border: `1px solid ${colorSoft}` }}
