@@ -69,11 +69,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [potions, setPotions] = useState<{ hp: number; mp: number }>({ hp: 0, mp: 0 });
   const [characterId, setCharacterId] = useState<string | null>(null);
 
-  const me = participants.find(p => p.user_id === myUserId);
-  const enemy = participants.find(p => p.is_bot);
+  // Live (DB) view
+  const liveMe = participants.find(p => p.user_id === myUserId);
+  const liveEnemy = participants.find(p => p.is_bot);
   const finished = battle?.status === 'finished';
   const won = finished && battle?.winner_user_id === myUserId;
-  const myTurn = !finished && battle?.current_turn === myUserId;
 
   const refreshPotions = useCallback(async (charId: string) => {
     const { data } = await supabase
@@ -104,18 +104,25 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
         refreshPotions(myRow.character_id);
       }
     }
-    if (a.data) setActions(a.data as any);
+    if (a.data) {
+      setActions(prev => {
+        const map = new Map<string, ActionRow>();
+        for (const row of (a.data as any[])) map.set(row.id, row as ActionRow);
+        for (const row of prev) if (!map.has(row.id)) map.set(row.id, row);
+        return Array.from(map.values()).sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime()).slice(0, 20);
+      });
+    }
   }, [battleId, myUserId, refreshPotions]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
-    if (!me) return;
+    if (!liveMe) return;
     (async () => {
-      const { data } = await supabase.from('skills').select('*').eq('class', me.snapshot.class);
+      const { data } = await supabase.from('skills').select('*').eq('class', liveMe.snapshot.class);
       if (data) setSkills(data as any);
     })();
-  }, [me?.snapshot?.class]);
+  }, [liveMe?.snapshot?.class]);
 
   useEffect(() => {
     const ch = supabase
@@ -123,7 +130,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       .on('postgres_changes', { event: '*', schema: 'public', table: 'battles', filter: `id=eq.${battleId}` }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'battle_participants', filter: `battle_id=eq.${battleId}` }, () => refresh())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'battle_actions', filter: `battle_id=eq.${battleId}` },
-          (payload) => setActions(prev => [payload.new as any, ...prev].slice(0, 20)))
+          (payload) => setActions(prev => {
+            const next = payload.new as ActionRow;
+            if (prev.some(a => a.id === next.id)) return prev;
+            return [next, ...prev].slice(0, 20);
+          }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [battleId, refresh]);
@@ -134,9 +145,21 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [playbackAction, setPlaybackAction] = useState<ActionRow | null>(null);
   const [playbackTick, setPlaybackTick] = useState(0);
   const [playbackAnimating, setPlaybackAnimating] = useState(false);
+  // Displayed (lagged) state — only advances when an animation completes.
+  const [displayedMe, setDisplayedMe] = useState<ParticipantRow | null>(null);
+  const [displayedEnemy, setDisplayedEnemy] = useState<ParticipantRow | null>(null);
+  const [displayedTurnNumber, setDisplayedTurnNumber] = useState<number>(1);
+  const [displayedCurrentTurn, setDisplayedCurrentTurn] = useState<string | null>(null);
   const seenActionIdsRef = useRef<Set<string>>(new Set());
   const playbackQueueRef = useRef<ActionRow[]>([]);
   const playbackHydratedRef = useRef(false);
+  // Pending DB snapshots keyed to the action id that should reveal them.
+  const pendingSnapshotsRef = useRef<Map<string, {
+    me: ParticipantRow | null;
+    enemy: ParticipantRow | null;
+    turn_number: number;
+    current_turn: string | null;
+  }>>(new Map());
 
   const orderedActions = useMemo(() => {
     return [...actions].sort((a, b) => {
@@ -158,15 +181,21 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     setPlaybackAnimating(true);
   }, []);
 
+  // Hydrate displayed state on first load and when a hydration is needed (battle ended w/ no playback).
   useEffect(() => {
-    if (!battle || !me || !enemy) return;
+    if (!battle || !liveMe || !liveEnemy) return;
 
     if (!playbackHydratedRef.current) {
       playbackHydratedRef.current = true;
       seenActionIdsRef.current = new Set(orderedActions.map((action) => action.id));
       playbackQueueRef.current = [];
+      pendingSnapshotsRef.current.clear();
       setPlaybackAnimating(false);
       setPlaybackAction(orderedActions[orderedActions.length - 1] ?? null);
+      setDisplayedMe(liveMe);
+      setDisplayedEnemy(liveEnemy);
+      setDisplayedTurnNumber(battle.turn_number);
+      setDisplayedCurrentTurn(battle.current_turn);
       return;
     }
 
@@ -174,18 +203,55 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     if (unseenActions.length === 0) return;
 
     unseenActions.forEach((action) => seenActionIdsRef.current.add(action.id));
+    // For each unseen action, snapshot the CURRENT live DB state and key it to that action.
+    // This snapshot will be revealed when that action's animation completes.
+    const lastUnseen = unseenActions[unseenActions.length - 1];
+    pendingSnapshotsRef.current.set(lastUnseen.id, {
+      me: liveMe,
+      enemy: liveEnemy,
+      turn_number: battle.turn_number,
+      current_turn: battle.current_turn,
+    });
     playbackQueueRef.current.push(...unseenActions);
 
     if (!playbackAnimating) {
       playNextQueuedAction();
     }
-  }, [battle, enemy, me, orderedActions, playbackAnimating, playNextQueuedAction]);
+  }, [battle, liveEnemy, liveMe, orderedActions, playbackAnimating, playNextQueuedAction]);
 
   const handlePlaybackComplete = useCallback(() => {
+    // Reveal snapshot for the action that just finished, if one was queued.
+    if (playbackAction) {
+      const snap = pendingSnapshotsRef.current.get(playbackAction.id);
+      if (snap) {
+        if (snap.me) setDisplayedMe(snap.me);
+        if (snap.enemy) setDisplayedEnemy(snap.enemy);
+        setDisplayedTurnNumber(snap.turn_number);
+        setDisplayedCurrentTurn(snap.current_turn);
+        pendingSnapshotsRef.current.delete(playbackAction.id);
+      }
+    }
     playNextQueuedAction();
-  }, [playNextQueuedAction]);
+  }, [playNextQueuedAction, playbackAction]);
 
-  const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : battle?.turn_number ?? 1;
+  // Use displayed snapshot for everything UI-facing.
+  const me = displayedMe ?? liveMe;
+  const enemy = displayedEnemy ?? liveEnemy;
+  const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === myUserId;
+
+  // When playback is fully drained, sync displayed → live (covers any missed snapshots, e.g. final state).
+  useEffect(() => {
+    if (playbackAnimating) return;
+    if (playbackQueueRef.current.length > 0) return;
+    if (liveMe) setDisplayedMe(liveMe);
+    if (liveEnemy) setDisplayedEnemy(liveEnemy);
+    if (battle) {
+      setDisplayedTurnNumber(battle.turn_number);
+      setDisplayedCurrentTurn(battle.current_turn);
+    }
+  }, [playbackAnimating, liveMe, liveEnemy, battle]);
+
+  const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : displayedTurnNumber;
   const turnStateLabel = finished
     ? 'BATTLE ENDED'
     : playbackAnimating && playbackAction
