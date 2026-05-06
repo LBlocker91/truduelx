@@ -286,20 +286,6 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
         <Fighter p={opponent} label={opponent.snapshot.name} />
       </div>
 
-      {/* Combat log */}
-      <div className="flex-1 bg-card border border-border rounded p-3 mb-4 overflow-y-auto max-h-40 text-xs font-rajdhani">
-        {actions.length === 0 && <p className="text-muted-foreground">Battle begins…</p>}
-        {actions.map(a => (
-          <div key={a.id} className="mb-1">
-            <span className="text-muted-foreground">T{a.turn_number}</span>{' '}
-            <span className={a.actor_slot === me.slot ? 'text-primary' : 'text-secondary'}>
-              {a.actor_slot === me.slot ? 'You' : 'Opponent'}
-            </span>{' '}
-            {describeAction(a)}
-          </div>
-        ))}
-      </div>
-
       {/* Action bar */}
       {finished ? (
         <div className="text-center py-6">
@@ -349,6 +335,20 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
           </div>
         </div>
       )}
+
+      {/* Combat log */}
+      <div className="bg-card border border-border rounded p-3 mt-4 overflow-y-auto max-h-40 text-xs font-rajdhani">
+        {actions.length === 0 && <p className="text-muted-foreground">Battle begins…</p>}
+        {actions.map(a => (
+          <div key={a.id} className="mb-1">
+            <span className="text-muted-foreground">T{a.turn_number}</span>{' '}
+            <span className={a.actor_slot === me.slot ? 'text-primary' : 'text-secondary'}>
+              {a.actor_slot === me.slot ? 'You' : 'Opponent'}
+            </span>{' '}
+            {describeAction(a)}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
