@@ -155,35 +155,15 @@ async function processAction(
       return await processBotTurn(admin, battle, userId, player, bot);
     }
     if (battle.current_turn === userId && isDeadlineExpired(battle.turn_deadline)) {
-      const timeoutResult = advancePassiveTurn(player, bot, 'timeout');
-      const nextTurnNumber = battle.turn_number + 1;
-      await persistParticipant(admin, battleId, player);
-      await persistParticipant(admin, battleId, bot);
-      await admin.from('battle_actions').insert({
-        battle_id: battleId,
-        turn_number: battle.turn_number,
-        actor_user_id: userId,
-        actor_slot: 0,
-        action_type: 'timeout',
-        skill_slug: null,
-        target_slot: 1,
-        result: enrichActionResult(timeoutResult, player, bot, {
-          nextTurnNumber,
-          nextTurnUserId: null,
-        }),
-      });
-      await admin.from('battles').update({
-        turn_number: nextTurnNumber,
-        current_turn: null,
-        turn_deadline: new Date(Date.now() + BOT_RESPONSE_DELAY_MS).toISOString(),
-      }).eq('id', battleId);
-      return j({ ok: true, skipped: true });
+      return await resolvePlayerTimeout(admin, battle, battleId, userId, player, bot);
     }
     return j({ ok: true, skipped: false });
   }
 
   if (battle.current_turn !== userId) return j({ error: 'not your turn' }, 400);
-  if (isDeadlineExpired(battle.turn_deadline) && playerAction !== 'forfeit') return j({ error: 'turn expired' }, 409);
+  if (isDeadlineExpired(battle.turn_deadline) && playerAction !== 'forfeit') {
+    return await resolvePlayerTimeout(admin, battle, battleId, userId, player, bot);
+  }
 
   const playerResult = await executeTurn({
     admin,
@@ -281,6 +261,41 @@ async function processBotTurn(admin: any, battle: any, userId: string, player: P
   }).eq('id', battle.id);
 
   return j({ ok: true, finished: false });
+}
+
+async function resolvePlayerTimeout(
+  admin: any,
+  battle: any,
+  battleId: string,
+  userId: string,
+  player: ParticipantState,
+  bot: ParticipantState,
+) {
+  const timeoutResult = advancePassiveTurn(player, bot, 'timeout');
+  const nextTurnNumber = battle.turn_number + 1;
+
+  await persistParticipant(admin, battleId, player);
+  await persistParticipant(admin, battleId, bot);
+  await admin.from('battle_actions').insert({
+    battle_id: battleId,
+    turn_number: battle.turn_number,
+    actor_user_id: userId,
+    actor_slot: 0,
+    action_type: 'timeout',
+    skill_slug: null,
+    target_slot: 1,
+    result: enrichActionResult(timeoutResult, player, bot, {
+      nextTurnNumber,
+      nextTurnUserId: null,
+    }),
+  });
+  await admin.from('battles').update({
+    turn_number: nextTurnNumber,
+    current_turn: null,
+    turn_deadline: new Date(Date.now() + BOT_RESPONSE_DELAY_MS).toISOString(),
+  }).eq('id', battleId);
+
+  return j({ ok: true, skipped: true, timeout: true });
 }
 
 async function executeTurn({
