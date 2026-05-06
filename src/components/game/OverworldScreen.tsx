@@ -464,20 +464,7 @@ export const OverworldScreen = ({
         </header>
       )}
 
-      {!hideChrome && (
-        <div className="flex gap-1 px-3 py-2 bg-card/40 border-b border-border z-10 overflow-x-auto">
-          {zones.map(z => (
-            <Button
-              key={z.id}
-              size="sm"
-              variant={z.id === zone.id ? 'default' : 'outline'}
-              onClick={() => switchZone(z.id)}
-            >
-              {z.name}
-            </Button>
-          ))}
-        </div>
-      )}
+      {/* Zone tabs removed — players now travel by walking through in-world portals. */}
 
       {/* Stage — flex:1, fills remaining HUD area */}
       <div className="relative flex-1 min-h-0 overflow-hidden bg-black">
