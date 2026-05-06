@@ -35,15 +35,27 @@ Deno.serve(async (req) => {
     if (skill.class !== ch.class) return j({ error: 'wrong class' }, 400);
     if ((ch.level ?? 1) < (skill.unlock_level ?? 1)) return j({ error: 'level too low' }, 400);
 
-    // Already unlocked?
+    // Rank-up logic: 0 = locked, 1 = unlocked, max 20.
     const sl = (ch.skill_levels ?? {}) as Record<string, number>;
-    if ((sl[skillSlug] ?? 0) >= 1) return j({ error: 'already unlocked' }, 400);
-    sl[skillSlug] = 1;
+    const currentRank = sl[skillSlug] ?? 0;
+    const maxRank = skill.max_level ?? 20;
+    if (currentRank >= maxRank) return j({ error: 'already at max rank' }, 400);
 
-    // Persist on characters.skill_levels (used by combat) AND in character_skills (audit)
-    await admin.from('character_skills')
-      .insert({ character_id: characterId, skill_slug: skillSlug, rank: 1 })
-      .then(() => {}, () => {}); // ignore duplicate insert race
+    const newRank = currentRank + 1;
+    sl[skillSlug] = newRank;
+
+    if (currentRank === 0) {
+      // First unlock — insert audit row
+      await admin.from('character_skills')
+        .insert({ character_id: characterId, skill_slug: skillSlug, rank: 1 })
+        .then(() => {}, () => {});
+    } else {
+      // Rank-up — update audit row
+      await admin.from('character_skills')
+        .update({ rank: newRank })
+        .eq('character_id', characterId).eq('skill_slug', skillSlug)
+        .then(() => {}, () => {});
+    }
 
     const { data: updated, error } = await admin.from('characters').update({
       skill_points: (ch.skill_points ?? 0) - 1,
@@ -51,7 +63,7 @@ Deno.serve(async (req) => {
     }).eq('id', characterId).select('*').single();
     if (error) return j({ error: error.message }, 500);
 
-    return j({ ok: true, character: updated, skill });
+    return j({ ok: true, character: updated, skill, rank: newRank });
   } catch (e) {
     console.error(e);
     return j({ error: String(e) }, 500);
