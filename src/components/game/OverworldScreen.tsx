@@ -700,6 +700,25 @@ export const OverworldScreen = ({
           {!debug && (
             <div className="absolute bottom-2 right-2 z-30 text-[10px] text-white/40 font-mono pointer-events-none">[`] debug</div>
           )}
+
+          {/* Zone transition fade — covers the stage with a soft wipe between zones */}
+          <div
+            className="absolute inset-0 z-50 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(ellipse at center, rgba(8,12,18,0.85) 0%, rgba(0,0,0,1) 80%)',
+              opacity: transitioning ? 1 : 0,
+              transition: 'opacity 240ms ease-out',
+            }}
+          >
+            {transitioning && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="font-orbitron text-primary text-sm tracking-widest animate-pulse">
+                  TRANSITIONING…
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
