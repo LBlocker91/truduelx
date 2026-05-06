@@ -296,7 +296,7 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
     stat_power: Math.floor(statPower),
     rank_mult: rankMult,
     mit_pct: mitPct,
-    weapon_subtype: aSnap.weapon_subtype,
+    weapon_subtype: weapon.subtype,
   };
 }
 
