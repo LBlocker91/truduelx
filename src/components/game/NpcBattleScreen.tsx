@@ -288,6 +288,68 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   );
 };
 
+// --- Animated battle stage wrapper -----------------------------------------
+function BattleStageBlock({ me, enemy, actions, skills }: {
+  me: ParticipantRow; enemy: ParticipantRow; actions: ActionRow[]; skills: SkillCatalog[];
+}) {
+  // Latest action drives the animation. actions are ordered desc by created_at.
+  const latest = actions[0];
+  const tick = actions.length; // bump on every new action insert
+
+  const lastActor: 'player' | 'enemy' | null = !latest
+    ? null
+    : latest.actor_slot === me.slot ? 'player' : 'enemy';
+
+  const hits = latest?.result?.hits ?? [];
+  const damage = hits.reduce((s: number, h: any) => s + (h.damage ?? 0), 0);
+  const crit = hits.some((h: any) => h.crit);
+  const isHeal = latest?.action_type === 'use_item';
+  const healAmt = latest?.result?.heal ?? latest?.result?.mpHeal ?? 0;
+
+  // Resolve skill name + visual kind
+  const skill = latest?.skill_slug ? skills.find(s => s.slug === latest.skill_slug) : null;
+  const lastSkillName = skill?.name ?? (latest?.action_type === 'attack' ? null : null);
+
+  const attackerWeapon =
+    lastActor === 'player' ? me.snapshot.equipped?.weapon_variant : enemy.snapshot.equipped?.weapon_variant;
+  const attackKind: AttackKind = (() => {
+    if (skill?.type === 'magical' || skill?.type === 'tech' || skill?.scale_stat === 'TECH') return 'tech';
+    if (attackerWeapon === 'gun') return 'ranged';
+    if (attackerWeapon === 'staff') return 'tech';
+    return 'melee';
+  })();
+
+  return (
+    <BattleStage
+      zoneId={me.snapshot?.zone_id}
+      player={{
+        name: 'YOU',
+        level: me.snapshot.level,
+        hp: me.hp, maxHp: me.max_hp, mp: me.energy, maxMp: me.max_energy,
+        armorVariant: me.snapshot.equipped?.armor_variant,
+        weaponVariant: me.snapshot.equipped?.weapon_variant,
+        isPlayer: true, characterClass: me.snapshot.class,
+      }}
+      enemy={{
+        name: enemy.snapshot.name,
+        level: enemy.snapshot.level,
+        hp: enemy.hp, maxHp: enemy.max_hp, mp: enemy.energy, maxMp: enemy.max_energy,
+        armorVariant: enemy.snapshot.equipped?.armor_variant ?? 'medium_blue',
+        weaponVariant: enemy.snapshot.equipped?.weapon_variant ?? 'sword',
+        isPlayer: false,
+      }}
+      actionTick={tick}
+      lastActor={lastActor}
+      lastDamage={isHeal ? healAmt : (damage || null)}
+      lastWasHeal={isHeal}
+      lastSkillName={lastSkillName}
+      attackKind={attackKind}
+      crit={crit}
+    />
+  );
+}
+
+
 function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: boolean }) {
   const hpPct = (p.hp / p.max_hp) * 100;
   const enPct = (p.energy / p.max_energy) * 100;
