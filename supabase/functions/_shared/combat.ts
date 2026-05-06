@@ -120,7 +120,10 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
     scaleVal = skill.scale_stat === 'strength' ? effectiveStr(stat) : stat;
     const scaleMult = 1 + scaleVal * 0.018;
     const lvlMult = 1 + aSnap.level * 0.01;
-    raw = skill.base_damage * scaleMult * lvlMult;
+    // Skill rank multiplier: rank 1 = 1.00x, rank 10 ≈ 1.54x, rank 20 ≈ 2.14x
+    const rank = Math.max(1, (aSnap.skill_levels?.[skill.slug] ?? 1));
+    const rankMult = 1 + (rank - 1) * 0.06;
+    raw = skill.base_damage * scaleMult * lvlMult * rankMult;
   }
 
   // Attack buffs / debuffs
