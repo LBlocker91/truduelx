@@ -489,6 +489,7 @@ function snapshotParticipant(p: ParticipantState) {
     energy: p.energy,
     max_energy: p.max_energy,
     rage: p.rage,
+    ultimate_charge: p.ultimate_charge ?? 0,
     status_effects: p.status_effects,
     cooldowns: p.cooldowns,
     snapshot: p.snapshot,
@@ -500,6 +501,7 @@ async function persistParticipant(admin: any, battleId: string, p: ParticipantSt
     hp: p.hp,
     energy: p.energy,
     rage: p.rage,
+    ultimate_charge: p.ultimate_charge ?? 0,
     status_effects: p.status_effects,
     cooldowns: p.cooldowns,
   }).eq('battle_id', battleId).eq('slot', p.slot);
