@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { PlayerSprite, SpriteRarity } from '../PlayerSprite';
 import { EnemySprite, inferEnemyKind } from './EnemySprite';
+import { classifySkillVfx, VFX_PRESET, SkillVfx, SkillLike } from './skill-vfx';
 
+/** Legacy attack kind kept for the existing call-site. */
 export type AttackKind = 'melee' | 'ranged' | 'tech' | 'aoe';
 
 interface FighterVisual {
@@ -21,12 +23,15 @@ interface BattleStageProps {
   zoneId?: string;
   player: FighterVisual;
   enemy: FighterVisual;
-  /** Bumped every time a new action lands. */
+  /** Bumped every time a new action lands. Drives the animation. */
   actionTick: number;
   lastActor: 'player' | 'enemy' | null;
   lastDamage: number | null;
   lastWasHeal?: boolean;
   lastSkillName?: string | null;
+  /** Full skill row when a skill was used — drives skill-specific VFX. */
+  lastSkill?: SkillLike | null;
+  /** Legacy fallback when no skill row is provided (basic attacks). */
   attackKind?: AttackKind;
   crit?: boolean;
 }
@@ -51,23 +56,9 @@ const variantToRarity = (armor?: string | null, weapon?: string | null): SpriteR
   return 'rare';
 };
 
-const inferAttackKind = (weaponVariant?: string | null): AttackKind => {
-  if (!weaponVariant) return 'melee';
-  if (weaponVariant === 'gun') return 'ranged';
-  if (weaponVariant === 'staff') return 'tech';
-  return 'melee';
-};
-
-const damageColor = (kind: AttackKind, isHeal: boolean, crit: boolean) => {
-  if (isHeal) return 'hsl(140 100% 60%)';
-  if (crit) return 'hsl(45 100% 60%)';
-  if (kind === 'tech') return 'hsl(195 100% 65%)';
-  return 'hsl(20 100% 65%)';
-};
-
-const FloatNumber = ({ value, color, crit }: { value: number; color: string; crit?: boolean }) => (
+const FloatNumber = ({ value, color, crit, label }: { value: number; color: string; crit?: boolean; label?: string }) => (
   <div
-    className="absolute left-1/2 font-orbitron pointer-events-none z-30"
+    className="absolute left-1/2 font-orbitron pointer-events-none z-30 whitespace-nowrap"
     style={{
       top: '-6%',
       color,
@@ -77,38 +68,46 @@ const FloatNumber = ({ value, color, crit }: { value: number; color: string; cri
       animation: 'damage-float 1.05s cubic-bezier(.2,.8,.2,1) forwards',
     }}
   >
-    {value < 0 || color === 'hsl(140 100% 60%)' ? '+' : '-'}{Math.abs(value)}{crit ? '!' : ''}
+    {label ?? (color === 'hsl(140 100% 60%)' ? '+' : '-')}{Math.abs(value)}{crit ? '!' : ''}
   </div>
 );
 
 export const BattleStage = ({
-  zoneId, player, enemy, actionTick, lastActor, lastDamage, lastWasHeal, lastSkillName, attackKind, crit,
+  zoneId, player, enemy, actionTick, lastActor, lastDamage, lastWasHeal, lastSkillName, lastSkill, attackKind, crit,
 }: BattleStageProps) => {
+  // Animation phase machine — only the actor animates; the other holds idle.
   const [phase, setPhase] = useState<'idle' | 'wind' | 'strike' | 'recover'>('idle');
   const [showImpact, setShowImpact] = useState(false);
   const [showProjectile, setShowProjectile] = useState(false);
   const [showMuzzle, setShowMuzzle] = useState(false);
   const [showCharge, setShowCharge] = useState(false);
   const [showHealAura, setShowHealAura] = useState(false);
+  const [showBuffRing, setShowBuffRing] = useState(false);
+  const [showShieldDome, setShowShieldDome] = useState(false);
+  const [showStunRing, setShowStunRing] = useState(false);
+  const [showDotDrip, setShowDotDrip] = useState(false);
+  const [showShockwave, setShowShockwave] = useState(false);
+  const [showUltimateFlash, setShowUltimateFlash] = useState(false);
   const [floatKey, setFloatKey] = useState(0);
-  const [shake, setShake] = useState(false);
+  const [shake, setShake] = useState<'none' | 'small' | 'large'>('none');
   const [skillBanner, setSkillBanner] = useState<string | null>(null);
+  const [bannerColor, setBannerColor] = useState<string>('hsl(195 100% 70%)');
   const tickRef = useRef(actionTick);
 
   const playerRarity = variantToRarity(player.armorVariant, player.weaponVariant);
   const enemyKind = inferEnemyKind(enemy.name);
+  const attackerWeapon = lastActor === 'player' ? player.weaponVariant : enemy.weaponVariant;
 
-  // For enemies, prefer a kind-aware attack:
-  // drones/bots → tech/ranged; humanoids may have weapon; beasts → melee.
-  const enemyAttackKind: AttackKind = (() => {
-    if (enemyKind === 'drone' || enemyKind === 'bot') return 'tech';
-    if (enemyKind === 'beast') return 'melee';
-    return inferAttackKind(enemy.weaponVariant);
+  // Determine VFX from skill row; fall back to weapon-driven basic attack.
+  const vfx: SkillVfx = (() => {
+    if (lastSkill) return classifySkillVfx(lastSkill, attackerWeapon);
+    // Legacy compat with attackKind
+    if (attackKind === 'tech') return 'tech_bolt';
+    if (attackKind === 'ranged') return 'ranged_shot';
+    if (attackKind === 'aoe') return 'tech_aoe';
+    return classifySkillVfx(null, attackerWeapon);
   })();
-
-  const kind: AttackKind = attackKind ?? (
-    lastActor === 'enemy' ? enemyAttackKind : inferAttackKind(player.weaponVariant)
-  );
+  const preset = VFX_PRESET[vfx];
 
   useEffect(() => {
     if (actionTick === tickRef.current) return;
@@ -116,57 +115,88 @@ export const BattleStage = ({
     if (!lastActor) return;
 
     setSkillBanner(lastSkillName ?? null);
+    setBannerColor(preset.bannerColor);
 
-    // Heal action: glow on user, no projectile/strike
-    if (lastWasHeal) {
+    // === Heal / buff / shield self-cast — no projectile, no strike ===
+    if (lastWasHeal || preset.hasHealAura) {
       setShowHealAura(true);
       setFloatKey(k => k + 1);
-      const tHeal = window.setTimeout(() => setShowHealAura(false), 700);
-      const tBan = window.setTimeout(() => setSkillBanner(null), 950);
-      return () => { clearTimeout(tHeal); clearTimeout(tBan); };
+      const tEnd = window.setTimeout(() => setShowHealAura(false), 800);
+      const tBan = window.setTimeout(() => setSkillBanner(null), 1000);
+      return () => { clearTimeout(tEnd); clearTimeout(tBan); };
+    }
+    if (preset.hasBuffRing) {
+      setShowBuffRing(true);
+      const t1 = window.setTimeout(() => setShowBuffRing(false), 900);
+      const t2 = window.setTimeout(() => setSkillBanner(null), 1100);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+    if (preset.hasShieldDome) {
+      setShowShieldDome(true);
+      const t1 = window.setTimeout(() => setShowShieldDome(false), 1100);
+      const t2 = window.setTimeout(() => setSkillBanner(null), 1200);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
     }
 
+    // === Offensive sequence ===
     setPhase('wind');
-    if (kind === 'tech') setShowCharge(true);
+    if (preset.hasCharge) setShowCharge(true);
+    if (preset.isUltimate) setShowUltimateFlash(true);
 
     const t1 = window.setTimeout(() => {
       setPhase('strike');
-      if (kind === 'tech') setShowCharge(false);
-      if (kind === 'ranged') {
+      if (preset.hasCharge) setShowCharge(false);
+      if (preset.hasMuzzle) {
         setShowMuzzle(true);
         window.setTimeout(() => setShowMuzzle(false), 160);
       }
-      if (kind === 'ranged' || kind === 'tech') {
+      if (preset.hasProjectile) {
         setShowProjectile(true);
-        window.setTimeout(() => setShowProjectile(false), 360);
+        window.setTimeout(() => setShowProjectile(false), 380);
       }
-    }, 240);
+    }, preset.isUltimate ? 380 : 240);
 
+    const impactDelay = preset.hasProjectile ? (preset.isUltimate ? 700 : 560) : (preset.isUltimate ? 540 : 400);
     const t2 = window.setTimeout(() => {
       setShowImpact(true);
       setFloatKey(k => k + 1);
-      setShake(true);
-      window.setTimeout(() => setShake(false), 280);
-      window.setTimeout(() => setShowImpact(false), 360);
-    }, kind === 'ranged' || kind === 'tech' ? 560 : 400);
+      setShake(preset.shake);
+      if (preset.hasShockwave) setShowShockwave(true);
+      if (preset.hasStunRing) setShowStunRing(true);
+      if (preset.hasDotDrip) setShowDotDrip(true);
+      window.setTimeout(() => setShake('none'), preset.shake === 'large' ? 420 : 240);
+      window.setTimeout(() => setShowImpact(false), 380);
+      window.setTimeout(() => setShowShockwave(false), 600);
+      window.setTimeout(() => setShowStunRing(false), 900);
+      window.setTimeout(() => setShowDotDrip(false), 1200);
+    }, impactDelay);
 
-    const t3 = window.setTimeout(() => setPhase('recover'), 740);
-    const t4 = window.setTimeout(() => { setPhase('idle'); setSkillBanner(null); }, 1000);
+    const t3 = window.setTimeout(() => setPhase('recover'), impactDelay + 220);
+    const t4 = window.setTimeout(() => {
+      setPhase('idle');
+      setSkillBanner(null);
+      setShowUltimateFlash(false);
+    }, impactDelay + 480);
 
     return () => { [t1, t2, t3, t4].forEach(clearTimeout); };
-  }, [actionTick, lastActor, lastSkillName, kind, lastWasHeal]);
+  }, [actionTick, lastActor, lastSkillName, lastWasHeal, preset]);
 
+  // Strict turn-based: only the acting fighter animates.
   const playerActing = phase !== 'idle' && lastActor === 'player';
   const enemyActing = phase !== 'idle' && lastActor === 'enemy';
-  const playerHit = phase === 'strike' && lastActor === 'enemy' && !lastWasHeal;
-  const enemyHit = phase === 'strike' && lastActor === 'player' && !lastWasHeal;
+  const playerHit = phase === 'strike' && lastActor === 'enemy' && !lastWasHeal && !preset.hasHealAura && !preset.hasBuffRing && !preset.hasShieldDome;
+  const enemyHit = phase === 'strike' && lastActor === 'player' && !lastWasHeal && !preset.hasHealAura && !preset.hasBuffRing && !preset.hasShieldDome;
 
+  // Lunge offsets — only attacker moves.
   const attackerOffset = (acting: boolean, dir: 1 | -1) => {
     if (!acting) return 0;
-    if (kind === 'ranged' || kind === 'tech') {
+    const ranged = preset.hasProjectile;
+    if (ranged) {
       return phase === 'wind' ? dir * 10 : phase === 'strike' ? dir * 22 : phase === 'recover' ? dir * 10 : 0;
     }
-    return phase === 'wind' ? dir * 24 : phase === 'strike' ? dir * 100 : phase === 'recover' ? dir * 32 : 0;
+    const big = preset.shake === 'large';
+    const lunge = big ? 120 : 100;
+    return phase === 'wind' ? dir * 24 : phase === 'strike' ? dir * lunge : phase === 'recover' ? dir * 32 : 0;
   };
 
   const playerOffset = attackerOffset(playerActing, 1);
@@ -175,7 +205,8 @@ export const BattleStage = ({
   const bg = ZONE_BG_GRADIENT[zoneId ?? ''] ?? ZONE_BG_GRADIENT['station-hub'];
   const accent = ZONE_ACCENT[zoneId ?? ''] ?? ZONE_ACCENT['station-hub'];
 
-  const dmgColor = damageColor(kind, !!lastWasHeal, !!crit);
+  const damageColor = preset.damageColor;
+  const shakeOffset = shake === 'large' ? 'translate(3px, -2px)' : shake === 'small' ? 'translate(2px, -1px)' : 'none';
 
   return (
     <div
@@ -183,12 +214,11 @@ export const BattleStage = ({
       style={{
         background: bg,
         height: 'min(48vh, 380px)',
-        transform: shake ? 'translate(2px, -1px)' : 'none',
+        transform: shakeOffset,
         transition: 'transform 60ms linear',
       }}
     >
-      {/* === Background layers === */}
-      {/* Distant skyline silhouette */}
+      {/* Skyline */}
       <svg viewBox="0 0 200 60" preserveAspectRatio="none"
         className="absolute left-0 right-0 top-[20%] w-full h-[35%] pointer-events-none opacity-40">
         <path d="M0 60 L0 40 L10 40 L12 30 L20 30 L22 38 L30 38 L32 22 L42 22 L44 36 L52 36 L56 28 L64 28 L66 18 L74 18 L78 32 L86 32 L88 24 L98 24 L100 14 L108 14 L112 30 L120 30 L122 22 L130 22 L132 34 L140 34 L144 26 L152 26 L156 16 L164 16 L168 32 L176 32 L180 22 L188 22 L192 30 L200 30 L200 60 Z"
@@ -214,7 +244,7 @@ export const BattleStage = ({
           style={{ background: `linear-gradient(90deg, transparent, ${accent}22, transparent)`, transform: 'skewX(-12deg)' }}/>
       </div>
 
-      {/* Floor plane gradient */}
+      {/* Floor gradient */}
       <div className="absolute left-0 right-0 bottom-0 h-[36%] pointer-events-none"
         style={{ background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.65))' }} />
 
@@ -229,22 +259,33 @@ export const BattleStage = ({
         ))}
       </svg>
 
-      {/* Arena holographic boundary line */}
+      {/* Arena boundary */}
       <div className="absolute left-[6%] right-[6%] bottom-[12%] pointer-events-none rounded-full"
-        style={{
-          height: 6,
-          background: `radial-gradient(ellipse at center, ${accent}55, transparent 70%)`,
-        }} />
+        style={{ height: 6, background: `radial-gradient(ellipse at center, ${accent}55, transparent 70%)` }} />
 
-      {/* === Skill banner === */}
-      {skillBanner && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 font-orbitron text-base sm:text-lg tracking-widest text-primary px-3 py-1 rounded"
+      {/* Ultimate full-screen flash */}
+      {showUltimateFlash && (
+        <div
+          className="absolute inset-0 pointer-events-none z-30"
           style={{
-            textShadow: '0 0 12px hsl(var(--primary)), 0 2px 0 rgba(0,0,0,0.8)',
-            background: 'rgba(0,0,0,0.35)',
-            border: `1px solid ${accent}55`,
+            background: `radial-gradient(ellipse at center, ${preset.hue}55 0%, transparent 65%)`,
+            animation: 'ultimate-flash 0.9s ease-out forwards',
+          }}
+        />
+      )}
+
+      {/* Skill banner */}
+      {skillBanner && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 font-orbitron text-base sm:text-lg tracking-widest px-3 py-1 rounded"
+          style={{
+            color: bannerColor,
+            textShadow: `0 0 14px ${bannerColor}, 0 2px 0 rgba(0,0,0,0.85)`,
+            background: 'rgba(0,0,0,0.4)',
+            border: `1px solid ${bannerColor}66`,
+            fontSize: preset.isUltimate ? '1.4rem' : undefined,
+            letterSpacing: preset.isUltimate ? '0.3em' : undefined,
           }}>
-          {skillBanner.toUpperCase()}
+          {preset.isUltimate && '★ '}{skillBanner.toUpperCase()}{preset.isUltimate && ' ★'}
         </div>
       )}
 
@@ -257,30 +298,35 @@ export const BattleStage = ({
           filter: playerHit ? 'brightness(2.5) drop-shadow(0 0 14px hsl(0 100% 60%))' : 'none',
         }}
       >
-        {/* Foot platform glow */}
         <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-[120px] h-3 arena-pulse pointer-events-none rounded-full"
           style={{ background: `radial-gradient(ellipse, ${accent}88, transparent 70%)` }} />
         <div className={phase === 'idle' ? 'battle-stance' : ''}>
           <PlayerSprite
             direction="right"
-            state={playerActing ? 'walk' : 'idle'}
+            state={playerActing && !preset.hasProjectile ? 'walk' : 'idle'}
             armorVariant={player.armorVariant ?? null}
             weaponVariant={player.weaponVariant ?? null}
             rarity={playerRarity}
             scale={1.4}
           />
         </div>
-        {showHealAura && lastActor === 'player' && (
-          <div className="absolute inset-0 pointer-events-none rounded-full"
-            style={{
-              background: 'radial-gradient(circle, hsl(140 100% 60% / 0.55), transparent 70%)',
-              animation: 'pulse 0.6s ease-out',
-            }} />
+
+        {/* Self-cast effects (only when player is the actor) */}
+        {lastActor === 'player' && showHealAura && (
+          <SelfAura color="hsl(140 100% 60%)" pattern="rising" />
         )}
+        {lastActor === 'player' && showBuffRing && (
+          <SelfAura color="hsl(45 100% 60%)" pattern="ring" />
+        )}
+        {lastActor === 'player' && showShieldDome && (
+          <ShieldDome color="hsl(195 100% 70%)" />
+        )}
+
+        {/* Damage / heal numbers */}
         {playerHit && lastDamage != null && (
-          <FloatNumber key={`p-${floatKey}`} value={lastDamage} color={dmgColor} crit={crit} />
+          <FloatNumber key={`p-${floatKey}`} value={lastDamage} color={damageColor} crit={crit} />
         )}
-        {playerActing && lastWasHeal && lastDamage != null && (
+        {playerActing && lastActor === 'player' && lastWasHeal && lastDamage != null && (
           <FloatNumber key={`ph-${floatKey}`} value={lastDamage} color="hsl(140 100% 60%)" />
         )}
       </div>
@@ -293,13 +339,12 @@ export const BattleStage = ({
           transition: 'transform 200ms cubic-bezier(0.25, 0.1, 0.25, 1)',
         }}
       >
-        {/* Foot platform glow */}
         <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-[120px] h-3 arena-pulse pointer-events-none rounded-full"
           style={{ background: `radial-gradient(ellipse, hsl(0 100% 60% / 0.45), transparent 70%)`, animationDelay: '0.4s' }} />
         {enemy.isPlayer ? (
           <PlayerSprite
             direction="left"
-            state={enemyActing ? 'walk' : 'idle'}
+            state={enemyActing && !preset.hasProjectile ? 'walk' : 'idle'}
             armorVariant={enemy.armorVariant ?? 'medium_blue'}
             weaponVariant={enemy.weaponVariant ?? 'sword'}
             rarity="rare"
@@ -313,12 +358,44 @@ export const BattleStage = ({
             scale={1.35}
           />
         )}
+
+        {/* Enemy-side self-cast (e.g. enemy heals) */}
+        {lastActor === 'enemy' && showHealAura && (
+          <SelfAura color="hsl(140 100% 60%)" pattern="rising" />
+        )}
+        {lastActor === 'enemy' && showBuffRing && (
+          <SelfAura color="hsl(45 100% 60%)" pattern="ring" />
+        )}
+        {lastActor === 'enemy' && showShieldDome && (
+          <ShieldDome color="hsl(195 100% 70%)" />
+        )}
+
+        {/* Stun ring & DoT drip — anchored to whoever was hit */}
+        {showStunRing && lastActor === 'player' && (
+          <StunRing color="hsl(55 100% 60%)" />
+        )}
+        {showDotDrip && lastActor === 'player' && (
+          <DotDrip color={preset.hue} />
+        )}
+
         {enemyHit && lastDamage != null && (
-          <FloatNumber key={`e-${floatKey}`} value={lastDamage} color={dmgColor} crit={crit} />
+          <FloatNumber key={`e-${floatKey}`} value={lastDamage} color={damageColor} crit={crit} />
         )}
       </div>
 
-      {/* === Charge buildup at attacker (tech) === */}
+      {/* Stun / DoT on player when enemy applied them */}
+      {showStunRing && lastActor === 'enemy' && (
+        <div className="absolute bottom-6 left-[16%] pointer-events-none">
+          <StunRing color="hsl(55 100% 60%)" />
+        </div>
+      )}
+      {showDotDrip && lastActor === 'enemy' && (
+        <div className="absolute bottom-6 left-[16%] pointer-events-none">
+          <DotDrip color={preset.hue} />
+        </div>
+      )}
+
+      {/* Charge buildup at attacker */}
       {showCharge && (
         <div
           className="absolute z-20 pointer-events-none"
@@ -328,7 +405,7 @@ export const BattleStage = ({
             right: lastActor === 'enemy' ? '24%' : 'auto',
             width: 60, height: 60,
             transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(circle, hsl(280 100% 75%) 0%, hsl(280 100% 50% / 0.4) 50%, transparent 75%)',
+            background: `radial-gradient(circle, ${preset.hue} 0%, ${preset.hue}66 50%, transparent 75%)`,
             borderRadius: '50%',
             animation: 'pulse 0.24s ease-in-out infinite',
             filter: 'blur(2px)',
@@ -336,7 +413,7 @@ export const BattleStage = ({
         />
       )}
 
-      {/* === Muzzle flash (ranged) === */}
+      {/* Muzzle flash */}
       {showMuzzle && (
         <div
           className="absolute z-20 pointer-events-none"
@@ -346,13 +423,13 @@ export const BattleStage = ({
             right: lastActor === 'enemy' ? '28%' : 'auto',
             width: 36, height: 36,
             transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(circle, hsl(45 100% 75%) 0%, hsl(15 100% 55% / 0.7) 40%, transparent 75%)',
+            background: `radial-gradient(circle, hsl(45 100% 80%) 0%, ${preset.hue} 40%, transparent 75%)`,
             borderRadius: '50%',
           }}
         />
       )}
 
-      {/* === Projectile === */}
+      {/* Projectile */}
       {showProjectile && (
         <div
           className="absolute z-20 pointer-events-none"
@@ -360,15 +437,13 @@ export const BattleStage = ({
             top: '55%',
             left: lastActor === 'player' ? '30%' : 'auto',
             right: lastActor === 'enemy' ? '30%' : 'auto',
-            width: kind === 'tech' ? 30 : 22,
-            height: kind === 'tech' ? 30 : 6,
-            borderRadius: kind === 'tech' ? '50%' : '3px',
-            background: kind === 'tech'
-              ? 'radial-gradient(circle, hsl(280 100% 75%) 0%, hsl(280 100% 50% / 0.6) 60%, transparent 80%)'
-              : 'linear-gradient(90deg, hsl(45 100% 70%), hsl(15 100% 55%))',
-            boxShadow: kind === 'tech'
-              ? '0 0 28px hsl(280 100% 70%)'
-              : '0 0 14px hsl(45 100% 60%)',
+            width: vfx === 'tech_aoe' || vfx === 'ultimate' ? 38 : vfx === 'tech_bolt' || vfx === 'control_stun' ? 30 : 22,
+            height: vfx === 'tech_aoe' || vfx === 'ultimate' ? 38 : vfx === 'tech_bolt' || vfx === 'control_stun' ? 30 : 6,
+            borderRadius: vfx === 'ranged_shot' ? '3px' : '50%',
+            background: vfx === 'ranged_shot'
+              ? `linear-gradient(90deg, hsl(45 100% 70%), ${preset.hue})`
+              : `radial-gradient(circle, ${preset.hue} 0%, ${preset.hue}99 60%, transparent 80%)`,
+            boxShadow: `0 0 24px ${preset.hue}`,
             animation: lastActor === 'player'
               ? 'projectile-right 0.36s linear forwards'
               : 'projectile-left 0.36s linear forwards',
@@ -376,7 +451,7 @@ export const BattleStage = ({
         />
       )}
 
-      {/* === Impact burst === */}
+      {/* Impact burst */}
       {showImpact && (
         <div
           className="absolute z-25 pointer-events-none"
@@ -384,21 +459,18 @@ export const BattleStage = ({
             top: '52%',
             left: lastActor === 'player' ? 'auto' : '20%',
             right: lastActor === 'player' ? '20%' : 'auto',
-            width: 90, height: 90,
+            width: preset.isUltimate ? 140 : 90,
+            height: preset.isUltimate ? 140 : 90,
             transform: 'translate(50%, -50%)',
-            background: kind === 'tech'
-              ? 'radial-gradient(circle, hsl(280 100% 80%) 0%, hsl(280 100% 50% / 0.6) 30%, transparent 70%)'
-              : kind === 'ranged'
-                ? 'radial-gradient(circle, hsl(45 100% 75%) 0%, hsl(15 100% 55% / 0.7) 30%, transparent 70%)'
-                : 'radial-gradient(circle, hsl(0 0% 100%) 0%, hsl(0 100% 60% / 0.7) 25%, transparent 70%)',
+            background: `radial-gradient(circle, hsl(0 0% 100%) 0%, ${preset.hue} 30%, transparent 70%)`,
             borderRadius: '50%',
-            animation: 'impact-burst 0.36s ease-out forwards',
+            animation: 'impact-burst 0.4s ease-out forwards',
           }}
         />
       )}
 
-      {/* === Slash arc (melee) === */}
-      {showImpact && kind === 'melee' && (
+      {/* Slash arc */}
+      {showImpact && preset.hasSlash && (
         <svg
           className="absolute z-25 pointer-events-none"
           style={{
@@ -412,14 +484,31 @@ export const BattleStage = ({
           viewBox="0 0 100 100"
         >
           <path d="M 10 80 Q 50 10 90 80" fill="none"
-            stroke={lastActor === 'player' ? 'hsl(195 100% 70%)' : 'hsl(0 100% 65%)'}
+            stroke={preset.hue}
             strokeWidth="7" strokeLinecap="round"
-            style={{ filter: 'drop-shadow(0 0 6px currentColor)' }}
+            style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
           />
         </svg>
       )}
 
-      {/* Inline keyframes for one-off animations not in index.css */}
+      {/* Shockwave ring on heavy / aoe / ultimate */}
+      {showShockwave && (
+        <div
+          className="absolute z-25 pointer-events-none rounded-full"
+          style={{
+            top: '60%',
+            left: lastActor === 'player' ? 'auto' : '20%',
+            right: lastActor === 'player' ? '20%' : 'auto',
+            width: 60, height: 60,
+            transform: 'translate(50%, -50%)',
+            border: `3px solid ${preset.hue}`,
+            boxShadow: `0 0 20px ${preset.hue}`,
+            animation: 'shockwave-expand 0.6s ease-out forwards',
+          }}
+        />
+      )}
+
+      {/* Inline keyframes */}
       <style>{`
         @keyframes projectile-right { from { transform: translateX(0); } to { transform: translateX(38vw); } }
         @keyframes projectile-left  { from { transform: translateX(0); } to { transform: translateX(-38vw); } }
@@ -427,7 +516,88 @@ export const BattleStage = ({
           30% { opacity: 1; } 100% { transform: translate(50%, -50%) scale(1.5); opacity: 0; } }
         @keyframes slash-fade { 0% { opacity: 0; transform: translate(50%, -50%) scale(0.6) rotate(-12deg); }
           40% { opacity: 1; } 100% { opacity: 0; transform: translate(50%, -50%) scale(1.15) rotate(12deg); } }
+        @keyframes shockwave-expand { 0% { transform: translate(50%, -50%) scale(0.3); opacity: 1; }
+          100% { transform: translate(50%, -50%) scale(3.2); opacity: 0; } }
+        @keyframes ultimate-flash { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes self-aura-pulse { 0% { transform: scale(0.5); opacity: 0; }
+          40% { opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+        @keyframes self-aura-rise { 0% { transform: translateY(20px) scale(0.6); opacity: 0; }
+          25% { opacity: 1; } 100% { transform: translateY(-30px) scale(1.1); opacity: 0; } }
+        @keyframes shield-pulse { 0% { transform: scale(0.7); opacity: 0; }
+          25% { opacity: 0.9; } 75% { opacity: 0.6; } 100% { transform: scale(1.15); opacity: 0; } }
+        @keyframes stun-ring-spin { from { transform: translate(-50%, -50%) rotate(0); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+        @keyframes dot-drip { 0% { transform: translateY(-10px); opacity: 0; }
+          30% { opacity: 1; } 100% { transform: translateY(40px); opacity: 0; } }
       `}</style>
     </div>
   );
 };
+
+// ===== Self-cast VFX subcomponents =====
+
+const SelfAura = ({ color, pattern }: { color: string; pattern: 'rising' | 'ring' }) => (
+  <div className="absolute inset-0 pointer-events-none z-20">
+    {pattern === 'rising' && (
+      <>
+        <div className="absolute inset-0 rounded-full"
+          style={{ background: `radial-gradient(circle at 50% 60%, ${color}88, transparent 65%)`,
+            animation: 'self-aura-rise 0.8s ease-out forwards' }} />
+        {[15, 50, 85].map((x, i) => (
+          <div key={i} className="absolute"
+            style={{
+              left: `${x}%`, bottom: '20%', width: 6, height: 6, borderRadius: '50%',
+              background: color, boxShadow: `0 0 10px ${color}`,
+              animation: `self-aura-rise 0.9s ease-out ${i * 0.12}s forwards`,
+            }} />
+        ))}
+      </>
+    )}
+    {pattern === 'ring' && (
+      <div className="absolute left-1/2 top-1/2 rounded-full -translate-x-1/2 -translate-y-1/2"
+        style={{
+          width: '120%', height: '120%', border: `3px solid ${color}`,
+          boxShadow: `0 0 20px ${color}, inset 0 0 20px ${color}66`,
+          animation: 'self-aura-pulse 0.9s ease-out forwards',
+        }} />
+    )}
+  </div>
+);
+
+const ShieldDome = ({ color }: { color: string }) => (
+  <div className="absolute inset-0 pointer-events-none z-20">
+    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+      style={{
+        width: '140%', height: '140%',
+        background: `radial-gradient(circle, transparent 55%, ${color}33 70%, ${color}88 85%, transparent 92%)`,
+        border: `2px solid ${color}`,
+        boxShadow: `0 0 30px ${color}, inset 0 0 30px ${color}88`,
+        animation: 'shield-pulse 1.1s ease-out forwards',
+      }} />
+  </div>
+);
+
+const StunRing = ({ color }: { color: string }) => (
+  <div className="absolute left-1/2 top-1/4 -translate-x-1/2 pointer-events-none z-25"
+    style={{ width: 60, height: 60 }}>
+    <svg viewBox="0 0 60 60" className="w-full h-full"
+      style={{ animation: 'stun-ring-spin 0.6s linear infinite', transformOrigin: 'center' }}>
+      <circle cx="30" cy="30" r="22" fill="none" stroke={color} strokeWidth="2" strokeDasharray="4 4"
+        style={{ filter: `drop-shadow(0 0 6px ${color})` }} />
+      <polygon points="30,8 33,16 26,16" fill={color} />
+      <polygon points="30,52 33,44 26,44" fill={color} />
+    </svg>
+  </div>
+);
+
+const DotDrip = ({ color }: { color: string }) => (
+  <div className="absolute inset-0 pointer-events-none z-25">
+    {[20, 50, 80].map((x, i) => (
+      <div key={i} className="absolute"
+        style={{
+          left: `${x}%`, top: '20%', width: 5, height: 12, borderRadius: '50%',
+          background: color, boxShadow: `0 0 8px ${color}`,
+          animation: `dot-drip 1.1s ease-in ${i * 0.15}s infinite`,
+        }} />
+    ))}
+  </div>
+);
