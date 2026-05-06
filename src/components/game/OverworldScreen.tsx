@@ -542,6 +542,23 @@ export const OverworldScreen = ({
             );
           })()}
 
+          {/* Zone portals — walk into them or press E to travel */}
+          {portals.map((p) => (
+            <div
+              key={p.id}
+              className="absolute z-10"
+              style={{
+                left: `${p.visual.x}%`,
+                top: `${p.visual.y}%`,
+                transform: 'translate(-50%, -100%)',
+                width: 'clamp(64px, 6.5vw, 96px)',
+                height: 'clamp(96px, 13vh, 150px)',
+              }}
+            >
+              <PortalMarker kind={p.kind} label={p.label} close={nearbyPortal?.id === p.id} />
+            </div>
+          ))}
+
           {/* NPCs — anchored to background via xPercent/yPercent, larger & responsive */}
           {npcsWithPos.map((n) => {
             const close = interactable?.id === n.id;
