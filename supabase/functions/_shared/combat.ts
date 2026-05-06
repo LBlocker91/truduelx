@@ -56,6 +56,8 @@ export interface CharacterSnapshot {
   defense: number;
   resistance: number;
   skill_levels: Record<string, number>;
+  equipped?: { weapon_variant: string | null; armor_variant: string | null };
+  zone_id?: string;
 }
 
 // Mulberry32 deterministic RNG seeded from battle.seed + turn for reproducibility
