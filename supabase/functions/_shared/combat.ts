@@ -134,20 +134,40 @@ export interface HitResult {
   weapon_subtype?: string;
 }
 
+/** Pick the equipped weapon to use for this skill (or basic attack). */
+export function pickWeapon(skill: SkillDef | null, snap: CharacterSnapshot): WeaponEntry {
+  const wmap = snap.weapons ?? {};
+  const fallback: WeaponEntry = {
+    min: snap.weapon_min ?? 12,
+    max: snap.weapon_max ?? 18,
+    subtype: snap.weapon_subtype ?? 'unarmed',
+    damage_type: snap.weapon_damage_type ?? 'physical',
+    scale_stat: snap.weapon_scale_stat ?? 'strength',
+  };
+  if (skill) {
+    const byStat: Record<ScaleStat, 'melee' | 'gun' | 'launcher' | 'staff'> = {
+      strength: 'melee', dexterity: 'gun', technology: 'staff', support: 'launcher',
+    };
+    return wmap[byStat[skill.scale_stat]] ?? fallback;
+  }
+  // Basic attack: melee → gun → staff → launcher → fallback
+  return wmap.melee ?? wmap.gun ?? wmap.staff ?? wmap.launcher ?? fallback;
+}
+
 /** Resolve which stat a skill (or basic attack) scales with for the current attacker. */
-function pickScaleStat(skill: SkillDef | null, snap: CharacterSnapshot): ScaleStat {
+function pickScaleStat(skill: SkillDef | null, weapon: WeaponEntry): ScaleStat {
   if (skill) return skill.scale_stat;
-  return snap.weapon_scale_stat ?? 'strength';
+  return weapon.scale_stat;
 }
 
 /** Resolve damage type for a skill / basic attack. */
-function pickDamageType(skill: SkillDef | null, snap: CharacterSnapshot): 'physical' | 'energy' | 'hybrid' {
+function pickDamageType(skill: SkillDef | null, weapon: WeaponEntry): 'physical' | 'energy' | 'hybrid' {
   if (skill) {
     if (skill.type === 'magical') return 'energy';
     if (skill.type === 'special') return 'hybrid';
     return 'physical';
   }
-  return snap.weapon_damage_type ?? 'physical';
+  return weapon.damage_type;
 }
 
 /** Per-stat scaling multiplier (added to stat power), depending on damage type. */
