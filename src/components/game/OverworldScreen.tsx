@@ -41,6 +41,8 @@ interface OverworldScreenProps {
   hideChrome?: boolean;
   /** Bump this number to force the overworld to re-fetch the equipped loadout. */
   loadoutBust?: number;
+  /** Notify parent that character row changed (e.g. credits after vendor purchase). */
+  onCharacterChanged?: () => void;
 }
 
 // ---------- Hub-mode tuning ----------
@@ -106,7 +108,7 @@ const toPct = (v: number, max = 100) => {
 export const OverworldScreen = ({
   characterId, characterName, characterClass, characterLevel,
   onEnterNpcBattle, onJoinPvpQueue, onExit,
-  hideChrome = false, loadoutBust = 0,
+  hideChrome = false, loadoutBust = 0, onCharacterChanged,
 }: OverworldScreenProps) => {
   const [zones, setZones] = useState<Zone[]>([]);
   const [zone, setZone] = useState<Zone | null>(null);
@@ -686,9 +688,8 @@ export const OverworldScreen = ({
                       try {
                         const { buyVendorItem } = await import('@/lib/overworld');
                         await buyVendorItem(characterId, vi.id, 1);
-                        // Inventory + credits will refresh on next panel open
-                        // Refresh vendor list (no quantity change but for UX consistency)
-                        // and re-fetch player credits via parent reload mechanism.
+                        // Refresh credits in HUD + inventory panels via parent reload.
+                        onCharacterChanged?.();
                         const { toast } = await import('sonner');
                         toast.success(`Bought ${vi.items?.name} for ${vi.price}c`);
                       } catch (e: any) {
