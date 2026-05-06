@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       mode: 'pvp',
       status: 'active',
       turn_number: 1,
-      turn_deadline: new Date(Date.now() + 30000).toISOString(),
+      turn_deadline: new Date(Date.now() + 10000).toISOString(),
     }).select().single();
     if (bErr || !battle) return jsonRes({ error: bErr?.message ?? 'battle insert failed' }, 500);
 
