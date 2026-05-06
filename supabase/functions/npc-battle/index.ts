@@ -412,6 +412,43 @@ function advancePassiveTurn(actor: ParticipantState, target: ParticipantState, r
   return result;
 }
 
+function enrichActionResult(
+  result: Record<string, unknown>,
+  actor: ParticipantState,
+  target: ParticipantState,
+  meta: {
+    nextTurnNumber: number;
+    nextTurnUserId: string | null;
+    battleFinished?: boolean;
+    winnerUserId?: string | null;
+  },
+) {
+  return {
+    ...result,
+    actor_state: snapshotParticipant(actor),
+    target_state: snapshotParticipant(target),
+    next_turn_number: meta.nextTurnNumber,
+    next_turn_user_id: meta.nextTurnUserId,
+    battle_finished: meta.battleFinished ?? false,
+    winner_user_id: meta.winnerUserId ?? null,
+  };
+}
+
+function snapshotParticipant(p: ParticipantState) {
+  return {
+    slot: p.slot,
+    user_id: p.user_id ?? p.snapshot?.user_id ?? null,
+    hp: p.hp,
+    max_hp: p.max_hp,
+    energy: p.energy,
+    max_energy: p.max_energy,
+    rage: p.rage,
+    status_effects: p.status_effects,
+    cooldowns: p.cooldowns,
+    snapshot: p.snapshot,
+  };
+}
+
 async function persistParticipant(admin: any, battleId: string, p: ParticipantState) {
   await admin.from('battle_participants').update({
     hp: p.hp,
