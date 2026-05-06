@@ -55,8 +55,17 @@ export interface CharacterSnapshot {
   weapon_max: number;
   defense: number;
   resistance: number;
+  /** physical | energy | hybrid — basic-attack damage type, comes from equipped weapon */
+  weapon_damage_type?: 'physical' | 'energy' | 'hybrid';
+  /** blade | pistol | rifle | rocket_launcher | tech_staff | heavy | drone | unarmed */
+  weapon_subtype?: string;
+  /** Strongest scaling stat for the equipped weapon's basic attack */
+  weapon_scale_stat?: ScaleStat;
   skill_levels: Record<string, number>;
   equipped?: { weapon_variant: string | null; armor_variant: string | null };
+  /** Cosmetic/passive equipped extras for VFX */
+  equipped_extras?: { wings_variant?: string | null; pet_variant?: string | null };
+  max_hp?: number;
   zone_id?: string;
 }
 
@@ -94,41 +103,82 @@ export interface HitResult {
   blocked: boolean;
   dodged: boolean;
   raw: number;
+  /** Diagnostic / log fields */
+  damage_type: 'physical' | 'energy' | 'hybrid';
+  scale_stat: ScaleStat;
+  weapon_roll: number;
+  stat_power: number;
+  rank_mult: number;
+  mit_pct: number;
+  weapon_subtype?: string;
+}
+
+/** Resolve which stat a skill (or basic attack) scales with for the current attacker. */
+function pickScaleStat(skill: SkillDef | null, snap: CharacterSnapshot): ScaleStat {
+  if (skill) return skill.scale_stat;
+  return snap.weapon_scale_stat ?? 'strength';
+}
+
+/** Resolve damage type for a skill / basic attack. */
+function pickDamageType(skill: SkillDef | null, snap: CharacterSnapshot): 'physical' | 'energy' | 'hybrid' {
+  if (skill) {
+    if (skill.type === 'magical') return 'energy';
+    if (skill.type === 'special') return 'hybrid';
+    return 'physical';
+  }
+  return snap.weapon_damage_type ?? 'physical';
+}
+
+/** Per-stat scaling multiplier (added to stat power), depending on damage type. */
+function statScaleMultFor(dmgType: 'physical' | 'energy' | 'hybrid'): number {
+  if (dmgType === 'physical') return 1.6;
+  if (dmgType === 'energy')   return 1.4;
+  return 1.2; // hybrid
 }
 
 export function resolveHit({ attacker, defender, skill, defending, rng }: DamageOpts): HitResult {
   const aSnap = attacker.snapshot;
   const dSnap = defender.snapshot;
 
+  const dmgType = pickDamageType(skill, aSnap);
+  const scaleStat = pickScaleStat(skill, aSnap);
+
   // Dodge check
   const dodgeBuff = defender.status_effects.find(e => e.type === 'dodge');
   if (dodgeBuff && rng() < dodgeBuff.value / 100) {
-    return { damage: 0, crit: false, blocked: false, dodged: true, raw: 0 };
+    return {
+      damage: 0, crit: false, blocked: false, dodged: true, raw: 0,
+      damage_type: dmgType, scale_stat: scaleStat,
+      weapon_roll: 0, stat_power: 0, rank_mult: 1, mit_pct: 0,
+      weapon_subtype: aSnap.weapon_subtype,
+    };
   }
 
-  // Compute base damage
-  let weaponBase = (aSnap.weapon_min + aSnap.weapon_max) / 2;
-  let scaleVal: number;
-  let raw: number;
+  // ---- Per-hit weapon roll (the source of variance) ----
+  const wMin = Math.max(1, aSnap.weapon_min ?? 1);
+  const wMax = Math.max(wMin, aSnap.weapon_max ?? wMin);
+  const weaponRoll = Math.floor(wMin + rng() * (wMax - wMin + 1));
 
-  if (!skill) {
-    // Basic attack
-    scaleVal = effectiveStr(aSnap.strength);
-    const strMult = 1 + scaleVal * 0.02;
-    const lvlMult = 1 + aSnap.level * 0.01;
-    raw = weaponBase * strMult * lvlMult;
-  } else {
-    const stat = aSnap[skill.scale_stat] as number;
-    scaleVal = skill.scale_stat === 'strength' ? effectiveStr(stat) : stat;
-    const scaleMult = 1 + scaleVal * 0.018;
-    const lvlMult = 1 + aSnap.level * 0.01;
-    // Skill rank multiplier: rank 1 = 1.00x, rank 10 ≈ 1.54x, rank 20 ≈ 2.14x
-    const rank = Math.max(1, (aSnap.skill_levels?.[skill.slug] ?? 1));
-    const rankMult = 1 + (rank - 1) * 0.06;
-    raw = skill.base_damage * scaleMult * lvlMult * rankMult;
-  }
+  // ---- Stat scaling ----
+  const rawStatVal = (aSnap[scaleStat] as number) ?? 0;
+  const statVal = scaleStat === 'strength' ? effectiveStr(rawStatVal) : rawStatVal;
+  const statMult = statScaleMultFor(dmgType);
+  const statPower = statVal * statMult;
 
-  // Attack buffs / debuffs
+  // ---- Skill rank multiplier ----
+  let rank = 1;
+  if (skill) rank = Math.max(1, (aSnap.skill_levels?.[skill.slug] ?? 1));
+  const rankMult = 1 + (rank - 1) * 0.06;
+
+  // ---- Level power ----
+  const levelPower = aSnap.level * 1.5;
+
+  // ---- Raw before mods ----
+  const skillBase = skill ? skill.base_damage : 0;
+  let raw = (weaponRoll + skillBase + statPower + levelPower) * rankMult;
+  const rawBeforeMods = raw;
+
+  // Attack buffs / damage-taken debuffs
   const atkBuff = attacker.status_effects.find(e => e.type === 'buff_attack');
   if (atkBuff) raw *= 1 + atkBuff.value / 100;
   const dmgTaken = defender.status_effects.find(e => e.type === 'damage_taken_increase');
@@ -136,20 +186,18 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
 
   // Crit
   const critBuff = attacker.status_effects.find(e => e.type === 'crit_buff');
-  const critChance = 0.05 + (aSnap.dexterity * 0.005) + (critBuff ? critBuff.value / 100 : 0);
+  const critChance = 0.05 + (aSnap.dexterity * 0.0005) + (critBuff ? critBuff.value / 100 : 0);
   const crit = rng() < critChance;
-  if (crit) raw *= 1.6;
+  if (crit) raw *= 1.5;
 
-  // ---- Mitigation by damage type (percent-based) ----
-  // physical -> Defense, magical/energy -> Resistance, special/hybrid -> avg
-  const dmgType = skill?.type ?? 'physical';
+  // ---- Mitigation by damage type ----
   let mitStat: number;
   if (dmgType === 'physical') {
-    mitStat = (dSnap.defense ?? 0) + dSnap.strength * 0.5;
-  } else if (dmgType === 'magical') {
-    mitStat = (dSnap.resistance ?? 0) + dSnap.technology * 0.5;
+    mitStat = (dSnap.defense ?? 0) + dSnap.strength * 0.4;
+  } else if (dmgType === 'energy') {
+    mitStat = (dSnap.resistance ?? 0) + dSnap.technology * 0.4;
   } else {
-    mitStat = ((dSnap.defense ?? 0) + (dSnap.resistance ?? 0)) / 2 + dSnap.dexterity * 0.3;
+    mitStat = ((dSnap.defense ?? 0) + (dSnap.resistance ?? 0)) / 2 + dSnap.dexterity * 0.25;
   }
 
   const defBuff = defender.status_effects.find(e => e.type === 'defense_buff');
@@ -157,8 +205,7 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
   const defDebuff = defender.status_effects.find(e => e.type === 'debuff_defense');
   if (defDebuff) mitStat *= 1 - defDebuff.value / 100;
 
-  const mitPct = mitStat / (mitStat + 100); // soft, asymptotic to 1
-  const rawBeforeMit = raw;
+  const mitPct = Math.max(0, Math.min(0.85, mitStat / (mitStat + 100)));
   raw = raw * (1 - mitPct);
 
   // Block
@@ -167,8 +214,12 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
   if (blocked) raw *= 0.5;
   if (defending) raw *= 0.5;
 
-  // Floor: at least max(3, 15% of pre-mitigation raw)
-  const floor = Math.max(3, Math.floor(rawBeforeMit * 0.15));
+  // Variance ±8% — keeps numbers moving even with identical inputs
+  const variance = 0.92 + rng() * 0.16;
+  raw *= variance;
+
+  // Floor: at least max(3, 15% of raw-before-mitigation)
+  const floor = Math.max(3, Math.floor(rawBeforeMods * 0.15));
   if (raw < floor) raw = floor;
 
   // Damage absorb shield
@@ -179,10 +230,22 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
     absorb.value -= absorbed;
   }
 
-  const cap = dSnap.max_hp ? dSnap.max_hp * 0.25 : defender.max_hp * 0.25;
-  const damage = Math.max(1, Math.min(Math.floor(raw), Math.floor(cap)));
+  const damage = Math.max(1, Math.floor(raw));
 
-  return { damage, crit, blocked, dodged: false, raw: Math.floor(raw) };
+  return {
+    damage,
+    crit,
+    blocked,
+    dodged: false,
+    raw: Math.floor(raw),
+    damage_type: dmgType,
+    scale_stat: scaleStat,
+    weapon_roll: weaponRoll,
+    stat_power: Math.floor(statPower),
+    rank_mult: rankMult,
+    mit_pct: mitPct,
+    weapon_subtype: aSnap.weapon_subtype,
+  };
 }
 
 export function applyEffect(target: ParticipantState, effect: SkillEffect, value: number, duration = 2) {

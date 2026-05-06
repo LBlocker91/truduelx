@@ -69,7 +69,7 @@ export const InventoryPanel = ({ characterId, onLoadoutChanged }: InventoryPanel
   // Group consumables separately from gear
   const consumables = items.filter(i => i.item.consumable);
   const gear = items.filter(i => !i.item.consumable);
-  const slots = ['weapon', 'armor', 'helmet', 'gloves', 'boots', 'accessory'] as const;
+  const slots = ['weapon', 'armor', 'wings', 'pet', 'helmet', 'gloves', 'boots', 'accessory'] as const;
   const grouped = slots.map((slot) => ({
     slot,
     items: gear.filter((i) => i.item.slot === slot),

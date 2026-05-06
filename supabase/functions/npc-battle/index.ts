@@ -67,8 +67,13 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
   const bonusHp = charForBonus?.bonus_max_hp ?? 0;
   const bonusMp = charForBonus?.bonus_max_mp ?? 0;
 
-  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp;
-  const playerMp = 100 + bonusMp;
+  // Re-fetch equipped items just to extract HP/MP modifiers (cheap, idempotent).
+  const { data: equippedRows } = await admin.from('inventory')
+    .select('items(stat_modifiers)').eq('character_id', characterId).eq('equipped', true);
+  const gearVitals = gearVitalBonuses((equippedRows ?? []).map((r: any) => r.items));
+
+  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp + gearVitals.hp;
+  const playerMp = 100 + bonusMp + gearVitals.mp;
   const enemyHp = calcMaxHp(enemy.strength, enemy.level);
 
   const enemySnap: CharacterSnapshot = {
@@ -83,6 +88,9 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
     support: enemy.support,
     weapon_min: enemy.weapon_min,
     weapon_max: enemy.weapon_max,
+    weapon_subtype: 'heavy',
+    weapon_damage_type: 'physical',
+    weapon_scale_stat: 'strength',
     defense: enemy.defense ?? 0,
     resistance: enemy.resistance ?? 0,
     skill_levels: Object.fromEntries((enemy.skill_slugs ?? []).map((s: string) => [s, 5])),
@@ -563,31 +571,74 @@ async function awardRewards(admin: any, battleId: string): Promise<any> {
   return { xpGained, creditsGained, updatedCharacter, level };
 }
 
+/** Pick the natural scaling stat for a weapon subtype. */
+function weaponScaleStat(subtype: string | null | undefined): 'strength' | 'dexterity' | 'technology' | 'support' {
+  switch (subtype) {
+    case 'pistol':
+    case 'rifle':           return 'dexterity';
+    case 'tech_staff':      return 'technology';
+    case 'rocket_launcher': return 'support';
+    case 'drone':           return 'support';
+    case 'blade':
+    case 'heavy':
+    default:                return 'strength';
+  }
+}
+
+/** Returns the bonus max-HP and max-MP that gear adds via stat_modifiers. */
+export function gearVitalBonuses(items: any[]): { hp: number; mp: number } {
+  let hp = 0, mp = 0;
+  for (const it of items ?? []) {
+    const m = it?.stat_modifiers ?? {};
+    hp += Number(m.max_hp ?? 0);
+    mp += Number(m.max_energy ?? 0);
+  }
+  return { hp, mp };
+}
+
 async function buildPlayerSnapshot(admin: any, characterId: string, userId: string): Promise<CharacterSnapshot | null> {
   const { data: char } = await admin.from('characters').select('*').eq('id', characterId).eq('user_id', userId).maybeSingle();
   if (!char) return null;
   const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
-  let weaponMin = 80, weaponMax = 100, defenseGear = 0, resistanceGear = 0;
+  let weaponMin = 60, weaponMax = 80;
+  let weaponSubtype: string | undefined;
+  let weaponDamageType: 'physical' | 'energy' | 'hybrid' = 'physical';
+  let weaponScale: 'strength' | 'dexterity' | 'technology' | 'support' = 'strength';
+  let defenseGear = 0, resistanceGear = 0;
   let strBonus = 0, dexBonus = 0, techBonus = 0, supBonus = 0;
   let weaponVariant: string | null = null;
   let armorVariant: string | null = null;
+  let wingsVariant: string | null = null;
+  let petVariant: string | null = null;
+  let hasWeapon = false;
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
     if (it.slot === 'weapon' && it.min_damage && it.max_damage) {
       weaponMin = it.min_damage;
       weaponMax = it.max_damage;
+      weaponSubtype = it.weapon_subtype ?? undefined;
+      weaponDamageType = (it.damage_type as any) ?? 'physical';
+      weaponScale = weaponScaleStat(weaponSubtype);
       weaponVariant = it.sprite_variant ?? it.subtype ?? null;
+      hasWeapon = true;
     }
     if (it.slot === 'armor') armorVariant = it.sprite_variant ?? it.subtype ?? null;
+    if (it.slot === 'wings') wingsVariant = it.sprite_variant ?? it.weapon_subtype ?? 'wings';
+    if (it.slot === 'pet')   petVariant   = it.sprite_variant ?? it.weapon_subtype ?? 'drone';
     defenseGear += it.defense ?? 0;
     const m = it.stat_modifiers ?? {};
-    strBonus += m.strength ?? 0;
-    dexBonus += m.dexterity ?? 0;
-    techBonus += m.technology ?? 0;
-    supBonus += m.support ?? 0;
-    resistanceGear += m.resistance ?? 0;
-    defenseGear += m.defense ?? 0;
+    strBonus      += Number(m.strength   ?? 0);
+    dexBonus      += Number(m.dexterity  ?? 0);
+    techBonus     += Number(m.technology ?? 0);
+    supBonus      += Number(m.support    ?? 0);
+    resistanceGear += Number(m.resistance ?? 0);
+    defenseGear   += Number(m.defense    ?? 0);
+  }
+  if (!hasWeapon) {
+    // Bare-handed fallback: weak strength weapon
+    weaponMin = 40; weaponMax = 55; weaponSubtype = 'unarmed';
+    weaponDamageType = 'physical'; weaponScale = 'strength';
   }
   return {
     user_id: userId,
@@ -601,10 +652,14 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     support: (char.support ?? 10) + supBonus,
     weapon_min: weaponMin,
     weapon_max: weaponMax,
+    weapon_subtype: weaponSubtype,
+    weapon_damage_type: weaponDamageType,
+    weapon_scale_stat: weaponScale,
     defense: (char.defense ?? 5) + defenseGear,
     resistance: (char.resistance ?? 5) + resistanceGear,
     skill_levels: char.skill_levels ?? {},
     equipped: { weapon_variant: weaponVariant, armor_variant: armorVariant },
+    equipped_extras: { wings_variant: wingsVariant, pet_variant: petVariant },
   };
 }
 

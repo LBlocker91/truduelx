@@ -111,39 +111,64 @@ Deno.serve(async (req) => {
   }
 });
 
+function weaponScaleStat(subtype: string | null | undefined): 'strength' | 'dexterity' | 'technology' | 'support' {
+  switch (subtype) {
+    case 'pistol':
+    case 'rifle':           return 'dexterity';
+    case 'tech_staff':      return 'technology';
+    case 'rocket_launcher':
+    case 'drone':           return 'support';
+    default:                return 'strength';
+  }
+}
+
 async function buildSnapshot(admin: any, characterId: string, userId: string): Promise<CharacterSnapshot | null> {
   const { data: char } = await admin.from('characters').select('*').eq('id', characterId).maybeSingle();
   if (!char) return null;
-  // Get equipped weapon
   const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
-  let weaponMin = 80, weaponMax = 100, defense = 0;
+  let weaponMin = 60, weaponMax = 80, defense = 0, resistance = 0;
+  let weaponSubtype: string | undefined;
+  let weaponDamageType: 'physical' | 'energy' | 'hybrid' = 'physical';
+  let weaponScale: 'strength' | 'dexterity' | 'technology' | 'support' = 'strength';
   let strBonus = 0, dexBonus = 0, techBonus = 0, supBonus = 0;
+  let hasWeapon = false;
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
     if (it.slot === 'weapon' && it.min_damage && it.max_damage) {
       weaponMin = it.min_damage; weaponMax = it.max_damage;
+      weaponSubtype = it.weapon_subtype ?? undefined;
+      weaponDamageType = (it.damage_type as any) ?? 'physical';
+      weaponScale = weaponScaleStat(weaponSubtype);
+      hasWeapon = true;
     }
     defense += it.defense ?? 0;
     const m = it.stat_modifiers ?? {};
-    strBonus += m.strength ?? 0;
-    dexBonus += m.dexterity ?? 0;
-    techBonus += m.technology ?? 0;
-    supBonus += m.support ?? 0;
+    strBonus += Number(m.strength ?? 0);
+    dexBonus += Number(m.dexterity ?? 0);
+    techBonus += Number(m.technology ?? 0);
+    supBonus += Number(m.support ?? 0);
+    resistance += Number(m.resistance ?? 0);
+    defense += Number(m.defense ?? 0);
   }
+  if (!hasWeapon) { weaponMin = 40; weaponMax = 55; weaponSubtype = 'unarmed'; }
   return {
     user_id: userId,
     character_id: characterId,
     name: char.name,
     class: char.class,
     level: char.level,
-    strength: char.strength + strBonus,
-    dexterity: char.dexterity + dexBonus,
-    technology: char.technology + techBonus,
-    support: char.support + supBonus,
+    strength: (char.strength ?? 10) + strBonus,
+    dexterity: (char.dexterity ?? 10) + dexBonus,
+    technology: (char.technology ?? 10) + techBonus,
+    support: (char.support ?? 10) + supBonus,
     weapon_min: weaponMin,
     weapon_max: weaponMax,
-    defense,
+    weapon_subtype: weaponSubtype,
+    weapon_damage_type: weaponDamageType,
+    weapon_scale_stat: weaponScale,
+    defense: (char.defense ?? 5) + defense,
+    resistance: (char.resistance ?? 5) + resistance,
     skill_levels: char.skill_levels ?? {},
   };
 }
