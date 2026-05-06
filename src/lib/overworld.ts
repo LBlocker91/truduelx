@@ -233,6 +233,17 @@ export async function submitNpcAction(
   const { data, error } = await supabase.functions.invoke('npc-battle', {
     body: { action: 'act', battleId, playerAction, skillSlug, itemSubtype },
   });
-  if (error) throw error;
+  if (error) {
+    // Edge function returned non-2xx — try to extract structured error from context
+    try {
+      const ctx: any = (error as any).context;
+      if (ctx?.body) {
+        const text = typeof ctx.body === 'string' ? ctx.body : await new Response(ctx.body).text();
+        const parsed = JSON.parse(text);
+        if (parsed?.error) return { error: parsed.error };
+      }
+    } catch {}
+    return { error: (error as any).message ?? 'request failed' };
+  }
   return data;
 }
