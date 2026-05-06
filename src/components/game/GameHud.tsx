@@ -139,6 +139,7 @@ export const GameHud = (props: GameHudProps) => {
           onExit={props.onExitToSlots}
           hideChrome
           loadoutBust={loadoutBust}
+          onCharacterChanged={() => props.onProgressionChange(null)}
         />
 
         <nav className="absolute top-3 right-3 z-30 flex flex-col gap-1 bg-card/85 backdrop-blur border border-border rounded-lg p-1.5">
