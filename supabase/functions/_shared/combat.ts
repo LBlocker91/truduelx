@@ -141,9 +141,9 @@ function pickDamageType(skill: SkillDef | null, snap: CharacterSnapshot): 'physi
 
 /** Per-stat scaling multiplier (added to stat power), depending on damage type. */
 function statScaleMultFor(dmgType: 'physical' | 'energy' | 'hybrid'): number {
-  if (dmgType === 'physical') return 1.6;
-  if (dmgType === 'energy')   return 1.4;
-  return 1.2; // hybrid
+  if (dmgType === 'physical') return 1.1;
+  if (dmgType === 'energy')   return 1.0;
+  return 0.9; // hybrid
 }
 
 export function resolveHit({ attacker, defender, skill, defending, rng, isUltimate }: DamageOpts): HitResult {
