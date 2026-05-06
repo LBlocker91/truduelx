@@ -435,10 +435,20 @@ async function executeTurn({
   return { result };
 }
 
-function botChooseAction(bot: ParticipantState): { action: string; skillSlug?: string } {
+async function botChooseAction(admin: any, bot: ParticipantState): Promise<{ action: string; skillSlug?: string }> {
   const hpPct = bot.hp / bot.max_hp;
   const slugs = Object.keys(bot.snapshot.skill_levels ?? {});
-  const usable = slugs.filter(s => (bot.cooldowns[s] ?? 0) === 0 && bot.energy >= 10);
+  let usable = slugs.filter(s => (bot.cooldowns[s] ?? 0) === 0 && bot.energy >= 10);
+
+  // Filter ultimates the bot cannot afford to use yet (charge < required)
+  if (usable.length) {
+    const { data: skillRows } = await admin.from('skills').select('slug, cooldown').in('slug', usable);
+    const ultSlugs = new Set((skillRows ?? []).filter((r: any) => (r.cooldown ?? 0) >= 6).map((r: any) => r.slug));
+    if ((bot.ultimate_charge ?? 0) < ULTIMATE_CHARGE_REQUIRED) {
+      usable = usable.filter(s => !ultSlugs.has(s));
+    }
+  }
+
   if (hpPct < 0.3) {
     const heal = usable.find(s => /medic|vanish|firewall|battle-orders/.test(s));
     if (heal) return { action: 'skill', skillSlug: heal };
