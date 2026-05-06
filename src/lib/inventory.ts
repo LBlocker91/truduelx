@@ -40,6 +40,16 @@ export async function fetchInventory(characterId: string): Promise<InventoryItem
   return (data ?? []) as any;
 }
 
+const SLOT_COLUMN: Record<string, string> = {
+  weapon: 'equipped_weapon_id',
+  gun: 'equipped_gun_id',
+  launcher: 'equipped_launcher_id',
+  staff: 'equipped_staff_id',
+  armor: 'equipped_armor_id',
+  wings: 'equipped_wings_id',
+  pet: 'equipped_pet_id',
+};
+
 /** Equip an item: unequip any other item in the same slot, then equip this one. */
 export async function equipItem(characterId: string, inventoryId: string, itemId: string, slot: string) {
   const { data: rows } = await supabase
@@ -54,16 +64,6 @@ export async function equipItem(characterId: string, inventoryId: string, itemId
     await supabase.from('inventory').update({ equipped: false }).in('id', sameSlotIds);
   }
   await supabase.from('inventory').update({ equipped: true }).eq('id', inventoryId);
-
-const SLOT_COLUMN: Record<string, string> = {
-  weapon: 'equipped_weapon_id',
-  gun: 'equipped_gun_id',
-  launcher: 'equipped_launcher_id',
-  staff: 'equipped_staff_id',
-  armor: 'equipped_armor_id',
-  wings: 'equipped_wings_id',
-  pet: 'equipped_pet_id',
-};
 
   const col = SLOT_COLUMN[slot];
   if (col) await supabase.from('characters').update({ [col]: itemId } as any).eq('id', characterId);
