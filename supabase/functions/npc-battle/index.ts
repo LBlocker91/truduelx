@@ -381,26 +381,34 @@ async function executeTurn({
   } else if (action === 'defend') {
     actor.energy = Math.min(actor.max_energy, actor.energy + 15);
     result.defending = true;
+    actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+    result.ultimate_charge = actor.ultimate_charge;
   } else if (action === 'attack') {
     const hit = resolveHit({ attacker: actor, defender: target, skill: null, defending: false, rng });
     target.hp = Math.max(0, target.hp - hit.damage);
     actor.rage = Math.min(100, actor.rage + 10);
     result.hits.push(hit);
+    actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+    result.ultimate_charge = actor.ultimate_charge;
   } else if (action === 'skill') {
     if (!skillSlug) return { result: {}, error: 'skillSlug required' };
     const { data: skill } = await admin.from('skills').select('*').eq('slug', skillSlug).maybeSingle();
     if (!skill) return { result: {}, error: 'skill not found' };
     const def = skill as SkillDef;
+    const ult = isUltimateSkill(def);
     const lvl = (actor.snapshot.skill_levels as any)?.[skillSlug] ?? 0;
     if (lvl < 1 && !isBot) return { result: {}, error: 'skill not learned' };
     if (actor.snapshot.level < def.unlock_level && !isBot) return { result: {}, error: 'level too low' };
-    if ((actor.cooldowns[skillSlug] ?? 0) > 0) return { result: {}, error: 'on cooldown' };
+    if ((actor.cooldowns[skillSlug] ?? 0) > 0) return { result: {}, error: 'Ultimate is on cooldown.' };
     if (actor.energy < def.energy_cost) return { result: {}, error: 'not enough energy' };
+    if (ult && (actor.ultimate_charge ?? 0) < ULTIMATE_CHARGE_REQUIRED) {
+      return { result: {}, error: 'Ultimate requires 3 charge.' };
+    }
     actor.energy -= def.energy_cost;
     actor.cooldowns[skillSlug] = def.cooldown;
     for (let i = 0; i < def.hits; i++) {
       if (target.hp <= 0) break;
-      const hit = resolveHit({ attacker: actor, defender: target, skill: def, defending: false, rng });
+      const hit = resolveHit({ attacker: actor, defender: target, skill: def, defending: false, rng, isUltimate: ult });
       target.hp = Math.max(0, target.hp - hit.damage);
       result.hits.push(hit);
     }
@@ -410,6 +418,13 @@ async function executeTurn({
       result.effect = def.effect;
     }
     actor.rage = Math.min(100, actor.rage + 15);
+    if (ult) {
+      actor.ultimate_charge = 0;
+      result.ultimate_used = true;
+    } else {
+      actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+    }
+    result.ultimate_charge = actor.ultimate_charge;
   } else {
     return { result: {}, error: 'invalid action' };
   }
