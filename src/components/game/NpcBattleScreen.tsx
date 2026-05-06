@@ -69,11 +69,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [potions, setPotions] = useState<{ hp: number; mp: number }>({ hp: 0, mp: 0 });
   const [characterId, setCharacterId] = useState<string | null>(null);
 
-  const me = participants.find(p => p.user_id === myUserId);
-  const enemy = participants.find(p => p.is_bot);
+  // Live (DB) view
+  const liveMe = participants.find(p => p.user_id === myUserId);
+  const liveEnemy = participants.find(p => p.is_bot);
   const finished = battle?.status === 'finished';
   const won = finished && battle?.winner_user_id === myUserId;
-  const myTurn = !finished && battle?.current_turn === myUserId;
 
   const refreshPotions = useCallback(async (charId: string) => {
     const { data } = await supabase
