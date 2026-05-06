@@ -164,6 +164,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const playbackQueueRef = useRef<ActionRow[]>([]);
   const playbackHydratedRef = useRef(false);
   const turnTickingRef = useRef(false);
+  const processedDeadlineRef = useRef<string | null>(null);
 
   const orderedActions = useMemo(() => {
     return [...actions].sort((a, b) => {
@@ -257,7 +258,9 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   useEffect(() => {
     if (!battle?.turn_deadline || finished || playbackAnimating || turnTickingRef.current) return;
     if (secondsLeft > 0) return;
+    if (processedDeadlineRef.current === battle.turn_deadline) return;
 
+    processedDeadlineRef.current = battle.turn_deadline;
     turnTickingRef.current = true;
     submitNpcAction(battleId, 'tick')
       .catch((error) => console.error(error))
@@ -267,6 +270,17 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
         }, 300);
       });
   }, [battle?.turn_deadline, battleId, finished, playbackAnimating, secondsLeft]);
+
+  useEffect(() => {
+    if (!battle?.turn_deadline) {
+      processedDeadlineRef.current = null;
+      return;
+    }
+
+    if (secondsLeft > 0 && processedDeadlineRef.current !== battle.turn_deadline) {
+      processedDeadlineRef.current = null;
+    }
+  }, [battle?.turn_deadline, secondsLeft]);
 
   const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : displayedTurnNumber;
   const turnStateLabel = finished
