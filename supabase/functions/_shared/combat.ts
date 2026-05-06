@@ -146,7 +146,8 @@ function statScaleMultFor(dmgType: 'physical' | 'energy' | 'hybrid'): number {
   return 1.2; // hybrid
 }
 
-export function resolveHit({ attacker, defender, skill, defending, rng }: DamageOpts): HitResult {
+export function resolveHit({ attacker, defender, skill, defending, rng, isUltimate }: DamageOpts): HitResult {
+  const ult = !!isUltimate || isUltimateSkill(skill);
   const aSnap = attacker.snapshot;
   const dSnap = defender.snapshot;
 
