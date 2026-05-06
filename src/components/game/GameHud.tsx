@@ -170,9 +170,50 @@ export const GameHud = (props: GameHudProps) => {
             {panel === 'quests'    && <QuestsPanel characterId={props.characterId} refreshTick={props.refreshTick} onProgressionChange={props.onProgressionChange} />}
             {panel === 'pvp'       && <PvpPanel onJoinRanked={() => { close(); props.onJoinPvpQueue(); }} />}
             {panel === 'skills'    && <SkillsPanel characterId={props.characterId} refreshTick={props.refreshTick} onProgressionChange={props.onProgressionChange} />}
-            {panel === 'map'       && <Placeholder text="Use the zone selector in the overworld to travel. Full minimap coming soon." />}
-            {panel === 'shop'      && <Placeholder text="Walk up to a vendor NPC in the overworld to trade." />}
-            {panel === 'settings'  && <Placeholder text="Settings — sound and graphics options coming soon." />}
+            {panel === 'map'       && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Travel between zones by walking through glowing portals in the world.
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1.5 list-disc pl-4">
+                  <li><span className="text-foreground font-orbitron">Bazaar Station</span> — central hub, vendors and mission boards.</li>
+                  <li><span className="text-foreground font-orbitron">Wasteland</span> — open frontier, hostile drones and marauders.</li>
+                  <li><span className="text-foreground font-orbitron">Neon District</span> — syndicate territory, higher-tier rewards.</li>
+                </ul>
+              </div>
+            )}
+            {panel === 'shop'      && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Approach a vendor in the world and press <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground text-[10px] font-mono">E</kbd> to trade.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Try <span className="text-foreground font-orbitron">Broker Vexon</span> for weapons,
+                  {' '}<span className="text-foreground font-orbitron">Medic Nara Coil</span> for armor, and
+                  {' '}<span className="text-foreground font-orbitron">Cyber-Doc Riku</span> for potions.
+                </p>
+              </div>
+            )}
+            {panel === 'settings'  && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Display & account options.</p>
+                <Button size="sm" variant="outline" onClick={toggleFullscreen} className="w-full justify-start">
+                  {isFullscreen ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize2 className="w-4 h-4 mr-2" />}
+                  {isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { close(); props.onExitToSlots(); }} className="w-full justify-start">
+                  <LogOut className="w-4 h-4 mr-2" /> Switch character
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => { await supabase.auth.signOut(); }}
+                  className="w-full justify-start text-muted-foreground"
+                >
+                  <LogOut className="w-4 h-4 mr-2" /> Sign out
+                </Button>
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>

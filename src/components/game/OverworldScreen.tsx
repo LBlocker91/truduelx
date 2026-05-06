@@ -684,9 +684,7 @@ export const OverworldScreen = ({
               </>
             );
           })()}
-          {!debug && (
-            <div className="absolute bottom-2 right-2 z-30 text-[10px] text-white/40 font-mono pointer-events-none">[`] debug</div>
-          )}
+          {/* Debug overlay is toggled with the backtick (`) key — hidden from players. */}
 
           {/* Zone transition fade — covers the stage with a soft wipe between zones */}
           <div
