@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   User as UserIcon, Backpack, ScrollText, Map as MapIcon, Swords,
-  Sparkles, Store, Settings as SettingsIcon, LogOut, Crown, Coins,
+  Sparkles, Store, Settings as SettingsIcon, LogOut, Crown, Coins, Gem,
   Maximize2, Minimize2,
 } from 'lucide-react';
+import { useEffect as useEffectExtra } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { OverworldScreen } from './OverworldScreen';
 import { ProfilePanel } from './panels/ProfilePanel';
 import { InventoryPanel } from './panels/InventoryPanel';
