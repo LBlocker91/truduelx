@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Swords, Shield, Loader2, Flag, Sparkles } from 'lucide-react';
 import { submitNpcAction } from '@/lib/overworld';
 import { setInBattle } from '@/lib/overworld';
+import { BattleStage, AttackKind } from './battle/BattleStage';
 
 interface LevelUpInfo {
   oldLevel: number;
@@ -180,6 +181,14 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
         <Button variant="outline" size="sm" onClick={handleExit}>Exit</Button>
       </div>
 
+      {/* Animated battle stage */}
+      <BattleStageBlock
+        me={me}
+        enemy={enemy}
+        actions={actions}
+        skills={skills}
+      />
+
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Fighter p={me} label="YOU" mine />
         <Fighter p={enemy} label={enemy.snapshot.name} />
@@ -278,6 +287,68 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     </div>
   );
 };
+
+// --- Animated battle stage wrapper -----------------------------------------
+function BattleStageBlock({ me, enemy, actions, skills }: {
+  me: ParticipantRow; enemy: ParticipantRow; actions: ActionRow[]; skills: SkillCatalog[];
+}) {
+  // Latest action drives the animation. actions are ordered desc by created_at.
+  const latest = actions[0];
+  const tick = actions.length; // bump on every new action insert
+
+  const lastActor: 'player' | 'enemy' | null = !latest
+    ? null
+    : latest.actor_slot === me.slot ? 'player' : 'enemy';
+
+  const hits = latest?.result?.hits ?? [];
+  const damage = hits.reduce((s: number, h: any) => s + (h.damage ?? 0), 0);
+  const crit = hits.some((h: any) => h.crit);
+  const isHeal = latest?.action_type === 'use_item';
+  const healAmt = latest?.result?.heal ?? latest?.result?.mpHeal ?? 0;
+
+  // Resolve skill name + visual kind
+  const skill = latest?.skill_slug ? skills.find(s => s.slug === latest.skill_slug) : null;
+  const lastSkillName = skill?.name ?? (latest?.action_type === 'attack' ? null : null);
+
+  const attackerWeapon =
+    lastActor === 'player' ? me.snapshot.equipped?.weapon_variant : enemy.snapshot.equipped?.weapon_variant;
+  const attackKind: AttackKind = (() => {
+    if (skill?.type === 'magical' || skill?.type === 'tech' || skill?.scale_stat === 'TECH') return 'tech';
+    if (attackerWeapon === 'gun') return 'ranged';
+    if (attackerWeapon === 'staff') return 'tech';
+    return 'melee';
+  })();
+
+  return (
+    <BattleStage
+      zoneId={me.snapshot?.zone_id}
+      player={{
+        name: 'YOU',
+        level: me.snapshot.level,
+        hp: me.hp, maxHp: me.max_hp, mp: me.energy, maxMp: me.max_energy,
+        armorVariant: me.snapshot.equipped?.armor_variant,
+        weaponVariant: me.snapshot.equipped?.weapon_variant,
+        isPlayer: true, characterClass: me.snapshot.class,
+      }}
+      enemy={{
+        name: enemy.snapshot.name,
+        level: enemy.snapshot.level,
+        hp: enemy.hp, maxHp: enemy.max_hp, mp: enemy.energy, maxMp: enemy.max_energy,
+        armorVariant: enemy.snapshot.equipped?.armor_variant ?? 'medium_blue',
+        weaponVariant: enemy.snapshot.equipped?.weapon_variant ?? 'sword',
+        isPlayer: false,
+      }}
+      actionTick={tick}
+      lastActor={lastActor}
+      lastDamage={isHeal ? healAmt : (damage || null)}
+      lastWasHeal={isHeal}
+      lastSkillName={lastSkillName}
+      attackKind={attackKind}
+      crit={crit}
+    />
+  );
+}
+
 
 function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: boolean }) {
   const hpPct = (p.hp / p.max_hp) * 100;

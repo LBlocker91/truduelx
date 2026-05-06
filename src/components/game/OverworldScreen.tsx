@@ -16,8 +16,10 @@ import {
 } from '@/lib/overworld';
 import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
 import { NpcMarker } from './NpcMarker';
+import { PortalMarker } from './PortalMarker';
 import {
   walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
+  ZonePortal,
 } from '@/lib/zone-walkable';
 import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
@@ -179,19 +181,26 @@ export const OverworldScreen = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const switchZone = useCallback(async (zoneId: string, zoneList?: Zone[]) => {
+  const [transitioning, setTransitioning] = useState(false);
+  const portalCooldownRef = useRef(0);
+
+  const switchZone = useCallback(async (zoneId: string, zoneList?: Zone[], arrival?: { x: number; y: number }) => {
     const list = zoneList ?? zones;
     const z = list.find(x => x.id === zoneId);
     if (!z) return;
+    setTransitioning(true);
+    // Brief fade-out before swap so the player sees a smooth wipe rather than a hard cut.
+    await new Promise(r => setTimeout(r, 240));
     await enterZone(zoneId);
     const ns = await fetchNpcs(zoneId);
     setZone(z);
     setNpcs(ns);
-    // Always spawn at the zone's safe floor spawn point. If a saved/legacy
-    // position is invalid, this guarantees we land on the floor.
     const wk = walkableFor(zoneId);
-    setPos({ ...wk.spawn });
+    setPos(arrival ? clampToWalkable(arrival, wk.polygon) : { ...wk.spawn });
     targetRef.current = null;
+    portalCooldownRef.current = performance.now() + 800; // brief lockout to avoid bouncing
+    // Fade back in.
+    setTimeout(() => setTransitioning(false), 280);
   }, [zones]);
 
   // Keyboard
@@ -313,17 +322,47 @@ export const OverworldScreen = ({
     let best: (typeof npcsWithPos)[number] | null = null;
     let bestD = Infinity;
     for (const n of npcsWithPos) {
-      // Distance is measured against the floor interaction point, not the visual.
       const d = Math.hypot(n._ix - pos.x, n._iy - pos.y);
       if (d < bestD && d <= INTERACTION_RADIUS_PCT) { best = n; bestD = d; }
     }
     return best;
   };
 
+  const portals: ZonePortal[] = useMemo(() => walkableFor(zone?.id ?? '').portals ?? [], [zone?.id]);
+
+  const closestPortal = (): ZonePortal | null => {
+    let best: ZonePortal | null = null;
+    let bestD = Infinity;
+    for (const p of portals) {
+      const d = Math.hypot(p.interaction.x - pos.x, p.interaction.y - pos.y);
+      if (d < bestD && d <= 8) { best = p; bestD = d; }
+    }
+    return best;
+  };
+
+  const usePortal = (p: ZonePortal) => {
+    if (transitioning) return;
+    if (performance.now() < portalCooldownRef.current) return;
+    switchZone(p.to, undefined, p.arrival);
+  };
+
   const tryInteract = () => {
+    const p = closestPortal();
+    if (p) { usePortal(p); return; }
     const n = closestNpc();
     if (n) openNpc(n);
   };
+
+  // Auto-trigger portal when player walks into the trigger circle.
+  useEffect(() => {
+    if (!zone || transitioning) return;
+    const p = closestPortal();
+    if (p && performance.now() >= portalCooldownRef.current) {
+      const d = Math.hypot(p.interaction.x - pos.x, p.interaction.y - pos.y);
+      if (d <= 4) usePortal(p);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos.x, pos.y, zone, transitioning, portals]);
 
   const refreshCredits = async () => {
     const { data } = await supabase.from('characters').select('credits').eq('id', characterId).maybeSingle();
@@ -399,6 +438,7 @@ export const OverworldScreen = ({
 
   const bg = ZONE_BG[zone.id] ?? stationHub;
   const interactable = closestNpc();
+  const nearbyPortal = closestPortal();
 
   return (
     <div className={`${hideChrome ? 'absolute inset-0 h-full w-full flex flex-col' : 'min-h-screen flex flex-col'} bg-black text-foreground min-h-0`}>
@@ -424,20 +464,7 @@ export const OverworldScreen = ({
         </header>
       )}
 
-      {!hideChrome && (
-        <div className="flex gap-1 px-3 py-2 bg-card/40 border-b border-border z-10 overflow-x-auto">
-          {zones.map(z => (
-            <Button
-              key={z.id}
-              size="sm"
-              variant={z.id === zone.id ? 'default' : 'outline'}
-              onClick={() => switchZone(z.id)}
-            >
-              {z.name}
-            </Button>
-          ))}
-        </div>
-      )}
+      {/* Zone tabs removed — players now travel by walking through in-world portals. */}
 
       {/* Stage — flex:1, fills remaining HUD area */}
       <div className="relative flex-1 min-h-0 overflow-hidden bg-black">
@@ -467,23 +494,12 @@ export const OverworldScreen = ({
             }}
           />
 
-          {/* In-hub zone selector (always visible, top-left) */}
+          {/* Current zone label only — travel happens by walking through portals */}
           {hideChrome && (
-            <div className="absolute top-3 left-3 z-30 flex flex-wrap gap-1 bg-card/85 backdrop-blur border border-border rounded-lg p-1.5 max-w-[60vw]">
-              <span className="text-[10px] text-muted-foreground font-orbitron px-1 self-center">
-                <Map className="w-3 h-3 inline mr-1" /> {zone.name}
-              </span>
-              {zones.map(z => (
-                <Button
-                  key={z.id}
-                  size="sm"
-                  variant={z.id === zone.id ? 'default' : 'ghost'}
-                  className="h-7 px-2 text-[11px]"
-                  onClick={(e) => { e.stopPropagation(); switchZone(z.id); }}
-                >
-                  {z.name}
-                </Button>
-              ))}
+            <div className="absolute top-3 left-3 z-30 bg-card/85 backdrop-blur border border-border rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <Map className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-orbitron text-foreground">{zone.name}</span>
+              <span className="hidden md:inline text-[10px] text-muted-foreground">— walk to a doorway to travel</span>
             </div>
           )}
 
@@ -512,6 +528,23 @@ export const OverworldScreen = ({
               </svg>
             );
           })()}
+
+          {/* Zone portals — walk into them or press E to travel */}
+          {portals.map((p) => (
+            <div
+              key={p.id}
+              className="absolute z-10"
+              style={{
+                left: `${p.visual.x}%`,
+                top: `${p.visual.y}%`,
+                transform: 'translate(-50%, -100%)',
+                width: 'clamp(64px, 6.5vw, 96px)',
+                height: 'clamp(96px, 13vh, 150px)',
+              }}
+            >
+              <PortalMarker kind={p.kind} label={p.label} close={nearbyPortal?.id === p.id} />
+            </div>
+          ))}
 
           {/* NPCs — anchored to background via xPercent/yPercent, larger & responsive */}
           {npcsWithPos.map((n) => {
@@ -654,13 +687,38 @@ export const OverworldScreen = ({
           {!debug && (
             <div className="absolute bottom-2 right-2 z-30 text-[10px] text-white/40 font-mono pointer-events-none">[`] debug</div>
           )}
+
+          {/* Zone transition fade — covers the stage with a soft wipe between zones */}
+          <div
+            className="absolute inset-0 z-50 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(ellipse at center, rgba(8,12,18,0.85) 0%, rgba(0,0,0,1) 80%)',
+              opacity: transitioning ? 1 : 0,
+              transition: 'opacity 240ms ease-out',
+            }}
+          >
+            {transitioning && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="font-orbitron text-primary text-sm tracking-widest animate-pulse">
+                  TRANSITIONING…
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {!hideChrome && (
         <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
-          <span>WASD or click to move · [E] to interact</span>
-          <span>{interactable ? `Press E to talk to ${interactable.name}` : 'Find an NPC to interact'}</span>
+          <span>WASD or click to move · [E] to interact · walk into doors to travel</span>
+          <span>
+            {nearbyPortal
+              ? `[E] Enter ${nearbyPortal.label}`
+              : interactable
+                ? `[E] Talk to ${interactable.name}`
+                : 'Explore the zone'}
+          </span>
         </footer>
       )}
 
