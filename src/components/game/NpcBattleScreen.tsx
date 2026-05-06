@@ -63,6 +63,9 @@ interface SkillCatalog {
   scale_stat: string; type: string; effect: string; unlock_level: number;
 }
 
+const ULTIMATE_CHARGE_REQUIRED = 3;
+const isUltimate = (s: { cooldown: number }) => (s?.cooldown ?? 0) >= 6;
+
 export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenProps) => {
   const [battle, setBattle] = useState<BattleRow | null>(null);
   const [participants, setParticipants] = useState<ParticipantRow[]>([]);
