@@ -1,10 +1,12 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import {
   resolveHit,
   applyEffect,
   tickStatusEffects,
   tickCooldowns,
   isStunned,
+  isUltimateSkill,
+  ULTIMATE_CHARGE_REQUIRED,
   makeRng,
   calcMaxHp,
   ParticipantState,
@@ -74,7 +76,8 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 
   const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp + gearVitals.hp;
   const playerMp = 100 + bonusMp + gearVitals.mp;
-  const enemyHp = calcMaxHp(enemy.strength, enemy.level);
+  const enemyHpMult = Number((enemy as any).hp_multiplier ?? 1.8);
+  const enemyHp = Math.floor(calcMaxHp(enemy.strength, enemy.level) * enemyHpMult);
 
   const enemySnap: CharacterSnapshot = {
     user_id: null,
@@ -118,6 +121,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
       max_energy: playerMp,
       snapshot: { ...playerSnap, max_hp: playerHp },
       is_bot: false,
+      ultimate_charge: 0,
     },
     {
       battle_id: battle.id,
@@ -130,6 +134,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
       energy: 100,
       max_energy: 100,
       snapshot: { ...enemySnap, max_hp: enemyHp },
+      ultimate_charge: 0,
     },
   ]);
 
@@ -223,7 +228,7 @@ async function processAction(
 }
 
 async function processBotTurn(admin: any, battle: any, userId: string, player: ParticipantState, bot: ParticipantState) {
-  const botAction = botChooseAction(bot);
+  const botAction = await botChooseAction(admin, bot);
   const botResult = await executeTurn({
     admin,
     battle,
@@ -376,26 +381,34 @@ async function executeTurn({
   } else if (action === 'defend') {
     actor.energy = Math.min(actor.max_energy, actor.energy + 15);
     result.defending = true;
+    actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+    result.ultimate_charge = actor.ultimate_charge;
   } else if (action === 'attack') {
     const hit = resolveHit({ attacker: actor, defender: target, skill: null, defending: false, rng });
     target.hp = Math.max(0, target.hp - hit.damage);
     actor.rage = Math.min(100, actor.rage + 10);
     result.hits.push(hit);
+    actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+    result.ultimate_charge = actor.ultimate_charge;
   } else if (action === 'skill') {
     if (!skillSlug) return { result: {}, error: 'skillSlug required' };
     const { data: skill } = await admin.from('skills').select('*').eq('slug', skillSlug).maybeSingle();
     if (!skill) return { result: {}, error: 'skill not found' };
     const def = skill as SkillDef;
+    const ult = isUltimateSkill(def);
     const lvl = (actor.snapshot.skill_levels as any)?.[skillSlug] ?? 0;
     if (lvl < 1 && !isBot) return { result: {}, error: 'skill not learned' };
     if (actor.snapshot.level < def.unlock_level && !isBot) return { result: {}, error: 'level too low' };
-    if ((actor.cooldowns[skillSlug] ?? 0) > 0) return { result: {}, error: 'on cooldown' };
+    if ((actor.cooldowns[skillSlug] ?? 0) > 0) return { result: {}, error: 'Ultimate is on cooldown.' };
     if (actor.energy < def.energy_cost) return { result: {}, error: 'not enough energy' };
+    if (ult && (actor.ultimate_charge ?? 0) < ULTIMATE_CHARGE_REQUIRED) {
+      return { result: {}, error: 'Ultimate requires 3 charge.' };
+    }
     actor.energy -= def.energy_cost;
     actor.cooldowns[skillSlug] = def.cooldown;
     for (let i = 0; i < def.hits; i++) {
       if (target.hp <= 0) break;
-      const hit = resolveHit({ attacker: actor, defender: target, skill: def, defending: false, rng });
+      const hit = resolveHit({ attacker: actor, defender: target, skill: def, defending: false, rng, isUltimate: ult });
       target.hp = Math.max(0, target.hp - hit.damage);
       result.hits.push(hit);
     }
@@ -405,6 +418,13 @@ async function executeTurn({
       result.effect = def.effect;
     }
     actor.rage = Math.min(100, actor.rage + 15);
+    if (ult) {
+      actor.ultimate_charge = 0;
+      result.ultimate_used = true;
+    } else {
+      actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+    }
+    result.ultimate_charge = actor.ultimate_charge;
   } else {
     return { result: {}, error: 'invalid action' };
   }
@@ -415,10 +435,20 @@ async function executeTurn({
   return { result };
 }
 
-function botChooseAction(bot: ParticipantState): { action: string; skillSlug?: string } {
+async function botChooseAction(admin: any, bot: ParticipantState): Promise<{ action: string; skillSlug?: string }> {
   const hpPct = bot.hp / bot.max_hp;
   const slugs = Object.keys(bot.snapshot.skill_levels ?? {});
-  const usable = slugs.filter(s => (bot.cooldowns[s] ?? 0) === 0 && bot.energy >= 10);
+  let usable = slugs.filter(s => (bot.cooldowns[s] ?? 0) === 0 && bot.energy >= 10);
+
+  // Filter ultimates the bot cannot afford to use yet (charge < required)
+  if (usable.length) {
+    const { data: skillRows } = await admin.from('skills').select('slug, cooldown').in('slug', usable);
+    const ultSlugs = new Set((skillRows ?? []).filter((r: any) => (r.cooldown ?? 0) >= 6).map((r: any) => r.slug));
+    if ((bot.ultimate_charge ?? 0) < ULTIMATE_CHARGE_REQUIRED) {
+      usable = usable.filter(s => !ultSlugs.has(s));
+    }
+  }
+
   if (hpPct < 0.3) {
     const heal = usable.find(s => /medic|vanish|firewall|battle-orders/.test(s));
     if (heal) return { action: 'skill', skillSlug: heal };
@@ -469,6 +499,7 @@ function snapshotParticipant(p: ParticipantState) {
     energy: p.energy,
     max_energy: p.max_energy,
     rage: p.rage,
+    ultimate_charge: p.ultimate_charge ?? 0,
     status_effects: p.status_effects,
     cooldowns: p.cooldowns,
     snapshot: p.snapshot,
@@ -480,6 +511,7 @@ async function persistParticipant(admin: any, battleId: string, p: ParticipantSt
     hp: p.hp,
     energy: p.energy,
     rage: p.rage,
+    ultimate_charge: p.ultimate_charge ?? 0,
     status_effects: p.status_effects,
     cooldowns: p.cooldowns,
   }).eq('battle_id', battleId).eq('slot', p.slot);
@@ -600,7 +632,7 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   const { data: char } = await admin.from('characters').select('*').eq('id', characterId).eq('user_id', userId).maybeSingle();
   if (!char) return null;
   const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
-  let weaponMin = 60, weaponMax = 80;
+  let weaponMin = 15, weaponMax = 22;
   let weaponSubtype: string | undefined;
   let weaponDamageType: 'physical' | 'energy' | 'hybrid' = 'physical';
   let weaponScale: 'strength' | 'dexterity' | 'technology' | 'support' = 'strength';
@@ -637,7 +669,7 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   }
   if (!hasWeapon) {
     // Bare-handed fallback: weak strength weapon
-    weaponMin = 40; weaponMax = 55; weaponSubtype = 'unarmed';
+    weaponMin = 12; weaponMax = 18; weaponSubtype = 'unarmed';
     weaponDamageType = 'physical'; weaponScale = 'strength';
   }
   return {

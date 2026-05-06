@@ -31,6 +31,7 @@ interface ParticipantRow {
   energy: number;
   max_energy: number;
   rage: number;
+  ultimate_charge?: number;
   status_effects: any[];
   cooldowns: Record<string, number>;
   snapshot: any;
@@ -61,6 +62,9 @@ interface SkillCatalog {
   energy_cost: number; cooldown: number; base_damage: number;
   scale_stat: string; type: string; effect: string; unlock_level: number;
 }
+
+const ULTIMATE_CHARGE_REQUIRED = 3;
+const isUltimate = (s: { cooldown: number }) => (s?.cooldown ?? 0) >= 6;
 
 export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenProps) => {
   const [battle, setBattle] = useState<BattleRow | null>(null);
@@ -417,18 +421,29 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
               const lowMp = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
-              const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowMp || lowLvl;
+              const ult = isUltimate(s);
+              const charge = me.ultimate_charge ?? 0;
+              const lowCharge = ult && charge < ULTIMATE_CHARGE_REQUIRED;
+              const ready = ult && !lowCharge && !onCd && !lowMp && !lowLvl && learned;
+              const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowMp || lowLvl || lowCharge;
+              const titleParts = [s.description, `MP ${s.energy_cost}`, `CD ${s.cooldown}`];
+              if (ult) titleParts.push(`Charge ${charge}/${ULTIMATE_CHARGE_REQUIRED}`);
+              titleParts.push(learned ? `Rank ${rank}` : 'NOT LEARNED');
               return (
                 <Button key={s.slug} disabled={disabled} variant="outline" size="sm"
                   onClick={() => doAction('skill', s.slug)}
-                  title={`${s.description} | MP ${s.energy_cost} | CD ${s.cooldown}${learned ? ` | Rank ${rank}` : ' | NOT LEARNED'}`}
-                  className="flex flex-col h-auto py-1 px-2"
+                  title={titleParts.join(' | ')}
+                  className={`flex flex-col h-auto py-1 px-2 ${ready ? 'border-accent shadow-[0_0_12px_hsl(var(--accent)/0.6)]' : ''}`}
                 >
                   <span className="font-orbitron text-[10px]">
-                    {s.name}{learned && <span className="ml-1 text-secondary">R{rank}</span>}
+                    {ult && '★ '}{s.name}{learned && <span className="ml-1 text-secondary">R{rank}</span>}
                   </span>
                   <span className="text-[9px] text-muted-foreground">
-                    {onCd ? `CD ${me.cooldowns[s.slug]}` : `MP ${s.energy_cost}`}
+                    {onCd
+                      ? `CD ${me.cooldowns[s.slug]}`
+                      : ult
+                        ? (lowCharge ? `Charge ${charge}/${ULTIMATE_CHARGE_REQUIRED}` : 'Ultimate Ready')
+                        : `MP ${s.energy_cost}`}
                     {!learned && ' 🔒'}
                   </span>
                 </Button>
@@ -529,6 +544,13 @@ function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: 
           <div className="flex justify-between text-[10px] font-rajdhani"><span>MP</span><span>{p.energy}/{p.max_energy}</span></div>
           <Progress value={enPct} className="h-1.5" />
         </div>
+        <div>
+          <div className="flex justify-between text-[10px] font-rajdhani">
+            <span>ULT</span>
+            <span>{Math.min(ULTIMATE_CHARGE_REQUIRED, p.ultimate_charge ?? 0)}/{ULTIMATE_CHARGE_REQUIRED}</span>
+          </div>
+          <Progress value={Math.min(100, ((p.ultimate_charge ?? 0) / ULTIMATE_CHARGE_REQUIRED) * 100)} className="h-1.5" />
+        </div>
         <div className="flex gap-1 mt-1 flex-wrap min-h-[16px]">
           {p.status_effects?.map((e: any, i: number) => (
             <span key={i} className="text-[9px] px-1 rounded bg-accent/20 text-accent">
@@ -564,8 +586,11 @@ function describeAction(a: ActionRow): string {
   if (blocked) tags.push('blocked');
   if (dodged) tags.push('dodged');
   const scaleNote = scaleStat ? ` · ${dmgType ?? ''} · scales ${scaleStat.toUpperCase().slice(0, 3)}` : '';
+  const ultNote = a.result?.ultimate_used
+    ? ' · ULTIMATE!'
+    : (typeof a.result?.ultimate_charge === 'number' ? ` · charge ${a.result.ultimate_charge}/${ULTIMATE_CHARGE_REQUIRED}` : '');
   if (a.action_type === 'skill') {
-    return `used ${a.skill_slug} → ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}`;
+    return `used ${a.skill_slug} → ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}${ultNote}`;
   }
-  return `attacked for ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}`;
+  return `attacked for ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}${ultNote}`;
 }

@@ -76,6 +76,7 @@ export type Database = {
           slot: number
           snapshot: Json
           status_effects: Json
+          ultimate_charge: number
           user_id: string | null
         }
         Insert: {
@@ -92,6 +93,7 @@ export type Database = {
           slot: number
           snapshot: Json
           status_effects?: Json
+          ultimate_charge?: number
           user_id?: string | null
         }
         Update: {
@@ -108,6 +110,7 @@ export type Database = {
           slot?: number
           snapshot?: Json
           status_effects?: Json
+          ultimate_charge?: number
           user_id?: string | null
         }
         Relationships: [
@@ -444,6 +447,7 @@ export type Database = {
           credit_reward: number
           defense: number
           dexterity: number
+          hp_multiplier: number
           level: number
           npc_id: string
           resistance: number
@@ -460,6 +464,7 @@ export type Database = {
           credit_reward?: number
           defense?: number
           dexterity?: number
+          hp_multiplier?: number
           level?: number
           npc_id: string
           resistance?: number
@@ -476,6 +481,7 @@ export type Database = {
           credit_reward?: number
           defense?: number
           dexterity?: number
+          hp_multiplier?: number
           level?: number
           npc_id?: string
           resistance?: number

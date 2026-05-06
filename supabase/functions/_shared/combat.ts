@@ -33,6 +33,7 @@ export interface ParticipantState {
   status_effects: StatusEffect[];
   cooldowns: Record<string, number>;
   snapshot: CharacterSnapshot;
+  ultimate_charge?: number;
 }
 
 export interface StatusEffect {
@@ -82,7 +83,8 @@ export function makeRng(seed: number) {
 }
 
 export function calcMaxHp(strength: number, level: number) {
-  return Math.floor(100 + strength * 8 + level * 12);
+  // Tougher base HP so equal-level fights last multiple turns.
+  return Math.floor(180 + strength * 10 + level * 22);
 }
 
 function effectiveStr(str: number) {
@@ -95,7 +97,16 @@ interface DamageOpts {
   skill: SkillDef | null; // null = basic attack
   defending: boolean;
   rng: () => number;
+  isUltimate?: boolean;
 }
+
+/** A skill is treated as an ultimate when its cooldown is high. */
+export function isUltimateSkill(skill: SkillDef | null | undefined): boolean {
+  if (!skill) return false;
+  return (skill.cooldown ?? 0) >= 6;
+}
+
+export const ULTIMATE_CHARGE_REQUIRED = 3;
 
 export interface HitResult {
   damage: number;
@@ -131,12 +142,13 @@ function pickDamageType(skill: SkillDef | null, snap: CharacterSnapshot): 'physi
 
 /** Per-stat scaling multiplier (added to stat power), depending on damage type. */
 function statScaleMultFor(dmgType: 'physical' | 'energy' | 'hybrid'): number {
-  if (dmgType === 'physical') return 1.6;
-  if (dmgType === 'energy')   return 1.4;
-  return 1.2; // hybrid
+  if (dmgType === 'physical') return 1.1;
+  if (dmgType === 'energy')   return 1.0;
+  return 0.9; // hybrid
 }
 
-export function resolveHit({ attacker, defender, skill, defending, rng }: DamageOpts): HitResult {
+export function resolveHit({ attacker, defender, skill, defending, rng, isUltimate }: DamageOpts): HitResult {
+  const ult = !!isUltimate || isUltimateSkill(skill);
   const aSnap = attacker.snapshot;
   const dSnap = defender.snapshot;
 
@@ -188,7 +200,7 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
   const critBuff = attacker.status_effects.find(e => e.type === 'crit_buff');
   const critChance = 0.05 + (aSnap.dexterity * 0.0005) + (critBuff ? critBuff.value / 100 : 0);
   const crit = rng() < critChance;
-  if (crit) raw *= 1.5;
+  if (crit) raw *= ult ? 1.25 : 1.5;
 
   // ---- Mitigation by damage type ----
   let mitStat: number;
@@ -221,6 +233,15 @@ export function resolveHit({ attacker, defender, skill, defending, rng }: Damage
   // Floor: at least max(3, 15% of raw-before-mitigation)
   const floor = Math.max(3, Math.floor(rawBeforeMods * 0.15));
   if (raw < floor) raw = floor;
+
+  // Soft cap by % target max HP — keeps battles multi-turn
+  const maxHpDef = defender.max_hp || 1;
+  let capPct: number;
+  if (skill && ult) capPct = crit ? 0.75 : 0.65;
+  else if (skill)   capPct = 0.45;
+  else              capPct = 0.40;
+  const cap = maxHpDef * capPct;
+  if (raw > cap) raw = cap + (raw - cap) * 0.25;
 
   // Damage absorb shield
   const absorb = defender.status_effects.find(e => e.type === 'damage_absorb');
