@@ -121,6 +121,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
       max_energy: playerMp,
       snapshot: { ...playerSnap, max_hp: playerHp },
       is_bot: false,
+      ultimate_charge: 0,
     },
     {
       battle_id: battle.id,
@@ -133,6 +134,7 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
       energy: 100,
       max_energy: 100,
       snapshot: { ...enemySnap, max_hp: enemyHp },
+      ultimate_charge: 0,
     },
   ]);
 
