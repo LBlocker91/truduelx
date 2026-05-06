@@ -195,6 +195,7 @@ async function commitTurn(
     hp: actor.hp,
     energy: actor.energy,
     rage: actor.rage,
+    ultimate_charge: actor.ultimate_charge ?? 0,
     status_effects: actor.status_effects,
     cooldowns: actor.cooldowns,
   }).eq('battle_id', battle.id).eq('slot', actor.slot);
@@ -203,6 +204,7 @@ async function commitTurn(
     hp: target.hp,
     energy: target.energy,
     rage: target.rage,
+    ultimate_charge: target.ultimate_charge ?? 0,
     status_effects: target.status_effects,
     cooldowns: target.cooldowns,
   }).eq('battle_id', battle.id).eq('slot', target.slot);
