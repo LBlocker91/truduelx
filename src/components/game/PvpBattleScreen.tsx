@@ -213,8 +213,7 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
 
   useEffect(() => {
     if (!battle?.turn_deadline || finished || playbackAnimating || turnTickingRef.current) return;
-    const expired = new Date(battle.turn_deadline).getTime() <= Date.now();
-    if (!expired) return;
+    if (secondsLeft > 0) return;
 
     turnTickingRef.current = true;
     submitBattleAction({ battleId, action: 'tick' })
@@ -224,7 +223,7 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
           turnTickingRef.current = false;
         }, 300);
       });
-  }, [battle?.turn_deadline, battleId, finished, playbackAnimating]);
+  }, [battle?.turn_deadline, battleId, finished, playbackAnimating, secondsLeft]);
 
   const doAction = async (payload: any) => {
     if (submitting || playbackAnimating || !myTurn || finished) return;
