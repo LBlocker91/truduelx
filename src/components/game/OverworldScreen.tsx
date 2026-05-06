@@ -324,9 +324,17 @@ export const OverworldScreen = ({
     if (n) openNpc(n);
   };
 
+  const refreshCredits = async () => {
+    const { data } = await supabase.from('characters').select('credits').eq('id', characterId).maybeSingle();
+    setCredits(data?.credits ?? 0);
+  };
+
   const openNpc = async (npc: Npc) => {
     setActiveNpc(npc);
-    if (npc.type === 'vendor') setVendorItems(await fetchVendorItems(npc.id));
+    if (npc.type === 'vendor') {
+      setVendorItems(await fetchVendorItems(npc.id));
+      await refreshCredits();
+    }
     if (npc.type === 'quest') setQuestData(await fetchQuestForNpc(npc.id));
   };
   const closeNpc = () => { setActiveNpc(null); setVendorItems([]); setQuestData(null); };
