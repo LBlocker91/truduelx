@@ -239,6 +239,18 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const enemy = displayedEnemy ?? liveEnemy;
   const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === myUserId;
 
+  // When playback is fully drained, sync displayed → live (covers any missed snapshots, e.g. final state).
+  useEffect(() => {
+    if (playbackAnimating) return;
+    if (playbackQueueRef.current.length > 0) return;
+    if (liveMe) setDisplayedMe(liveMe);
+    if (liveEnemy) setDisplayedEnemy(liveEnemy);
+    if (battle) {
+      setDisplayedTurnNumber(battle.turn_number);
+      setDisplayedCurrentTurn(battle.current_turn);
+    }
+  }, [playbackAnimating, liveMe, liveEnemy, battle]);
+
   const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : displayedTurnNumber;
   const turnStateLabel = finished
     ? 'BATTLE ENDED'
