@@ -233,6 +233,15 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
   const floor = Math.max(3, Math.floor(rawBeforeMods * 0.15));
   if (raw < floor) raw = floor;
 
+  // Soft cap by % target max HP — keeps battles multi-turn
+  const maxHpDef = defender.max_hp || 1;
+  let capPct: number;
+  if (skill && ult) capPct = crit ? 0.75 : 0.65;
+  else if (skill)   capPct = 0.45;
+  else              capPct = 0.40;
+  const cap = maxHpDef * capPct;
+  if (raw > cap) raw = cap + (raw - cap) * 0.25;
+
   // Damage absorb shield
   const absorb = defender.status_effects.find(e => e.type === 'damage_absorb');
   if (absorb) {
