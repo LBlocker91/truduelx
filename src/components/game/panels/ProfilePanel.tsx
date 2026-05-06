@@ -158,19 +158,47 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
   }
 
   const meta = (CLASS_META as any)[c.class];
-  // Effective values include pending draft.
-  const effStr = c.strength + draft.strength;
-  const effDex = c.dexterity + draft.dexterity;
-  const effTech = c.technology + draft.technology;
-  const effSup = c.support + draft.support;
-  const effDef = c.defense + draft.defense;
-  const effRes = c.resistance + draft.resistance;
-  const effBonusHp = (c.bonus_max_hp ?? 0) + draft.max_hp * 5;
-  const effBonusMp = (c.bonus_max_mp ?? 0) + draft.max_energy * 3;
+
+  // Aggregate gear bonuses from every equipped item (mirrors server snapshot logic).
+  const gearBonus = useMemo(() => {
+    const out = { strength: 0, dexterity: 0, technology: 0, support: 0, defense: 0, resistance: 0, max_hp: 0, max_energy: 0 };
+    for (const it of equipped) {
+      const m = it.stat_modifiers ?? {};
+      for (const k of Object.keys(out) as (keyof typeof out)[]) out[k] += Number((m as any)[k] ?? 0);
+      out.defense += Number(it.defense ?? 0);
+    }
+    return out;
+  }, [equipped]);
+
+  // Effective values include pending draft + equipped gear.
+  const effStr = c.strength + draft.strength + gearBonus.strength;
+  const effDex = c.dexterity + draft.dexterity + gearBonus.dexterity;
+  const effTech = c.technology + draft.technology + gearBonus.technology;
+  const effSup = c.support + draft.support + gearBonus.support;
+  const effDef = c.defense + draft.defense + gearBonus.defense;
+  const effRes = c.resistance + draft.resistance + gearBonus.resistance;
+  const effBonusHp = (c.bonus_max_hp ?? 0) + draft.max_hp * 5 + gearBonus.max_hp;
+  const effBonusMp = (c.bonus_max_mp ?? 0) + draft.max_energy * 3 + gearBonus.max_energy;
 
   const maxHp = Math.floor(100 + effStr * 8 + c.level * 12) + effBonusHp;
   const maxMp = 100 + effTech * 2 + effBonusMp;
   const canSpend = remainingPoints > 0;
+
+  // Damage preview against a Lv-equivalent dummy, using equipped weapon (or fallback).
+  const weapon = equipped.find(e => e.slot === 'weapon');
+  const weaponSubtype = weapon?.weapon_subtype ?? 'unarmed';
+  const weaponDamageType: DamageType = (weapon?.damage_type as DamageType) ?? 'physical';
+  const weaponScale: ScaleStat =
+    weaponSubtype === 'pistol' || weaponSubtype === 'rifle' ? 'dexterity' :
+    weaponSubtype === 'tech_staff' ? 'technology' :
+    weaponSubtype === 'rocket_launcher' || weaponSubtype === 'drone' ? 'support' : 'strength';
+  const weaponMin = weapon?.min_damage ?? 40;
+  const weaponMax = weapon?.max_damage ?? 55;
+  const dmg = useMemo(() => calculateDamagePreview({
+    attacker: { level: c.level, strength: effStr, dexterity: effDex, technology: effTech, support: effSup, defense: effDef, resistance: effRes },
+    weapon: { min: weaponMin, max: weaponMax, damageType: weaponDamageType, scaleStat: weaponScale, subtype: weaponSubtype },
+  }), [c.level, effStr, effDex, effTech, effSup, effDef, effRes, weaponMin, weaponMax, weaponDamageType, weaponScale, weaponSubtype]);
+
 
   return (
     <div className="space-y-4">
