@@ -16,8 +16,10 @@ import {
 } from '@/lib/overworld';
 import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
 import { NpcMarker } from './NpcMarker';
+import { PortalMarker } from './PortalMarker';
 import {
   walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
+  ZonePortal,
 } from '@/lib/zone-walkable';
 import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
