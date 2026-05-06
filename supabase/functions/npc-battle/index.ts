@@ -632,7 +632,7 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   const { data: char } = await admin.from('characters').select('*').eq('id', characterId).eq('user_id', userId).maybeSingle();
   if (!char) return null;
   const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
-  let weaponMin = 60, weaponMax = 80;
+  let weaponMin = 15, weaponMax = 22;
   let weaponSubtype: string | undefined;
   let weaponDamageType: 'physical' | 'energy' | 'hybrid' = 'physical';
   let weaponScale: 'strength' | 'dexterity' | 'technology' | 'support' = 'strength';
