@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Swords, Shield, Loader2, Flag, Sparkles } from 'lucide-react';
 import { submitNpcAction } from '@/lib/overworld';
 import { setInBattle } from '@/lib/overworld';
+import { BattleStage, AttackKind } from './battle/BattleStage';
 
 interface LevelUpInfo {
   oldLevel: number;
