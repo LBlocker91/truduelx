@@ -506,23 +506,12 @@ export const OverworldScreen = ({
             }}
           />
 
-          {/* In-hub zone selector (always visible, top-left) */}
+          {/* Current zone label only — travel happens by walking through portals */}
           {hideChrome && (
-            <div className="absolute top-3 left-3 z-30 flex flex-wrap gap-1 bg-card/85 backdrop-blur border border-border rounded-lg p-1.5 max-w-[60vw]">
-              <span className="text-[10px] text-muted-foreground font-orbitron px-1 self-center">
-                <Map className="w-3 h-3 inline mr-1" /> {zone.name}
-              </span>
-              {zones.map(z => (
-                <Button
-                  key={z.id}
-                  size="sm"
-                  variant={z.id === zone.id ? 'default' : 'ghost'}
-                  className="h-7 px-2 text-[11px]"
-                  onClick={(e) => { e.stopPropagation(); switchZone(z.id); }}
-                >
-                  {z.name}
-                </Button>
-              ))}
+            <div className="absolute top-3 left-3 z-30 bg-card/85 backdrop-blur border border-border rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <Map className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-orbitron text-foreground">{zone.name}</span>
+              <span className="hidden md:inline text-[10px] text-muted-foreground">— walk to a doorway to travel</span>
             </div>
           )}
 
