@@ -421,18 +421,29 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
               const lowMp = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
-              const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowMp || lowLvl;
+              const ult = isUltimate(s);
+              const charge = me.ultimate_charge ?? 0;
+              const lowCharge = ult && charge < ULTIMATE_CHARGE_REQUIRED;
+              const ready = ult && !lowCharge && !onCd && !lowMp && !lowLvl && learned;
+              const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowMp || lowLvl || lowCharge;
+              const titleParts = [s.description, `MP ${s.energy_cost}`, `CD ${s.cooldown}`];
+              if (ult) titleParts.push(`Charge ${charge}/${ULTIMATE_CHARGE_REQUIRED}`);
+              titleParts.push(learned ? `Rank ${rank}` : 'NOT LEARNED');
               return (
                 <Button key={s.slug} disabled={disabled} variant="outline" size="sm"
                   onClick={() => doAction('skill', s.slug)}
-                  title={`${s.description} | MP ${s.energy_cost} | CD ${s.cooldown}${learned ? ` | Rank ${rank}` : ' | NOT LEARNED'}`}
-                  className="flex flex-col h-auto py-1 px-2"
+                  title={titleParts.join(' | ')}
+                  className={`flex flex-col h-auto py-1 px-2 ${ready ? 'border-accent shadow-[0_0_12px_hsl(var(--accent)/0.6)]' : ''}`}
                 >
                   <span className="font-orbitron text-[10px]">
-                    {s.name}{learned && <span className="ml-1 text-secondary">R{rank}</span>}
+                    {ult && '★ '}{s.name}{learned && <span className="ml-1 text-secondary">R{rank}</span>}
                   </span>
                   <span className="text-[9px] text-muted-foreground">
-                    {onCd ? `CD ${me.cooldowns[s.slug]}` : `MP ${s.energy_cost}`}
+                    {onCd
+                      ? `CD ${me.cooldowns[s.slug]}`
+                      : ult
+                        ? (lowCharge ? `Charge ${charge}/${ULTIMATE_CHARGE_REQUIRED}` : 'Ultimate Ready')
+                        : `MP ${s.energy_cost}`}
                     {!learned && ' 🔒'}
                   </span>
                 </Button>
