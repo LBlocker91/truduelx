@@ -322,17 +322,47 @@ export const OverworldScreen = ({
     let best: (typeof npcsWithPos)[number] | null = null;
     let bestD = Infinity;
     for (const n of npcsWithPos) {
-      // Distance is measured against the floor interaction point, not the visual.
       const d = Math.hypot(n._ix - pos.x, n._iy - pos.y);
       if (d < bestD && d <= INTERACTION_RADIUS_PCT) { best = n; bestD = d; }
     }
     return best;
   };
 
+  const portals: ZonePortal[] = useMemo(() => walkableFor(zone?.id ?? '').portals ?? [], [zone?.id]);
+
+  const closestPortal = (): ZonePortal | null => {
+    let best: ZonePortal | null = null;
+    let bestD = Infinity;
+    for (const p of portals) {
+      const d = Math.hypot(p.interaction.x - pos.x, p.interaction.y - pos.y);
+      if (d < bestD && d <= 8) { best = p; bestD = d; }
+    }
+    return best;
+  };
+
+  const usePortal = (p: ZonePortal) => {
+    if (transitioning) return;
+    if (performance.now() < portalCooldownRef.current) return;
+    switchZone(p.to, undefined, p.arrival);
+  };
+
   const tryInteract = () => {
+    const p = closestPortal();
+    if (p) { usePortal(p); return; }
     const n = closestNpc();
     if (n) openNpc(n);
   };
+
+  // Auto-trigger portal when player walks into the trigger circle.
+  useEffect(() => {
+    if (!zone || transitioning) return;
+    const p = closestPortal();
+    if (p && performance.now() >= portalCooldownRef.current) {
+      const d = Math.hypot(p.interaction.x - pos.x, p.interaction.y - pos.y);
+      if (d <= 4) usePortal(p);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos.x, pos.y, zone, transitioning, portals]);
 
   const refreshCredits = async () => {
     const { data } = await supabase.from('characters').select('credits').eq('id', characterId).maybeSingle();
