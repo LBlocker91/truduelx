@@ -131,16 +131,36 @@ async function buildSnapshot(admin: any, characterId: string, userId: string): P
   let weaponDamageType: 'physical' | 'energy' | 'hybrid' = 'physical';
   let weaponScale: 'strength' | 'dexterity' | 'technology' | 'support' = 'strength';
   let strBonus = 0, dexBonus = 0, techBonus = 0, supBonus = 0;
-  let hasWeapon = false;
+  const weapons: Record<string, any> = {};
+  let primaryItem: any = null;
+  const slotKey = (slot: string, sub?: string): 'melee' | 'gun' | 'launcher' | 'staff' | null => {
+    if (slot === 'gun') return 'gun';
+    if (slot === 'launcher') return 'launcher';
+    if (slot === 'staff') return 'staff';
+    if (slot === 'weapon') return 'melee';
+    if (sub === 'pistol' || sub === 'rifle') return 'gun';
+    if (sub === 'rocket_launcher') return 'launcher';
+    if (sub === 'tech_staff') return 'staff';
+    return null;
+  };
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
-    if (it.slot === 'weapon' && it.min_damage && it.max_damage) {
-      weaponMin = it.min_damage; weaponMax = it.max_damage;
-      weaponSubtype = it.weapon_subtype ?? undefined;
-      weaponDamageType = (it.damage_type as any) ?? 'physical';
-      weaponScale = weaponScaleStat(weaponSubtype);
-      hasWeapon = true;
+    const sk = slotKey(it.slot, it.weapon_subtype);
+    if (sk && it.min_damage && it.max_damage) {
+      weapons[sk] = {
+        min: it.min_damage, max: it.max_damage,
+        subtype: it.weapon_subtype ?? sk,
+        damage_type: (it.damage_type as any) ?? 'physical',
+        scale_stat: weaponScaleStat(it.weapon_subtype),
+      };
+      if (!primaryItem || sk === 'melee') {
+        primaryItem = it;
+        weaponMin = it.min_damage; weaponMax = it.max_damage;
+        weaponSubtype = it.weapon_subtype ?? undefined;
+        weaponDamageType = (it.damage_type as any) ?? 'physical';
+        weaponScale = weaponScaleStat(it.weapon_subtype);
+      }
     }
     defense += it.defense ?? 0;
     const m = it.stat_modifiers ?? {};
@@ -151,7 +171,7 @@ async function buildSnapshot(admin: any, characterId: string, userId: string): P
     resistance += Number(m.resistance ?? 0);
     defense += Number(m.defense ?? 0);
   }
-  if (!hasWeapon) { weaponMin = 40; weaponMax = 55; weaponSubtype = 'unarmed'; }
+  if (!primaryItem) { weaponMin = 40; weaponMax = 55; weaponSubtype = 'unarmed'; }
   return {
     user_id: userId,
     character_id: characterId,
@@ -167,6 +187,7 @@ async function buildSnapshot(admin: any, characterId: string, userId: string): P
     weapon_subtype: weaponSubtype,
     weapon_damage_type: weaponDamageType,
     weapon_scale_stat: weaponScale,
+    weapons,
     defense: (char.defense ?? 5) + defense,
     resistance: (char.resistance ?? 5) + resistance,
     skill_levels: char.skill_levels ?? {},
