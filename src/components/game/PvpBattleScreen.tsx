@@ -24,6 +24,7 @@ interface ParticipantRow {
   rage: number;
   status_effects: any[];
   cooldowns: Record<string, number>;
+  ultimate_charge?: number;
   snapshot: any;
 }
 
