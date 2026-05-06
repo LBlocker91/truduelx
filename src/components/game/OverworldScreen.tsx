@@ -711,8 +711,14 @@ export const OverworldScreen = ({
 
       {!hideChrome && (
         <footer className="px-3 py-2 bg-card/80 border-t border-border text-xs text-muted-foreground flex justify-between">
-          <span>WASD or click to move · [E] to interact</span>
-          <span>{interactable ? `Press E to talk to ${interactable.name}` : 'Find an NPC to interact'}</span>
+          <span>WASD or click to move · [E] to interact · walk into doors to travel</span>
+          <span>
+            {nearbyPortal
+              ? `[E] Enter ${nearbyPortal.label}`
+              : interactable
+                ? `[E] Talk to ${interactable.name}`
+                : 'Explore the zone'}
+          </span>
         </footer>
       )}
 
