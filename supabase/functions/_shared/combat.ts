@@ -199,7 +199,7 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
   const critBuff = attacker.status_effects.find(e => e.type === 'crit_buff');
   const critChance = 0.05 + (aSnap.dexterity * 0.0005) + (critBuff ? critBuff.value / 100 : 0);
   const crit = rng() < critChance;
-  if (crit) raw *= 1.5;
+  if (crit) raw *= ult ? 1.25 : 1.5;
 
   // ---- Mitigation by damage type ----
   let mitStat: number;
