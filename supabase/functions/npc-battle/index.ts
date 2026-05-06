@@ -669,7 +669,7 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   }
   if (!hasWeapon) {
     // Bare-handed fallback: weak strength weapon
-    weaponMin = 40; weaponMax = 55; weaponSubtype = 'unarmed';
+    weaponMin = 12; weaponMax = 18; weaponSubtype = 'unarmed';
     weaponDamageType = 'physical'; weaponScale = 'strength';
   }
   return {
