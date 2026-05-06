@@ -225,12 +225,14 @@ export type Database = {
           resistance: number
           skill_levels: Json
           skill_points: number
+          stat_allocations: Json
           stat_points: number
           strength: number
           support: number
           technology: number
           updated_at: string
           user_id: string
+          vibranium: number
           xp: number
         }
         Insert: {
@@ -252,12 +254,14 @@ export type Database = {
           resistance?: number
           skill_levels?: Json
           skill_points?: number
+          stat_allocations?: Json
           stat_points?: number
           strength?: number
           support?: number
           technology?: number
           updated_at?: string
           user_id: string
+          vibranium?: number
           xp?: number
         }
         Update: {
@@ -279,12 +283,14 @@ export type Database = {
           resistance?: number
           skill_levels?: Json
           skill_points?: number
+          stat_allocations?: Json
           stat_points?: number
           strength?: number
           support?: number
           technology?: number
           updated_at?: string
           user_id?: string
+          vibranium?: number
           xp?: number
         }
         Relationships: []

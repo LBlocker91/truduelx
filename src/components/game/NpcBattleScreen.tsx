@@ -250,7 +250,8 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
           </div>
           <div className="flex flex-wrap gap-2 justify-center">
             {skills.map(s => {
-              const learned = (me.snapshot.skill_levels?.[s.slug] ?? 0) >= 1;
+              const rank = me.snapshot.skill_levels?.[s.slug] ?? 0;
+              const learned = rank >= 1;
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
               const lowMp = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
@@ -258,10 +259,12 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
               return (
                 <Button key={s.slug} disabled={disabled} variant="outline" size="sm"
                   onClick={() => doAction('skill', s.slug)}
-                  title={`${s.description} | MP ${s.energy_cost} | CD ${s.cooldown}${!learned ? ' | NOT LEARNED' : ''}`}
+                  title={`${s.description} | MP ${s.energy_cost} | CD ${s.cooldown}${learned ? ` | Rank ${rank}` : ' | NOT LEARNED'}`}
                   className="flex flex-col h-auto py-1 px-2"
                 >
-                  <span className="font-orbitron text-[10px]">{s.name}</span>
+                  <span className="font-orbitron text-[10px]">
+                    {s.name}{learned && <span className="ml-1 text-secondary">R{rank}</span>}
+                  </span>
                   <span className="text-[9px] text-muted-foreground">
                     {onCd ? `CD ${me.cooldowns[s.slug]}` : `MP ${s.energy_cost}`}
                     {!learned && ' 🔒'}

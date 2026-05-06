@@ -176,6 +176,26 @@ export async function spendStatPoint(characterId: string, stat: SpendableStat) {
   return data;
 }
 
+export type StatAllocations = Partial<Record<SpendableStat, number>>;
+
+export async function allocateStatPoints(characterId: string, allocations: StatAllocations) {
+  const { data, error } = await supabase.functions.invoke('allocate-stat-points', {
+    body: { characterId, allocations },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? 'allocation failed');
+  return data;
+}
+
+export async function resetStats(characterId: string) {
+  const { data, error } = await supabase.functions.invoke('reset-stats', {
+    body: { characterId },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error ?? 'reset failed');
+  return data;
+}
+
 export async function buyVendorItem(characterId: string, vendorItemId: string, quantity = 1) {
   const { data, error } = await supabase.functions.invoke('buy-item', {
     body: { characterId, vendorItemId, quantity },

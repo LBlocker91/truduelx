@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   User as UserIcon, Backpack, ScrollText, Map as MapIcon, Swords,
-  Sparkles, Store, Settings as SettingsIcon, LogOut, Crown, Coins,
+  Sparkles, Store, Settings as SettingsIcon, LogOut, Crown, Coins, Gem,
   Maximize2, Minimize2,
 } from 'lucide-react';
+
+import { supabase } from '@/integrations/supabase/client';
 import { OverworldScreen } from './OverworldScreen';
 import { ProfilePanel } from './panels/ProfilePanel';
 import { InventoryPanel } from './panels/InventoryPanel';
@@ -36,6 +38,7 @@ export const GameHud = (props: GameHudProps) => {
   const [panel, setPanel] = useState<PanelKey>(null);
   const [loadoutBust, setLoadoutBust] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [vibranium, setVibranium] = useState<number>(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const close = () => setPanel(null);
@@ -45,6 +48,17 @@ export const GameHud = (props: GameHudProps) => {
     document.addEventListener('fullscreenchange', sync);
     return () => document.removeEventListener('fullscreenchange', sync);
   }, []);
+
+  // Refresh vibranium whenever character/refresh changes or the profile panel closes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('characters').select('vibranium').eq('id', props.characterId).maybeSingle();
+      if (!cancelled) setVibranium(Number(data?.vibranium ?? 0));
+    })();
+    return () => { cancelled = true; };
+  }, [props.characterId, props.refreshTick, panel]);
 
   const toggleFullscreen = async () => {
     try {
@@ -98,6 +112,9 @@ export const GameHud = (props: GameHudProps) => {
         <div className="flex items-center gap-3">
           <span className="text-xs text-shield font-orbitron flex items-center gap-1">
             <Coins className="w-3 h-3" /> {props.credits.toLocaleString()}
+          </span>
+          <span className="text-xs text-neon-purple font-orbitron flex items-center gap-1" title="Vibranium">
+            <Gem className="w-3 h-3" /> {vibranium.toLocaleString()}
           </span>
           <Button size="sm" variant="ghost" onClick={() => setPanel('pvp')} title="PvP">
             <Swords className="w-4 h-4 mr-1" /> PvP

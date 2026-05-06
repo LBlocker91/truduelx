@@ -10,16 +10,18 @@
 export const MAX_LEVEL = 100;
 
 export function xpForNextLevel(level: number): number {
-  if (level < 1) return 200;
+  if (level < 1) return 80;
+  if (level <= 5) {
+    // Very fast first few levels: 110, 160, 210, 260, 310
+    return 60 + level * 50;
+  }
   if (level <= 20) {
-    // Fast: ~200 → ~2,000 over levels 1..20
-    return 100 + level * 100;
+    // Smooth ramp into the original L20 ~2,100 target
+    return 200 + (level - 5) * 130;
   }
   if (level <= 50) {
-    // Medium: ~3,000 → ~25,000
     return 1500 + (level - 20) * (level - 20) * 25 + (level - 20) * 200;
   }
-  // Slow endgame: scales hard
   return 25_000 + (level - 50) * (level - 50) * 200 + (level - 50) * 1_500;
 }
 
