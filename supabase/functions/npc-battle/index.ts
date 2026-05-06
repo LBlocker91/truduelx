@@ -644,18 +644,41 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   let armorVariant: string | null = null;
   let wingsVariant: string | null = null;
   let petVariant: string | null = null;
-  let hasWeapon = false;
+  const weapons: Record<string, any> = {};
+  let primaryWeaponItem: any = null;
+  const slotKey = (slot: string, sub?: string): 'melee' | 'gun' | 'launcher' | 'staff' | null => {
+    if (slot === 'gun') return 'gun';
+    if (slot === 'launcher') return 'launcher';
+    if (slot === 'staff') return 'staff';
+    if (slot === 'weapon') return 'melee';
+    // legacy fallback by weapon_subtype
+    if (sub === 'pistol' || sub === 'rifle') return 'gun';
+    if (sub === 'rocket_launcher') return 'launcher';
+    if (sub === 'tech_staff') return 'staff';
+    if (sub === 'blade' || sub === 'heavy') return 'melee';
+    return null;
+  };
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
-    if (it.slot === 'weapon' && it.min_damage && it.max_damage) {
-      weaponMin = it.min_damage;
-      weaponMax = it.max_damage;
-      weaponSubtype = it.weapon_subtype ?? undefined;
-      weaponDamageType = (it.damage_type as any) ?? 'physical';
-      weaponScale = weaponScaleStat(weaponSubtype);
-      weaponVariant = it.sprite_variant ?? it.subtype ?? null;
-      hasWeapon = true;
+    const sk = slotKey(it.slot, it.weapon_subtype);
+    if (sk && it.min_damage && it.max_damage) {
+      weapons[sk] = {
+        min: it.min_damage,
+        max: it.max_damage,
+        subtype: it.weapon_subtype ?? sk,
+        damage_type: (it.damage_type as any) ?? 'physical',
+        scale_stat: weaponScaleStat(it.weapon_subtype),
+      };
+      if (!primaryWeaponItem || sk === 'melee') {
+        primaryWeaponItem = it;
+        weaponMin = it.min_damage;
+        weaponMax = it.max_damage;
+        weaponSubtype = it.weapon_subtype ?? undefined;
+        weaponDamageType = (it.damage_type as any) ?? 'physical';
+        weaponScale = weaponScaleStat(it.weapon_subtype);
+        weaponVariant = it.sprite_variant ?? it.subtype ?? null;
+      }
     }
     if (it.slot === 'armor') armorVariant = it.sprite_variant ?? it.subtype ?? null;
     if (it.slot === 'wings') wingsVariant = it.sprite_variant ?? it.weapon_subtype ?? 'wings';
@@ -669,7 +692,7 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     resistanceGear += Number(m.resistance ?? 0);
     defenseGear   += Number(m.defense    ?? 0);
   }
-  if (!hasWeapon) {
+  if (!primaryWeaponItem) {
     // Bare-handed fallback: weak strength weapon
     weaponMin = 12; weaponMax = 18; weaponSubtype = 'unarmed';
     weaponDamageType = 'physical'; weaponScale = 'strength';
@@ -689,6 +712,7 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     weapon_subtype: weaponSubtype,
     weapon_damage_type: weaponDamageType,
     weapon_scale_stat: weaponScale,
+    weapons,
     defense: (char.defense ?? 5) + defenseGear,
     resistance: (char.resistance ?? 5) + resistanceGear,
     skill_levels: char.skill_levels ?? {},
