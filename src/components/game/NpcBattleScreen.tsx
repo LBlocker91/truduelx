@@ -31,6 +31,7 @@ interface ParticipantRow {
   energy: number;
   max_energy: number;
   rage: number;
+  ultimate_charge?: number;
   status_effects: any[];
   cooldowns: Record<string, number>;
   snapshot: any;
