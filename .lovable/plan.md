@@ -1,87 +1,119 @@
-## Phase: Progression Feel + Stat Draft + Vibranium + Skill Ranks + Class Ultimates
 
-Large but cohesive phase. I'll ship it in one coordinated pass — DB migration first, then edge functions, then UI.
+# Riftbound Duel — Real Damage, Build Page, Gear Scaling, New Slots
 
-### 1. Faster early leveling (XP curve tune)
+This phase rewires combat math so stats/skill rank/weapon/gear visibly drive damage, adds wings + robot pet equipment slots, expands the store with new item types, and consolidates progression into a single **Build** page with live damage previews.
 
-In both `src/lib/leveling.ts` and `supabase/functions/_shared/leveling.ts`, retune `xpForLevel` / `xpForNextLevel` for L1–10:
-- L1→2: 80 XP (was 200)
-- L2→3: 140
-- L3→4: 220
-- L4→5: 320
-- Smooth ramp into existing L20 value (~2,100)
-- L20→50 and L50→100 curves unchanged → long-term pacing preserved
+The work is large. To keep risk low and the build green between steps, it is grouped into 4 sequential parts. Auth, character slots, quests, XP, credits, potions, portals, turn timer, and existing battle pipeline are NOT touched.
 
-Training Drone XP/credits scaling stays as-is (already player-level scaled).
+---
 
-### 2. Vibranium currency
+## Part 1 — Damage formula rewrite (server + shared)
 
-Migration:
-- `characters.vibranium int not null default 100` (new chars start with 100 for testing; backfill existing chars to 100)
-- `characters.stat_allocations jsonb not null default '{"strength":0,"dexterity":0,"technology":0,"support":0,"defense":0,"resistance":0,"max_hp":0,"max_energy":0}'`
+Goal: no more flat 44/53 hits. Every component (weapon roll, stat, rank, level, mitigation, variance, crit) actively moves the number.
 
-Display Vibranium in HUD and ProfilePanel with a small gem icon (lucide `Gem`).
+**Files**
+- `supabase/functions/_shared/combat.ts` — replace `resolveHit` with new formula:
+  - `weaponRoll = rng(weapon_min..weapon_max)` (per hit, not per turn)
+  - `rankMultiplier = 1 + (skillRank-1) * 0.06`
+  - `statPower = attacker[skill.scale_stat] * scaleMultiplier` where multiplier depends on skill type
+  - `levelPower = level * 1.5`
+  - `raw = (weaponRoll + skill.base_damage + statPower + levelPower) * rankMultiplier`
+  - Mitigation by damage type: physical → defense, magical/energy → resistance, special/hybrid → average
+  - `mitPct = mitStat / (mitStat + 100)`
+  - Variance `0.92..1.08`
+  - Crit: `0.05 + dex * 0.0005` chance, ×1.5
+  - Floor `max(3, raw*0.15)`; remove the hard 25%-max-HP cap that was flattening big hits
+  - Return enriched `HitResult` including `scaleStat`, `damageType`, `weaponRoll`, `statPower`, `mitigation`, `rank` so the log/preview can explain it.
+- Snapshot now includes `weapon_subtype` (blade/pistol/rifle/rocket_launcher/tech_staff/heavy/pet/wings) so VFX + scaling rules know what was used.
+- `supabase/functions/npc-battle/index.ts` & `battle-action/index.ts` — pass new fields into snapshot from equipped items, no other behavior change.
 
-### 3. Stat allocation: draft mode + batch save
+**Acceptance:** consecutive identical-input attacks now vary; equipping a stronger weapon raises damage; raising STR raises STR-scaling skills; raising DEF lowers physical incoming.
 
-- ProfilePanel: local `draft` state for all 8 stat targets. Clicking `+` only mutates draft + decrements local available points. `Save` and `Cancel` buttons appear when draft is non-zero.
-- New edge function `allocate-stat-points`: validates ownership, all keys are in the allowed set, ints ≥ 0, sum ≤ stat_points; applies atomically; updates `stat_allocations` cumulatively.
-- Keep `spend-stat-point` (legacy, still works) but ProfilePanel uses batch.
+---
 
-### 4. Stat reset with Vibranium
+## Part 2 — DB: new equipment slots, item subtypes, store catalog
 
-New edge function `reset-stats`:
-- Requires character ownership and `vibranium >= 100`
-- Deducts 100 Vibranium
-- Refunds total of `stat_allocations` values back to `stat_points`
-- Subtracts allocations from current stats (strength, dexterity, technology, support, defense, resistance, bonus_max_hp = -allocs.max_hp*5, bonus_max_mp = -allocs.max_energy*3)
-- Resets `stat_allocations` to zeros
-- Preserves: level, XP, credits, inventory, equipment, skills, quests
+Single migration:
+- `characters`: add `equipped_wings_id uuid`, `equipped_pet_id uuid`.
+- `items`: add `damage_type text` ('physical'|'energy'|'hybrid'), `weapon_subtype text` (nullable). Extend `item_slot` enum with `wings` and `pet`.
+- Seed new items via INSERT (separate insert call after migration approval):
+  - Weapons: Pulse Saber (blade/STR/phys), Arc Pistol (pistol/DEX/phys), Ion Staff (tech_staff/TECH/energy), Scrapline Rifle (rifle/DEX/phys), Training Launcher (rocket_launcher/SUP+DEX/hybrid).
+  - Armor: Scout Plating (DEF+DEX), Vanguard Shell (DEF+HP), Circuit Robe (RES+MP).
+  - Wings: Glider Fins (DEX+MP), Ion Wings (TECH+RES), Rift Wings (SUP+MP).
+  - Pets: Spark Drone (SUP+TECH), Med Bot (SUP+HP), Rail Pup (SUP+DEX).
+  - Stock all into Broker Vexon's vendor inventory at tiered prices (starter 200–600 cr, mid 1.2k–3k, wings/pets 2.5k–5k).
 
-Confirmation dialog in ProfilePanel before calling.
+---
 
-### 5. Skill ranks (1–20) + scaling
+## Part 3 — Build page + previews + gear bonus pipeline
 
-- `character_skills.rank` already exists (default 1). Keep it.
-- `characters.skill_levels` jsonb stores `{slug: rank}`. Backfill existing entries to ensure rank ≥ 1.
-- Update `unlock-skill` edge function → rename behavior to "rank up": if not learned, unlock at rank 1 (cost 1 SP); if learned and rank < 20 and level ≥ unlock_level, increment rank (cost 1 SP). Single endpoint, single SP per call.
-- `combat.ts` → apply `rankMultiplier = 1 + (rank - 1) * 0.06` to skill base damage and effect_value. Read rank from snapshot's `skill_levels`.
-- Battle snapshot already includes `skill_levels` — verify it's passed through.
-- Battle UI: show "R{n}" badge on skill button.
+Goal: one page that combines stats, skills, equipped gear, and shows damage preview that updates live when draft stats change.
 
-### 6. Class ultimates (3 per class, L5/L20/L50)
+**New shared util:** `src/lib/damage-preview.ts`
+- `getEquippedBonuses(items[])` → flat stat/HP/MP modifiers
+- `calculateDamagePreview({ stats, weapon, skill, skillRank, target })` → `{ minDamage, maxDamage, damageType, scalingStat, mitigationType, rankMultiplier }`
+- Mirrors server formula closely.
 
-Insert 9 new skills (3 each for mercenary, tech-mage, gunner) via `supabase--insert`. Map class names from existing DB: check what classes are actually in `skills.class` enum. Mercenary, Tech Mage, and Gunner per project memory.
+**Snapshots:** `src/lib/overworld.ts` builds the snapshot used to start NPC battles — extend it to:
+- Read all 4 equipped items (weapon, armor, wings, pet)
+- Fold their `stat_modifiers` into snapshot stats and HP/MP bonuses
+- Carry `weapon_subtype` and `damage_type` into the weapon snapshot
 
-Skill design (high MP, high CD, high base damage, scales with primary stat):
-- **Mercenary**: Titan Breaker (L5, str), Warzone Slam (L20, str + debuff_defense), Omega Berserker (L50, str + buff_attack)
-- **Tech Mage**: Plasma Nova (L5, tech, magical), Gravity Lock (L20, tech, stun), Singularity Storm (L50, tech, magical)
-- **Gunner**: Deadeye Burst (L5, dex), Trap Field (L20, dex, stun), Phantom Execution (L50, dex, bonus_low_hp)
+**ProfilePanel → BuildPanel** (`src/components/game/panels/ProfilePanel.tsx`):
+- Add an "Equipped" grid showing all 4 slots (weapon/armor/wings/pet) with quick stats.
+- Add a "Final Stats" block showing `base + allocated + gear = total` for each stat.
+- Inline a compact "Skills" section (pulled from `SkillsPanel`) — collapsible.
+- Add "Damage Preview" — pick a skill, show `min–max` damage vs a Lv-equivalent dummy, with a one-line scaling explanation. Updates instantly with draft stat changes.
+- `SkillsPanel` keeps existing route, but Profile button is renamed "Build" in the HUD.
 
-SkillsPanel groups skills into Basic / Advanced / Ultimate sections. Locked ultimates show "Unlocks at Level X".
+**Inventory** (`src/components/game/panels/InventoryPanel.tsx`):
+- Recognize new slots `wings` and `pet`; show their stat bonuses, equip/unequip works via existing flow (extend `equipItem`/`unequipItem` to mirror onto `equipped_wings_id` / `equipped_pet_id`).
 
-### 7. Existing skills preserved
+---
 
-- Migration backfills any `character_skills` rows with `rank = 0 or null` → `rank = 1`
-- Backfills `characters.skill_levels` so existing slugs map to at least 1
-- New ultimates start locked (not in skill_levels) until player ranks them
+## Part 4 — Combat log clarity + weapon-typed VFX
 
-### Files
+- `CombatLog`: when hit result has scaling info, show: `"<Skill/Attack> dealt 51 physical damage."` and a small dim line: `"Scaled with STR · Reduced by Defense"`. Crits and dodges keep their callouts.
+- Battle screens read `weapon_subtype` from the snapshot and pick a VFX preset in `skill-vfx.ts`:
+  - blade → slash arc, pistol/rifle → muzzle flash + tracer, rocket_launcher → projectile + impact burst, tech_staff → plasma bolt, pet → small drone projectile.
+  - Wings render as a subtle aura on the character sprite (cosmetic + passive only — no attack).
 
-**New**
-- `supabase/functions/allocate-stat-points/index.ts`
-- `supabase/functions/reset-stats/index.ts`
+---
 
-**Edited**
-- `src/lib/leveling.ts` + `supabase/functions/_shared/leveling.ts` (XP curve)
-- `supabase/functions/_shared/combat.ts` (rank multiplier)
-- `supabase/functions/unlock-skill/index.ts` (rank-up support)
-- `supabase/functions/npc-battle/index.ts` (snapshot already has skill_levels — verify)
-- `src/components/game/panels/ProfilePanel.tsx` (draft mode, vibranium, reset button)
-- `src/components/game/panels/SkillsPanel.tsx` (rank display, group sections, ultimates)
-- `src/components/game/NpcBattleScreen.tsx` (rank badge on skill buttons)
-- `src/components/game/GameHud.tsx` (vibranium display)
-- `src/lib/overworld.ts` (allocateStatPoints, resetStats helpers)
+## Technical details
 
-**Migration**
-- Add `vibranium`, `stat_allocations` columns; backfill skill ranks; insert 9 ultimate skills
+```text
+Final formula (server + preview):
+  weaponRoll  = rand(weapon.min, weapon.max)            // per hit
+  statPower   = attacker[skill.scale_stat] * scaleMult  // 1.6 phys, 1.4 energy, 1.2 hybrid
+  levelPower  = attacker.level * 1.5
+  rankMult    = 1 + (rank - 1) * 0.06
+  raw         = (weaponRoll + skill.base_damage + statPower + levelPower) * rankMult
+  if crit: raw *= 1.5     // chance = 0.05 + dex * 0.0005
+  mitStat     = phys ? def : energy ? res : (def+res)/2
+  mitPct      = mitStat / (mitStat + 100)
+  dmg         = raw * (1 - mitPct) * rand(0.92, 1.08)
+  return max(round(dmg), max(3, round(raw*0.15)))
+```
+
+Stat-modifier shape on items already exists as `stat_modifiers jsonb`; we just start populating and reading it consistently. No breaking changes to existing tables — only additive columns + enum values.
+
+---
+
+## Out of scope (per the brief)
+
+- Auth, character slot screens, quest/XP/credit/potion/portal logic.
+- Turn timer, NPC turn pipeline (already verified).
+- AoE/multi-target. Wings stay passive. Pets stay passive (stat bonus only) — active pet attacks are a future phase.
+
+---
+
+## Order of operations (so each step is testable)
+
+1. Migration (new columns + enum values) — wait for approval.
+2. Insert new items + vendor stock.
+3. Rewrite `_shared/combat.ts` and snapshot building. Build should pass; existing battles keep working.
+4. Inventory + equip flow for wings/pet.
+5. Build page (rename Profile → Build, add equipped grid, final stats, damage preview).
+6. Combat log + weapon VFX presets.
+7. Smoke-test a Calibration Unit Mk-I battle: damage varies, log explains scaling, gear changes preview and real damage.

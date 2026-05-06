@@ -216,7 +216,9 @@ export type Database = {
           defense: number
           dexterity: number
           equipped_armor_id: string | null
+          equipped_pet_id: string | null
           equipped_weapon_id: string | null
+          equipped_wings_id: string | null
           id: string
           last_x: number | null
           last_y: number | null
@@ -245,7 +247,9 @@ export type Database = {
           defense?: number
           dexterity?: number
           equipped_armor_id?: string | null
+          equipped_pet_id?: string | null
           equipped_weapon_id?: string | null
+          equipped_wings_id?: string | null
           id?: string
           last_x?: number | null
           last_y?: number | null
@@ -274,7 +278,9 @@ export type Database = {
           defense?: number
           dexterity?: number
           equipped_armor_id?: string | null
+          equipped_pet_id?: string | null
           equipped_weapon_id?: string | null
+          equipped_wings_id?: string | null
           id?: string
           last_x?: number | null
           last_y?: number | null
@@ -342,6 +348,7 @@ export type Database = {
           class_req: Database["public"]["Enums"]["character_class"] | null
           consumable: boolean
           created_at: string
+          damage_type: string | null
           defense: number
           description: string | null
           id: string
@@ -355,11 +362,13 @@ export type Database = {
           sprite_variant: string | null
           stat_modifiers: Json
           subtype: string | null
+          weapon_subtype: string | null
         }
         Insert: {
           class_req?: Database["public"]["Enums"]["character_class"] | null
           consumable?: boolean
           created_at?: string
+          damage_type?: string | null
           defense?: number
           description?: string | null
           id?: string
@@ -373,11 +382,13 @@ export type Database = {
           sprite_variant?: string | null
           stat_modifiers?: Json
           subtype?: string | null
+          weapon_subtype?: string | null
         }
         Update: {
           class_req?: Database["public"]["Enums"]["character_class"] | null
           consumable?: boolean
           created_at?: string
+          damage_type?: string | null
           defense?: number
           description?: string | null
           id?: string
@@ -391,6 +402,7 @@ export type Database = {
           sprite_variant?: string | null
           stat_modifiers?: Json
           subtype?: string | null
+          weapon_subtype?: string | null
         }
         Relationships: []
       }
@@ -884,6 +896,8 @@ export type Database = {
         | "boots"
         | "accessory"
         | "consumable"
+        | "wings"
+        | "pet"
       npc_type: "vendor" | "quest" | "enemy"
       scale_stat: "strength" | "dexterity" | "technology" | "support"
       skill_effect:
@@ -1055,6 +1069,8 @@ export const Constants = {
         "boots",
         "accessory",
         "consumable",
+        "wings",
+        "pet",
       ],
       npc_type: ["vendor", "quest", "enemy"],
       scale_stat: ["strength", "dexterity", "technology", "support"],
