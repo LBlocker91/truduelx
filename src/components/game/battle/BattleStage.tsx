@@ -34,6 +34,7 @@ interface BattleStageProps {
   /** Legacy fallback when no skill row is provided (basic attacks). */
   attackKind?: AttackKind;
   crit?: boolean;
+  onAnimationComplete?: () => void;
 }
 
 const ZONE_BG_GRADIENT: Record<string, string> = {
@@ -74,6 +75,7 @@ const FloatNumber = ({ value, color, crit, label }: { value: number; color: stri
 
 export const BattleStage = ({
   zoneId, player, enemy, actionTick, lastActor, lastDamage, lastWasHeal, lastSkillName, lastSkill, attackKind, crit,
+  onAnimationComplete,
 }: BattleStageProps) => {
   // Animation phase machine — only the actor animates; the other holds idle.
   const [phase, setPhase] = useState<'idle' | 'wind' | 'strike' | 'recover'>('idle');
@@ -123,19 +125,22 @@ export const BattleStage = ({
       setFloatKey(k => k + 1);
       const tEnd = window.setTimeout(() => setShowHealAura(false), 800);
       const tBan = window.setTimeout(() => setSkillBanner(null), 1000);
-      return () => { clearTimeout(tEnd); clearTimeout(tBan); };
+      const tDone = window.setTimeout(() => onAnimationComplete?.(), 1000);
+      return () => { clearTimeout(tEnd); clearTimeout(tBan); clearTimeout(tDone); };
     }
     if (preset.hasBuffRing) {
       setShowBuffRing(true);
       const t1 = window.setTimeout(() => setShowBuffRing(false), 900);
       const t2 = window.setTimeout(() => setSkillBanner(null), 1100);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
+      const tDone = window.setTimeout(() => onAnimationComplete?.(), 1100);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(tDone); };
     }
     if (preset.hasShieldDome) {
       setShowShieldDome(true);
       const t1 = window.setTimeout(() => setShowShieldDome(false), 1100);
       const t2 = window.setTimeout(() => setSkillBanner(null), 1200);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
+      const tDone = window.setTimeout(() => onAnimationComplete?.(), 1200);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(tDone); };
     }
 
     // === Offensive sequence ===
@@ -177,9 +182,10 @@ export const BattleStage = ({
       setSkillBanner(null);
       setShowUltimateFlash(false);
     }, impactDelay + 480);
+    const tDone = window.setTimeout(() => onAnimationComplete?.(), impactDelay + 500);
 
-    return () => { [t1, t2, t3, t4].forEach(clearTimeout); };
-  }, [actionTick, lastActor, lastSkillName, lastWasHeal, preset]);
+    return () => { [t1, t2, t3, t4, tDone].forEach(clearTimeout); };
+  }, [actionTick, lastActor, lastSkillName, lastWasHeal, onAnimationComplete, preset]);
 
   // Strict turn-based: only the acting fighter animates.
   const playerActing = phase !== 'idle' && lastActor === 'player';
