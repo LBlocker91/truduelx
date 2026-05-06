@@ -181,19 +181,26 @@ export const OverworldScreen = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const switchZone = useCallback(async (zoneId: string, zoneList?: Zone[]) => {
+  const [transitioning, setTransitioning] = useState(false);
+  const portalCooldownRef = useRef(0);
+
+  const switchZone = useCallback(async (zoneId: string, zoneList?: Zone[], arrival?: { x: number; y: number }) => {
     const list = zoneList ?? zones;
     const z = list.find(x => x.id === zoneId);
     if (!z) return;
+    setTransitioning(true);
+    // Brief fade-out before swap so the player sees a smooth wipe rather than a hard cut.
+    await new Promise(r => setTimeout(r, 240));
     await enterZone(zoneId);
     const ns = await fetchNpcs(zoneId);
     setZone(z);
     setNpcs(ns);
-    // Always spawn at the zone's safe floor spawn point. If a saved/legacy
-    // position is invalid, this guarantees we land on the floor.
     const wk = walkableFor(zoneId);
-    setPos({ ...wk.spawn });
+    setPos(arrival ? clampToWalkable(arrival, wk.polygon) : { ...wk.spawn });
     targetRef.current = null;
+    portalCooldownRef.current = performance.now() + 800; // brief lockout to avoid bouncing
+    // Fade back in.
+    setTimeout(() => setTransitioning(false), 280);
   }, [zones]);
 
   // Keyboard
