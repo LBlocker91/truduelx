@@ -298,8 +298,16 @@ export const OverworldScreen = ({
     const np = setInterval(async () => {
       try { setNearby(await fetchNearbyPlayers(zone.id)); } catch { /* ignore */ }
     }, NEARBY_POLL_MS);
-    return () => { clearInterval(hb); clearInterval(np); };
-  }, [zone]);
+    // Persist last-known position so it survives reloads / battle returns.
+    const persist = setInterval(() => {
+      supabase.from('characters').update({
+        current_zone_id: zone.id,
+        last_x: Math.round(posRef.current.x),
+        last_y: Math.round(posRef.current.y),
+      }).eq('id', characterId).then(() => {});
+    }, 2000);
+    return () => { clearInterval(hb); clearInterval(np); clearInterval(persist); };
+  }, [zone, characterId]);
 
   // Loadout
   useEffect(() => {
