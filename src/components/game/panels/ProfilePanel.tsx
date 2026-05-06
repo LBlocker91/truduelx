@@ -40,15 +40,21 @@ interface CharRow {
   bonus_max_mp: number;
   equipped_weapon_id: string | null;
   equipped_armor_id: string | null;
+  equipped_wings_id: string | null;
+  equipped_pet_id: string | null;
 }
 
 interface EquippedItem {
+  id: string;
   name: string;
   rarity: string;
   slot: string;
   min_damage: number | null;
   max_damage: number | null;
   defense: number;
+  damage_type: DamageType | null;
+  weapon_subtype: string | null;
+  stat_modifiers: Record<string, number> | null;
 }
 
 type DraftKey = SpendableStat;
@@ -81,11 +87,16 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
         setIsPremium(!!prof?.is_premium);
       }
 
-      const ids = [charRow.equipped_weapon_id, charRow.equipped_armor_id].filter(Boolean) as string[];
+      const ids = [
+        charRow.equipped_weapon_id,
+        charRow.equipped_armor_id,
+        (charRow as any).equipped_wings_id,
+        (charRow as any).equipped_pet_id,
+      ].filter(Boolean) as string[];
       if (ids.length) {
         const { data: items } = await supabase
           .from('items')
-          .select('name, rarity, slot, min_damage, max_damage, defense')
+          .select('id, name, rarity, slot, min_damage, max_damage, defense, damage_type, weapon_subtype, stat_modifiers')
           .in('id', ids);
         setEquipped((items ?? []) as EquippedItem[]);
       } else {
