@@ -171,6 +171,9 @@ async function commitTurn(
   skillSlug: string | null,
   result: any = {},
 ) {
+  const next = participants.find((p: any) => p.slot !== actor.slot);
+  const actionTurnNumber = battle.turn_number;
+
   await admin.from('battle_participants').update({
     hp: actor.hp,
     energy: actor.energy,
@@ -189,13 +192,15 @@ async function commitTurn(
 
   await admin.from('battle_actions').insert({
     battle_id: battle.id,
-    turn_number: battle.turn_number,
+    turn_number: actionTurnNumber,
     actor_user_id: actor.snapshot.user_id,
     actor_slot: actor.slot,
     action_type: action,
     skill_slug: skillSlug,
     target_slot: target.slot,
-    result,
+    result: enrichActionResult(result, actor, target, target.hp <= 0
+      ? { battleFinished: true, winnerUserId: actor.snapshot.user_id, nextTurnNumber: actionTurnNumber, nextTurnUserId: null }
+      : { nextTurnNumber: actionTurnNumber + 1, nextTurnUserId: next?.user_id ?? null }),
   });
 
   if (target.hp <= 0) {
@@ -218,12 +223,48 @@ async function commitTurn(
     return;
   }
 
-  const next = participants.find((p: any) => p.slot !== actor.slot);
   await admin.from('battles').update({
     current_turn: next.user_id,
-    turn_number: battle.turn_number + 1,
+    turn_number: actionTurnNumber + 1,
     turn_deadline: deadlineFromNow(TURN_LIMIT_MS),
   }).eq('id', battle.id);
+}
+
+function enrichActionResult(
+  result: Record<string, unknown>,
+  actor: ParticipantState,
+  target: ParticipantState,
+  meta: {
+    nextTurnNumber: number;
+    nextTurnUserId: string | null;
+    battleFinished?: boolean;
+    winnerUserId?: string | null;
+  },
+) {
+  return {
+    ...result,
+    actor_state: snapshotParticipant(actor),
+    target_state: snapshotParticipant(target),
+    next_turn_number: meta.nextTurnNumber,
+    next_turn_user_id: meta.nextTurnUserId,
+    battle_finished: meta.battleFinished ?? false,
+    winner_user_id: meta.winnerUserId ?? null,
+  };
+}
+
+function snapshotParticipant(p: ParticipantState) {
+  return {
+    slot: p.slot,
+    user_id: p.user_id ?? p.snapshot?.user_id ?? null,
+    hp: p.hp,
+    max_hp: p.max_hp,
+    energy: p.energy,
+    max_energy: p.max_energy,
+    rage: p.rage,
+    status_effects: p.status_effects,
+    cooldowns: p.cooldowns,
+    snapshot: p.snapshot,
+  };
 }
 
 async function getCount(admin: any, userId: string, field: 'wins' | 'losses') {
