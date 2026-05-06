@@ -208,14 +208,14 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
 
   const handlePlaybackComplete = useCallback(() => {
     if (playbackAction && displayedMe && displayedEnemy) {
-      const next = resolvePlaybackState(playbackAction, me?.slot ?? 0, displayedMe, displayedEnemy);
+      const next = resolvePlaybackState(playbackAction, displayedMe.slot, displayedMe, displayedEnemy);
       setDisplayedMe(next.me as ParticipantRow);
       setDisplayedEnemy(next.enemy as ParticipantRow);
       setDisplayedTurnNumber(next.nextTurnNumber);
       setDisplayedCurrentTurn(next.nextCurrentTurn);
     }
     playNextQueuedAction();
-  }, [displayedEnemy, displayedMe, me?.slot, playNextQueuedAction, playbackAction]);
+  }, [displayedEnemy, displayedMe, playNextQueuedAction, playbackAction]);
 
   // Use displayed snapshot for everything UI-facing.
   const me = displayedMe ?? liveMe;
