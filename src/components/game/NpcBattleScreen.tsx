@@ -544,6 +544,13 @@ function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: 
           <div className="flex justify-between text-[10px] font-rajdhani"><span>MP</span><span>{p.energy}/{p.max_energy}</span></div>
           <Progress value={enPct} className="h-1.5" />
         </div>
+        <div>
+          <div className="flex justify-between text-[10px] font-rajdhani">
+            <span>ULT</span>
+            <span>{Math.min(ULTIMATE_CHARGE_REQUIRED, p.ultimate_charge ?? 0)}/{ULTIMATE_CHARGE_REQUIRED}</span>
+          </div>
+          <Progress value={Math.min(100, ((p.ultimate_charge ?? 0) / ULTIMATE_CHARGE_REQUIRED) * 100)} className="h-1.5" />
+        </div>
         <div className="flex gap-1 mt-1 flex-wrap min-h-[16px]">
           {p.status_effects?.map((e: any, i: number) => (
             <span key={i} className="text-[9px] px-1 rounded bg-accent/20 text-accent">
