@@ -149,6 +149,9 @@ async function processAction(
 
   if (playerAction === 'tick') {
     if (battle.current_turn === null) {
+      if (!isDeadlineExpired(battle.turn_deadline)) {
+        return j({ ok: true, skipped: false, waiting: true });
+      }
       return await processBotTurn(admin, battle, userId, player, bot);
     }
     if (battle.current_turn === userId && isDeadlineExpired(battle.turn_deadline)) {

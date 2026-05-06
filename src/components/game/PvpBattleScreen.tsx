@@ -71,6 +71,7 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
   const playbackQueueRef = useRef<ActionRow[]>([]);
   const playbackHydratedRef = useRef(false);
   const turnTickingRef = useRef(false);
+  const processedDeadlineRef = useRef<string | null>(null);
 
   const liveMe = participants.find(p => p.user_id === myUserId);
   const liveOpponent = participants.find(p => p.user_id !== myUserId);
@@ -213,9 +214,10 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
 
   useEffect(() => {
     if (!battle?.turn_deadline || finished || playbackAnimating || turnTickingRef.current) return;
-    const expired = new Date(battle.turn_deadline).getTime() <= Date.now();
-    if (!expired) return;
+    if (secondsLeft > 0) return;
+    if (processedDeadlineRef.current === battle.turn_deadline) return;
 
+    processedDeadlineRef.current = battle.turn_deadline;
     turnTickingRef.current = true;
     submitBattleAction({ battleId, action: 'tick' })
       .catch((error) => console.error(error))
@@ -224,7 +226,18 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
           turnTickingRef.current = false;
         }, 300);
       });
-  }, [battle?.turn_deadline, battleId, finished, playbackAnimating]);
+  }, [battle?.turn_deadline, battleId, finished, playbackAnimating, secondsLeft]);
+
+  useEffect(() => {
+    if (!battle?.turn_deadline) {
+      processedDeadlineRef.current = null;
+      return;
+    }
+
+    if (secondsLeft > 0 && processedDeadlineRef.current !== battle.turn_deadline) {
+      processedDeadlineRef.current = null;
+    }
+  }, [battle?.turn_deadline, secondsLeft]);
 
   const doAction = async (payload: any) => {
     if (submitting || playbackAnimating || !myTurn || finished) return;
