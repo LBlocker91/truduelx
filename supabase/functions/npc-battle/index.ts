@@ -387,10 +387,16 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
   let weaponMin = 80, weaponMax = 100, defenseGear = 0, resistanceGear = 0;
   let strBonus = 0, dexBonus = 0, techBonus = 0, supBonus = 0;
+  let weaponVariant: string | null = null;
+  let armorVariant: string | null = null;
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
-    if (it.slot === 'weapon' && it.min_damage && it.max_damage) { weaponMin = it.min_damage; weaponMax = it.max_damage; }
+    if (it.slot === 'weapon' && it.min_damage && it.max_damage) {
+      weaponMin = it.min_damage; weaponMax = it.max_damage;
+      weaponVariant = it.variant ?? it.subtype ?? null;
+    }
+    if (it.slot === 'armor') armorVariant = it.variant ?? it.subtype ?? null;
     defenseGear += it.defense ?? 0;
     const m = it.stat_modifiers ?? {};
     strBonus += m.strength ?? 0; dexBonus += m.dexterity ?? 0;
@@ -409,6 +415,7 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     defense: (char.defense ?? 5) + defenseGear,
     resistance: (char.resistance ?? 5) + resistanceGear,
     skill_levels: char.skill_levels ?? {},
+    equipped: { weapon_variant: weaponVariant, armor_variant: armorVariant },
   };
 }
 
