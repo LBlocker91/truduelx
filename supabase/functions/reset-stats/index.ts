@@ -1,4 +1,4 @@
-// Reset all manually allocated stat points for 100 Vibranium.
+// Reset all manually allocated stat points for 100 Aetherium (DB column: vibranium).
 // Refunds stat_allocations back to stat_points, removes the allocated stats,
 // and zeros stat_allocations. Preserves level/XP/credits/inventory/skills.
 // POST { characterId }
@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     const admin = createClient(url, service);
     const { data: ch } = await admin.from('characters').select('*').eq('id', characterId).maybeSingle();
     if (!ch || ch.user_id !== ud.user.id) return j({ error: 'not your character' }, 403);
-    if ((ch.vibranium ?? 0) < RESET_COST) return j({ error: `Need ${RESET_COST} Vibranium to reset` }, 400);
+    if ((ch.vibranium ?? 0) < RESET_COST) return j({ error: `Need ${RESET_COST} Aetherium to reset` }, 400);
 
     const allocs = (ch.stat_allocations ?? {}) as Record<string, number>;
     let refund = 0;

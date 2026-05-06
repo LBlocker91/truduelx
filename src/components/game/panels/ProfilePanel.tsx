@@ -281,7 +281,7 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
         </div>
         <div className="flex items-center justify-between">
           <span className="font-orbitron text-sm text-muted-foreground flex items-center gap-2">
-            <Gem className="w-4 h-4 text-neon-purple" /> VIBRANIUM
+            <Gem className="w-4 h-4 text-neon-purple" /> AETHERIUM
           </span>
           <span className="font-orbitron text-lg text-neon-purple">{(c.vibranium ?? 0).toLocaleString()}</span>
         </div>
@@ -289,7 +289,7 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
           size="sm" variant="outline" className="w-full"
           disabled={(c.vibranium ?? 0) < 100 || dirty}
           onClick={() => setResetOpen(true)}
-          title={dirty ? 'Save or cancel pending changes first' : (c.vibranium ?? 0) < 100 ? 'Need 100 Vibranium' : 'Reset all allocated stat points'}
+          title={dirty ? 'Save or cancel pending changes first' : (c.vibranium ?? 0) < 100 ? 'Need 100 Aetherium' : 'Reset all allocated stat points'}
         >
           <RotateCcw className="w-3 h-3 mr-1" /> Reset Stats (100 <Gem className="w-3 h-3 mx-0.5" />)
         </Button>
@@ -300,7 +300,7 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
           <AlertDialogHeader>
             <AlertDialogTitle>Reset Allocated Stats?</AlertDialogTitle>
             <AlertDialogDescription>
-              Spend <strong>100 Vibranium</strong> to refund every stat point you've allocated.
+              Spend <strong>100 Aetherium</strong> to refund every stat point you've allocated.
               Your level, XP, credits, inventory, equipment, and skills are kept.
             </AlertDialogDescription>
           </AlertDialogHeader>
