@@ -201,7 +201,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     skillSlug?: string,
     itemSubtype?: 'hp_potion'|'mp_potion',
   ) => {
-    if (submitting || !myTurn) return;
+    if (submitting || playbackAnimating || !myTurn) return;
     setSubmitting(true);
     try {
       const r = await submitNpcAction(battleId, action, skillSlug, itemSubtype);
@@ -295,14 +295,14 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 justify-center">
-            <Button disabled={!myTurn || submitting} onClick={() => doAction('attack')}>
+            <Button disabled={!myTurn || submitting || playbackAnimating} onClick={() => doAction('attack')}>
               <Swords className="w-4 h-4 mr-1" /> Attack
             </Button>
-            <Button disabled={!myTurn || submitting} variant="secondary" onClick={() => doAction('defend')}>
+            <Button disabled={!myTurn || submitting || playbackAnimating} variant="secondary" onClick={() => doAction('defend')}>
               <Shield className="w-4 h-4 mr-1" /> Defend
             </Button>
             <Button
-              disabled={!myTurn || submitting || potions.hp <= 0 || me.hp >= me.max_hp}
+              disabled={!myTurn || submitting || playbackAnimating || potions.hp <= 0 || me.hp >= me.max_hp}
               variant="outline"
               size="sm"
               onClick={() => doAction('use_item', undefined, 'hp_potion')}
@@ -311,7 +311,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
               ❤ HP Potion ×{potions.hp}
             </Button>
             <Button
-              disabled={!myTurn || submitting || potions.mp <= 0 || me.energy >= me.max_energy}
+              disabled={!myTurn || submitting || playbackAnimating || potions.mp <= 0 || me.energy >= me.max_energy}
               variant="outline"
               size="sm"
               onClick={() => doAction('use_item', undefined, 'mp_potion')}
@@ -319,7 +319,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
             >
               ⚡ MP Potion ×{potions.mp}
             </Button>
-            <Button disabled={submitting} variant="destructive" size="sm" onClick={() => doAction('forfeit')}>
+            <Button disabled={submitting || playbackAnimating} variant="destructive" size="sm" onClick={() => doAction('forfeit')}>
               <Flag className="w-4 h-4 mr-1" /> Forfeit
             </Button>
           </div>
@@ -330,7 +330,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
               const lowMp = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
-              const disabled = !myTurn || submitting || !learned || onCd || lowMp || lowLvl;
+              const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowMp || lowLvl;
               return (
                 <Button key={s.slug} disabled={disabled} variant="outline" size="sm"
                   onClick={() => doAction('skill', s.slug)}
