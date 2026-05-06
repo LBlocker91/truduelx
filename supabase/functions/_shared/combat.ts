@@ -62,12 +62,22 @@ export interface CharacterSnapshot {
   weapon_subtype?: string;
   /** Strongest scaling stat for the equipped weapon's basic attack */
   weapon_scale_stat?: ScaleStat;
+  /** All equipped weapons keyed by slot. Combat picks the right one per skill / basic attack. */
+  weapons?: Partial<Record<'melee' | 'gun' | 'launcher' | 'staff', WeaponEntry>>;
   skill_levels: Record<string, number>;
   equipped?: { weapon_variant: string | null; armor_variant: string | null };
   /** Cosmetic/passive equipped extras for VFX */
   equipped_extras?: { wings_variant?: string | null; pet_variant?: string | null };
   max_hp?: number;
   zone_id?: string;
+}
+
+export interface WeaponEntry {
+  min: number;
+  max: number;
+  subtype: string;
+  damage_type: 'physical' | 'energy' | 'hybrid';
+  scale_stat: ScaleStat;
 }
 
 // Mulberry32 deterministic RNG seeded from battle.seed + turn for reproducibility
