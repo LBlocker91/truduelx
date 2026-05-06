@@ -226,7 +226,7 @@ export async function startNpcBattle(npcId: string, characterId: string): Promis
 
 export async function submitNpcAction(
   battleId: string,
-  playerAction: 'attack' | 'defend' | 'forfeit' | 'skill' | 'use_item',
+  playerAction: 'attack' | 'defend' | 'forfeit' | 'skill' | 'use_item' | 'tick',
   skillSlug?: string,
   itemSubtype?: 'hp_potion' | 'mp_potion',
 ) {
