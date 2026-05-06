@@ -19,6 +19,7 @@ import { NpcMarker } from './NpcMarker';
 import {
   walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
 } from '@/lib/zone-walkable';
+import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
 import neonDistrict from '@/assets/zones/neon-district.jpg';
@@ -133,6 +134,7 @@ export const OverworldScreen = ({
 
   const [activeNpc, setActiveNpc] = useState<Npc | null>(null);
   const [vendorItems, setVendorItems] = useState<any[]>([]);
+  const [credits, setCredits] = useState<number>(0);
   const [questData, setQuestData] = useState<any>(null);
   const [myQuests, setMyQuests] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
@@ -323,9 +325,17 @@ export const OverworldScreen = ({
     if (n) openNpc(n);
   };
 
+  const refreshCredits = async () => {
+    const { data } = await supabase.from('characters').select('credits').eq('id', characterId).maybeSingle();
+    setCredits(data?.credits ?? 0);
+  };
+
   const openNpc = async (npc: Npc) => {
     setActiveNpc(npc);
-    if (npc.type === 'vendor') setVendorItems(await fetchVendorItems(npc.id));
+    if (npc.type === 'vendor') {
+      setVendorItems(await fetchVendorItems(npc.id));
+      await refreshCredits();
+    }
     if (npc.type === 'quest') setQuestData(await fetchQuestForNpc(npc.id));
   };
   const closeNpc = () => { setActiveNpc(null); setVendorItems([]); setQuestData(null); };
@@ -668,40 +678,63 @@ export const OverworldScreen = ({
           </DialogHeader>
 
           {activeNpc?.type === 'vendor' && (
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {vendorItems.length === 0 && <p className="text-xs text-muted-foreground">No stock right now.</p>}
-              {vendorItems.map(vi => (
-                <div key={vi.id} className="flex items-center justify-between border border-border rounded p-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{vi.items?.name}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Lv {vi.items?.level_req} · {vi.items?.rarity} · {vi.items?.consumable ? 'consumable' : vi.items?.slot}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Wallet</span>
+                <span className="font-orbitron text-amber-300">{credits} credits</span>
+              </div>
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {vendorItems.length === 0 && <p className="text-xs text-muted-foreground">No stock right now.</p>}
+                {vendorItems.map(vi => {
+                  const it = vi.items ?? {};
+                  const mods = (it.stat_modifiers ?? {}) as Record<string, number>;
+                  const modEntries = Object.entries(mods).filter(([, v]) => Number(v) !== 0);
+                  const canAfford = credits >= vi.price;
+                  const meetsLevel = (characterLevel ?? 1) >= (it.level_req ?? 1);
+                  const disabled = !canAfford || !meetsLevel;
+                  return (
+                    <div key={vi.id} className="flex items-start justify-between gap-2 border border-border rounded p-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{it.name}</div>
+                        <div className="text-[10px] text-muted-foreground capitalize">
+                          Lv {it.level_req} · {it.rarity} · {it.consumable ? 'consumable' : it.slot}
+                        </div>
+                        {it.description && (
+                          <div className="text-[10px] text-muted-foreground/80 mt-0.5 line-clamp-2">{it.description}</div>
+                        )}
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] mt-1 text-foreground/80">
+                          {it.min_damage != null && <span>{it.min_damage}-{it.max_damage} dmg</span>}
+                          {it.defense > 0 && <span>+{it.defense} def</span>}
+                          {modEntries.map(([k, v]) => (
+                            <span key={k} className="text-primary/90">+{v} {k.replace('max_', '')}</span>
+                          ))}
+                          {it.subtype === 'hp_potion' && <span className="text-red-300">Restores 50% HP</span>}
+                          {it.subtype === 'mp_potion' && <span className="text-blue-300">Restores 50% MP</span>}
+                        </div>
+                        {!meetsLevel && <div className="text-[10px] text-destructive mt-0.5">Requires Lv {it.level_req}</div>}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={canAfford && meetsLevel ? 'default' : 'outline'}
+                        disabled={disabled}
+                        onClick={async () => {
+                          try {
+                            const { buyVendorItem } = await import('@/lib/overworld');
+                            await buyVendorItem(characterId, vi.id, 1);
+                            await refreshCredits();
+                            onCharacterChanged?.();
+                            toast.success(`Bought ${it.name} for ${vi.price}c`);
+                          } catch (e: any) {
+                            toast.error(e.message ?? 'purchase failed');
+                          }
+                        }}
+                      >
+                        {vi.price}c
+                      </Button>
                     </div>
-                    {vi.items?.description && (
-                      <div className="text-[10px] text-muted-foreground/80 mt-0.5 line-clamp-2">{vi.items.description}</div>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        const { buyVendorItem } = await import('@/lib/overworld');
-                        await buyVendorItem(characterId, vi.id, 1);
-                        // Refresh credits in HUD + inventory panels via parent reload.
-                        onCharacterChanged?.();
-                        const { toast } = await import('sonner');
-                        toast.success(`Bought ${vi.items?.name} for ${vi.price}c`);
-                      } catch (e: any) {
-                        const { toast } = await import('sonner');
-                        toast.error(e.message ?? 'purchase failed');
-                      }
-                    }}
-                  >
-                    {vi.price}c
-                  </Button>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
 
