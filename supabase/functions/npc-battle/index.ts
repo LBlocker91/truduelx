@@ -76,7 +76,8 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 
   const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp + gearVitals.hp;
   const playerMp = 100 + bonusMp + gearVitals.mp;
-  const enemyHp = calcMaxHp(enemy.strength, enemy.level);
+  const enemyHpMult = Number((enemy as any).hp_multiplier ?? 1.8);
+  const enemyHp = Math.floor(calcMaxHp(enemy.strength, enemy.level) * enemyHpMult);
 
   const enemySnap: CharacterSnapshot = {
     user_id: null,
