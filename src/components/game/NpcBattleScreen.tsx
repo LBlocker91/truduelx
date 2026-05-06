@@ -306,18 +306,9 @@ function BattleStageBlock({ me, enemy, actions, skills }: {
   const isHeal = latest?.action_type === 'use_item';
   const healAmt = latest?.result?.heal ?? latest?.result?.mpHeal ?? 0;
 
-  // Resolve skill name + visual kind
+  // Resolve skill name + full skill row for VFX classification
   const skill = latest?.skill_slug ? skills.find(s => s.slug === latest.skill_slug) : null;
-  const lastSkillName = skill?.name ?? (latest?.action_type === 'attack' ? null : null);
-
-  const attackerWeapon =
-    lastActor === 'player' ? me.snapshot.equipped?.weapon_variant : enemy.snapshot.equipped?.weapon_variant;
-  const attackKind: AttackKind = (() => {
-    if (skill?.type === 'magical' || skill?.type === 'tech' || skill?.scale_stat === 'TECH') return 'tech';
-    if (attackerWeapon === 'gun') return 'ranged';
-    if (attackerWeapon === 'staff') return 'tech';
-    return 'melee';
-  })();
+  const lastSkillName = skill?.name ?? null;
 
   return (
     <BattleStage
