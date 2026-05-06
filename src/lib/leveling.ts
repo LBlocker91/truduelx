@@ -4,9 +4,11 @@ import { Character } from '@/types/game';
 export const MAX_LEVEL = 100;
 
 // --- XP required per level (must match supabase/functions/_shared/leveling.ts) ---
+// Fast early levels (L1-5), then ramps to existing L20+ pacing.
 export function xpForLevel(level: number): number {
-  if (level < 1) return 200;
-  if (level <= 20) return 100 + level * 100;
+  if (level < 1) return 80;
+  if (level <= 5) return 60 + level * 50;       // 110, 160, 210, 260, 310
+  if (level <= 20) return 200 + (level - 5) * 130; // ~330 → ~2,150
   if (level <= 50) return 1500 + (level - 20) * (level - 20) * 25 + (level - 20) * 200;
   return 25_000 + (level - 50) * (level - 50) * 200 + (level - 50) * 1_500;
 }
