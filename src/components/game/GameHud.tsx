@@ -9,7 +9,7 @@ import {
 
 import { supabase } from '@/integrations/supabase/client';
 import { OverworldScreen } from './OverworldScreen';
-import { ProfilePanel } from './panels/ProfilePanel';
+import { BuildPanel } from './panels/BuildPanel';
 import { InventoryPanel } from './panels/InventoryPanel';
 import { QuestsPanel } from './panels/QuestsPanel';
 import { PvpPanel } from './panels/PvpPanel';
@@ -159,13 +159,22 @@ export const GameHud = (props: GameHudProps) => {
         </nav>
       </div>
 
-      <Sheet open={panel !== null} onOpenChange={(o) => !o && close()}>
+      {/* Build = full-screen overlay (its own modal, NOT inside the side Sheet) */}
+      <BuildPanel
+        characterId={props.characterId}
+        open={panel === 'profile'}
+        onClose={close}
+        refreshTick={props.refreshTick}
+        onProgressionChange={props.onProgressionChange}
+        onLoadoutChanged={() => setLoadoutBust((n) => n + 1)}
+      />
+
+      <Sheet open={panel !== null && panel !== 'profile'} onOpenChange={(o) => !o && close()}>
         <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="font-orbitron capitalize">{panel}</SheetTitle>
           </SheetHeader>
           <div className="mt-4">
-            {panel === 'profile'   && <ProfilePanel characterId={props.characterId} refreshTick={props.refreshTick} onProgressionChange={props.onProgressionChange} />}
             {panel === 'inventory' && <InventoryPanel characterId={props.characterId} onLoadoutChanged={() => setLoadoutBust((n) => n + 1)} />}
             {panel === 'quests'    && <QuestsPanel characterId={props.characterId} refreshTick={props.refreshTick} onProgressionChange={props.onProgressionChange} />}
             {panel === 'pvp'       && <PvpPanel onJoinRanked={() => { close(); props.onJoinPvpQueue(); }} />}
