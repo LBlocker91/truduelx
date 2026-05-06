@@ -228,7 +228,7 @@ async function processAction(
 }
 
 async function processBotTurn(admin: any, battle: any, userId: string, player: ParticipantState, bot: ParticipantState) {
-  const botAction = botChooseAction(bot);
+  const botAction = await botChooseAction(admin, bot);
   const botResult = await executeTurn({
     admin,
     battle,
