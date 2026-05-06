@@ -76,10 +76,10 @@ export const AuthScreen = () => {
             <Zap className="w-8 h-8 text-primary animate-pulse-glow" />
           </div>
           <h1 className="font-orbitron text-4xl font-black tracking-wider">
-            <span className="text-primary text-glow-cyan">COSMIC</span>{' '}
+            <span className="text-primary text-glow-cyan">RIFTBOUND</span>{' '}
             <span className="text-secondary text-glow-orange">DUEL</span>
           </h1>
-          <p className="text-muted-foreground text-sm font-rajdhani mt-1">Sign in to enter the arena</p>
+          <p className="text-muted-foreground text-sm font-rajdhani mt-1">Sign in to enter the Rift</p>
         </div>
 
         <div className="game-card rounded-xl p-5">

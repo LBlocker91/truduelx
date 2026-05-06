@@ -37,13 +37,13 @@ export const TitleScreen = ({ onStart, onContinue, onPvp, onOverworld, saveData 
             <Zap className="w-12 h-12 text-primary animate-pulse-glow" />
           </div>
           <h1 className="font-orbitron text-6xl md:text-8xl font-black tracking-wider">
-            <span className="text-primary text-glow-cyan">COSMIC</span>
+            <span className="text-primary text-glow-cyan">RIFTBOUND</span>
           </h1>
           <h1 className="font-orbitron text-5xl md:text-7xl font-black tracking-wider">
             <span className="text-secondary text-glow-orange">DUEL</span>
           </h1>
           <p className="text-muted-foreground text-lg md:text-xl font-rajdhani tracking-wide mt-4">
-            Battle across the galaxy in epic PvP combat
+            Tactical turn-based sci-fi arena. Build your loadout. Claim the Rift.
           </p>
         </div>
 
@@ -103,9 +103,9 @@ export const TitleScreen = ({ onStart, onContinue, onPvp, onOverworld, saveData 
         {/* Features */}
         <div className="flex flex-wrap justify-center gap-8 pt-8 max-w-2xl">
           {[
-            { label: '3 CLASSES', desc: 'Warrior • Mage • Hunter' },
-            { label: 'TURN-BASED', desc: 'Strategic Combat' },
-            { label: 'ABILITIES', desc: 'Unique Skills' },
+            { label: '9 CLASSES', desc: 'Vanguard • Engineer • Stalker +6' },
+            { label: 'TURN-BASED', desc: 'Tactical Sci-Fi Combat' },
+            { label: 'GEAR & RANKS', desc: 'Loadouts • Ranked Skills' },
           ].map((feature) => (
             <div key={feature.label} className="text-center">
               <p className="font-orbitron text-primary text-sm font-bold">{feature.label}</p>
