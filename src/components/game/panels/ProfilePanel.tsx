@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown, Plus, Shield, ShieldCheck, Gem, RotateCcw, Save, X } from 'lucide-react';
+import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown, Plus, Shield, ShieldCheck, Gem, RotateCcw, Save, X, Sparkles, Target, Feather, Bot } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { allocateStatPoints, resetStats, type SpendableStat } from '@/lib/overworld';
 import { CLASS_META } from '@/data/class-definitions';
+import { calculateDamagePreview, type ScaleStat, type DamageType } from '@/lib/damage-preview';
 import type { LevelUpInfo } from '@/pages/Index';
 
 interface ProfilePanelProps {
@@ -39,15 +40,21 @@ interface CharRow {
   bonus_max_mp: number;
   equipped_weapon_id: string | null;
   equipped_armor_id: string | null;
+  equipped_wings_id: string | null;
+  equipped_pet_id: string | null;
 }
 
 interface EquippedItem {
+  id: string;
   name: string;
   rarity: string;
   slot: string;
   min_damage: number | null;
   max_damage: number | null;
   defense: number;
+  damage_type: DamageType | null;
+  weapon_subtype: string | null;
+  stat_modifiers: Record<string, number> | null;
 }
 
 type DraftKey = SpendableStat;
@@ -80,11 +87,16 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
         setIsPremium(!!prof?.is_premium);
       }
 
-      const ids = [charRow.equipped_weapon_id, charRow.equipped_armor_id].filter(Boolean) as string[];
+      const ids = [
+        charRow.equipped_weapon_id,
+        charRow.equipped_armor_id,
+        (charRow as any).equipped_wings_id,
+        (charRow as any).equipped_pet_id,
+      ].filter(Boolean) as string[];
       if (ids.length) {
         const { data: items } = await supabase
           .from('items')
-          .select('name, rarity, slot, min_damage, max_damage, defense')
+          .select('id, name, rarity, slot, min_damage, max_damage, defense, damage_type, weapon_subtype, stat_modifiers')
           .in('id', ids);
         setEquipped((items ?? []) as EquippedItem[]);
       } else {
@@ -146,19 +158,47 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
   }
 
   const meta = (CLASS_META as any)[c.class];
-  // Effective values include pending draft.
-  const effStr = c.strength + draft.strength;
-  const effDex = c.dexterity + draft.dexterity;
-  const effTech = c.technology + draft.technology;
-  const effSup = c.support + draft.support;
-  const effDef = c.defense + draft.defense;
-  const effRes = c.resistance + draft.resistance;
-  const effBonusHp = (c.bonus_max_hp ?? 0) + draft.max_hp * 5;
-  const effBonusMp = (c.bonus_max_mp ?? 0) + draft.max_energy * 3;
+
+  // Aggregate gear bonuses from every equipped item (mirrors server snapshot logic).
+  const gearBonus = useMemo(() => {
+    const out = { strength: 0, dexterity: 0, technology: 0, support: 0, defense: 0, resistance: 0, max_hp: 0, max_energy: 0 };
+    for (const it of equipped) {
+      const m = it.stat_modifiers ?? {};
+      for (const k of Object.keys(out) as (keyof typeof out)[]) out[k] += Number((m as any)[k] ?? 0);
+      out.defense += Number(it.defense ?? 0);
+    }
+    return out;
+  }, [equipped]);
+
+  // Effective values include pending draft + equipped gear.
+  const effStr = c.strength + draft.strength + gearBonus.strength;
+  const effDex = c.dexterity + draft.dexterity + gearBonus.dexterity;
+  const effTech = c.technology + draft.technology + gearBonus.technology;
+  const effSup = c.support + draft.support + gearBonus.support;
+  const effDef = c.defense + draft.defense + gearBonus.defense;
+  const effRes = c.resistance + draft.resistance + gearBonus.resistance;
+  const effBonusHp = (c.bonus_max_hp ?? 0) + draft.max_hp * 5 + gearBonus.max_hp;
+  const effBonusMp = (c.bonus_max_mp ?? 0) + draft.max_energy * 3 + gearBonus.max_energy;
 
   const maxHp = Math.floor(100 + effStr * 8 + c.level * 12) + effBonusHp;
   const maxMp = 100 + effTech * 2 + effBonusMp;
   const canSpend = remainingPoints > 0;
+
+  // Damage preview against a Lv-equivalent dummy, using equipped weapon (or fallback).
+  const weapon = equipped.find(e => e.slot === 'weapon');
+  const weaponSubtype = weapon?.weapon_subtype ?? 'unarmed';
+  const weaponDamageType: DamageType = (weapon?.damage_type as DamageType) ?? 'physical';
+  const weaponScale: ScaleStat =
+    weaponSubtype === 'pistol' || weaponSubtype === 'rifle' ? 'dexterity' :
+    weaponSubtype === 'tech_staff' ? 'technology' :
+    weaponSubtype === 'rocket_launcher' || weaponSubtype === 'drone' ? 'support' : 'strength';
+  const weaponMin = weapon?.min_damage ?? 40;
+  const weaponMax = weapon?.max_damage ?? 55;
+  const dmg = useMemo(() => calculateDamagePreview({
+    attacker: { level: c.level, strength: effStr, dexterity: effDex, technology: effTech, support: effSup, defense: effDef, resistance: effRes },
+    weapon: { min: weaponMin, max: weaponMax, damageType: weaponDamageType, scaleStat: weaponScale, subtype: weaponSubtype },
+  }), [c.level, effStr, effDex, effTech, effSup, effDef, effRes, weaponMin, weaponMax, weaponDamageType, weaponScale, weaponSubtype]);
+
 
   return (
     <div className="space-y-4">
@@ -255,21 +295,73 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
       </div>
 
       <div className="game-card rounded-lg p-4">
+        <h3 className="font-orbitron text-sm text-muted-foreground mb-2 flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-secondary" /> DAMAGE PREVIEW
+        </h3>
+        <div className="flex items-baseline justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">vs Lv {c.level} dummy</div>
+            <div className="font-orbitron text-2xl text-secondary">
+              {dmg.min}<span className="text-muted-foreground text-base"> – </span>{dmg.max}
+            </div>
+          </div>
+          <div className="text-right text-[10px] text-muted-foreground space-y-0.5">
+            <div>type: <span className="text-foreground capitalize">{dmg.damageType}</span></div>
+            <div>scales: <span className="text-foreground uppercase">{dmg.scaleStat.slice(0, 3)}</span></div>
+            <div>mit: <span className="text-foreground">{Math.round(dmg.mitPct * 100)}%</span></div>
+          </div>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
+          Live preview of your weapon's basic attack. Allocating stats updates this instantly.
+        </p>
+      </div>
+
+      <div className="game-card rounded-lg p-4">
         <h3 className="font-orbitron text-sm text-muted-foreground mb-2">EQUIPPED</h3>
         {equipped.length === 0 ? (
           <p className="text-xs text-muted-foreground">Nothing equipped. Open Inventory to equip gear.</p>
         ) : (
           <ul className="space-y-1.5">
-            {equipped.map((it) => (
-              <li key={it.slot} className="flex items-center justify-between text-sm">
-                <span className="font-rajdhani"><span className="text-muted-foreground capitalize text-xs mr-2">{it.slot}</span>{it.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {it.slot === 'weapon' && it.min_damage != null ? `${it.min_damage}-${it.max_damage} dmg` : `+${it.defense} def`}
-                </span>
-              </li>
-            ))}
+            {equipped.map((it) => {
+              const mods = it.stat_modifiers ?? {};
+              const modParts = Object.entries(mods)
+                .filter(([, v]) => Number(v) !== 0)
+                .map(([k, v]) => `+${v} ${k.replace('max_', '').slice(0, 3).toUpperCase()}`);
+              const right =
+                it.slot === 'weapon' && it.min_damage != null
+                  ? `${it.min_damage}-${it.max_damage} dmg`
+                  : it.defense > 0 ? `+${it.defense} def` : modParts[0] ?? '';
+              const SlotIcon =
+                it.slot === 'weapon' ? Sword :
+                it.slot === 'armor' ? Shield :
+                it.slot === 'wings' ? Feather :
+                it.slot === 'pet' ? Bot : Sparkles;
+              return (
+                <li key={it.id} className="flex items-center justify-between text-sm gap-2">
+                  <span className="font-rajdhani flex items-center gap-2 min-w-0">
+                    <SlotIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground capitalize text-xs">{it.slot}</span>
+                    <span className="truncate">{it.name}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{right}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
+        {(gearBonus.strength || gearBonus.dexterity || gearBonus.technology || gearBonus.support || gearBonus.defense || gearBonus.resistance || gearBonus.max_hp || gearBonus.max_energy) ? (
+          <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 font-rajdhani">
+            <span className="text-foreground/80 font-orbitron text-[9px] uppercase tracking-wider">Gear bonus:</span>
+            {gearBonus.strength ? <span>+{gearBonus.strength} STR</span> : null}
+            {gearBonus.dexterity ? <span>+{gearBonus.dexterity} DEX</span> : null}
+            {gearBonus.technology ? <span>+{gearBonus.technology} TEC</span> : null}
+            {gearBonus.support ? <span>+{gearBonus.support} SUP</span> : null}
+            {gearBonus.defense ? <span>+{gearBonus.defense} DEF</span> : null}
+            {gearBonus.resistance ? <span>+{gearBonus.resistance} RES</span> : null}
+            {gearBonus.max_hp ? <span>+{gearBonus.max_hp} HP</span> : null}
+            {gearBonus.max_energy ? <span>+{gearBonus.max_energy} MP</span> : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="game-card rounded-lg p-4 space-y-2">

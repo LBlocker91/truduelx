@@ -542,6 +542,7 @@ function describeAction(a: ActionRow): string {
   if (a.action_type === 'forfeit') return 'forfeited.';
   if (a.action_type === 'defend') return 'braced for impact.';
   if (a.action_type === 'stunned') return 'is stunned!';
+  if (a.action_type === 'timeout') return 'hesitated — turn skipped.';
   if (a.action_type === 'use_item') {
     if (a.result?.item === 'hp_potion') return `used HP Potion. Restored ${a.result.heal ?? 0} HP.`;
     if (a.result?.item === 'mp_potion') return `used MP Potion. Restored ${a.result.mpHeal ?? 0} MP.`;
@@ -551,6 +552,17 @@ function describeAction(a: ActionRow): string {
   const total = hits.reduce((s: number, h: any) => s + (h.damage ?? 0), 0);
   const crit = hits.some((h: any) => h.crit);
   const dodged = hits.some((h: any) => h.dodged);
-  if (a.action_type === 'skill') return `used ${a.skill_slug} → ${total} dmg${crit ? ' CRIT!' : ''}${dodged ? ' (dodged)' : ''}`;
-  return `attacked for ${total} dmg${crit ? ' CRIT!' : ''}${dodged ? ' (dodged)' : ''}`;
+  const blocked = hits.some((h: any) => h.blocked);
+  const first = hits[0];
+  const dmgType = first?.damage_type as string | undefined;
+  const scaleStat = first?.scale_stat as string | undefined;
+  const tags: string[] = [];
+  if (crit) tags.push('CRIT!');
+  if (blocked) tags.push('blocked');
+  if (dodged) tags.push('dodged');
+  const scaleNote = scaleStat ? ` · ${dmgType ?? ''} · scales ${scaleStat.toUpperCase().slice(0, 3)}` : '';
+  if (a.action_type === 'skill') {
+    return `used ${a.skill_slug} → ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}`;
+  }
+  return `attacked for ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}`;
 }

@@ -71,7 +71,7 @@ export const GameHud = (props: GameHudProps) => {
   };
 
   const items: { key: PanelKey; icon: React.ReactNode; label: string }[] = [
-    { key: 'profile',   icon: <UserIcon className="w-4 h-4" />,   label: 'Profile' },
+    { key: 'profile',   icon: <UserIcon className="w-4 h-4" />,   label: 'Build' },
     { key: 'inventory', icon: <Backpack className="w-4 h-4" />,   label: 'Inventory' },
     { key: 'quests',    icon: <ScrollText className="w-4 h-4" />, label: 'Quests' },
     { key: 'pvp',       icon: <Swords className="w-4 h-4" />,     label: 'PvP' },
