@@ -116,6 +116,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     }
   }, [battleId, myUserId, refreshPotions]);
 
+  const refreshBattleRow = useCallback(async () => {
+    const { data } = await supabase.from('battles').select('*').eq('id', battleId).maybeSingle();
+    if (data) setBattle(data as any);
+  }, [battleId]);
+
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
@@ -129,17 +134,19 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   useEffect(() => {
     const ch = supabase
       .channel(`npc-battle:${battleId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'battles', filter: `id=eq.${battleId}` }, () => refresh())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'battle_participants', filter: `battle_id=eq.${battleId}` }, () => refresh())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'battles', filter: `id=eq.${battleId}` }, () => refreshBattleRow())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'battle_actions', filter: `battle_id=eq.${battleId}` },
-          (payload) => setActions(prev => {
+          async (payload) => {
             const next = payload.new as ActionRow;
-            if (prev.some(a => a.id === next.id)) return prev;
-            return [next, ...prev].slice(0, 20);
-          }))
+            setActions(prev => {
+              if (prev.some(a => a.id === next.id)) return prev;
+              return [next, ...prev].slice(0, 20);
+            });
+            await refresh();
+          })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [battleId, refresh]);
+  }, [battleId, refresh, refreshBattleRow]);
 
   // Reward summary captured from the last action response.
   const [rewards, setRewards] = useState<{ xpGained: number; creditsGained: number } | null>(null);
