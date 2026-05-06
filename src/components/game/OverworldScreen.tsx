@@ -170,16 +170,26 @@ export const OverworldScreen = ({
     };
   }, []);
 
-  // Load zones & enter starting zone
+  // Load zones & enter starting zone (resume last position if available)
   useEffect(() => {
     (async () => {
       const zs = await fetchZones();
       setZones(zs);
-      const start = zs.find(z => z.id === 'station-hub') ?? zs[0];
-      if (start) await switchZone(start.id, zs);
+      const { data: ch } = await supabase
+        .from('characters')
+        .select('current_zone_id, last_x, last_y')
+        .eq('id', characterId)
+        .maybeSingle();
+      const lastZoneId = ch?.current_zone_id ?? null;
+      const start = (lastZoneId && zs.find(z => z.id === lastZoneId)) || zs.find(z => z.id === 'station-hub') || zs[0];
+      if (!start) return;
+      const arrival = (lastZoneId && Number.isFinite(ch?.last_x) && Number.isFinite(ch?.last_y))
+        ? { x: Number(ch!.last_x), y: Number(ch!.last_y) }
+        : undefined;
+      await switchZone(start.id, zs, arrival);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [characterId]);
 
   const [transitioning, setTransitioning] = useState(false);
   const portalCooldownRef = useRef(0);
