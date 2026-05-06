@@ -237,11 +237,11 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
   // Soft cap by % target max HP — keeps battles multi-turn
   const maxHpDef = defender.max_hp || 1;
   let capPct: number;
-  if (skill && ult) capPct = crit ? 0.75 : 0.65;
-  else if (skill)   capPct = 0.45;
-  else              capPct = 0.40;
+  if (skill && ult) capPct = crit ? 0.55 : 0.45;
+  else if (skill)   capPct = 0.32;
+  else              capPct = 0.28;
   const cap = maxHpDef * capPct;
-  if (raw > cap) raw = cap + (raw - cap) * 0.25;
+  if (raw > cap) raw = cap + (raw - cap) * 0.15;
 
   // Damage absorb shield
   const absorb = defender.status_effects.find(e => e.type === 'damage_absorb');
