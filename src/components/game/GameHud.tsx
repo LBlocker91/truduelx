@@ -113,6 +113,9 @@ export const GameHud = (props: GameHudProps) => {
           <span className="text-xs text-shield font-orbitron flex items-center gap-1">
             <Coins className="w-3 h-3" /> {props.credits.toLocaleString()}
           </span>
+          <span className="text-xs text-neon-purple font-orbitron flex items-center gap-1" title="Vibranium">
+            <Gem className="w-3 h-3" /> {vibranium.toLocaleString()}
+          </span>
           <Button size="sm" variant="ghost" onClick={() => setPanel('pvp')} title="PvP">
             <Swords className="w-4 h-4 mr-1" /> PvP
           </Button>
