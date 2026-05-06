@@ -256,8 +256,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
 
   useEffect(() => {
     if (!battle?.turn_deadline || finished || playbackAnimating || turnTickingRef.current) return;
-    const expired = new Date(battle.turn_deadline).getTime() <= Date.now();
-    if (!expired) return;
+    if (secondsLeft > 0) return;
 
     turnTickingRef.current = true;
     submitNpcAction(battleId, 'tick')
@@ -267,7 +266,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
           turnTickingRef.current = false;
         }, 300);
       });
-  }, [battle?.turn_deadline, battleId, finished, playbackAnimating]);
+  }, [battle?.turn_deadline, battleId, finished, playbackAnimating, secondsLeft]);
 
   const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : displayedTurnNumber;
   const turnStateLabel = finished
