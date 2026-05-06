@@ -133,6 +133,7 @@ export const OverworldScreen = ({
 
   const [activeNpc, setActiveNpc] = useState<Npc | null>(null);
   const [vendorItems, setVendorItems] = useState<any[]>([]);
+  const [credits, setCredits] = useState<number>(0);
   const [questData, setQuestData] = useState<any>(null);
   const [myQuests, setMyQuests] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
