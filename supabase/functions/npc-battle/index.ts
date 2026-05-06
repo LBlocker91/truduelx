@@ -394,9 +394,9 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     if (!it) continue;
     if (it.slot === 'weapon' && it.min_damage && it.max_damage) {
       weaponMin = it.min_damage; weaponMax = it.max_damage;
-      weaponVariant = it.variant ?? it.subtype ?? null;
+      weaponVariant = it.sprite_variant ?? it.subtype ?? null;
     }
-    if (it.slot === 'armor') armorVariant = it.variant ?? it.subtype ?? null;
+    if (it.slot === 'armor') armorVariant = it.sprite_variant ?? it.subtype ?? null;
     defenseGear += it.defense ?? 0;
     const m = it.stat_modifiers ?? {};
     strBonus += m.strength ?? 0; dexBonus += m.dexterity ?? 0;
