@@ -82,7 +82,8 @@ export function makeRng(seed: number) {
 }
 
 export function calcMaxHp(strength: number, level: number) {
-  return Math.floor(100 + strength * 8 + level * 12);
+  // Tougher base HP so equal-level fights last multiple turns.
+  return Math.floor(180 + strength * 10 + level * 22);
 }
 
 function effectiveStr(str: number) {
