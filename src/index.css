@@ -473,4 +473,34 @@
     100% { transform: translateX(130%); opacity: 0; }
   }
   .light-sweep { animation: light-sweep 11s ease-in-out infinite; }
+
+  /* ===== Battle stage ===== */
+  @keyframes damage-float {
+    0%   { transform: translate(-50%, 0)    scale(0.7); opacity: 0; }
+    20%  { transform: translate(-50%, -10px) scale(1.15); opacity: 1; }
+    70%  { opacity: 1; }
+    100% { transform: translate(-50%, -56px) scale(0.9); opacity: 0; }
+  }
+
+  /* Combat-ready stance — slight crouch + readiness sway, distinct from overworld */
+  @keyframes battle-stance {
+    0%, 100% { transform: translateY(0)    scaleY(1); }
+    50%      { transform: translateY(-1.2px) scaleY(1.02); }
+  }
+  .battle-stance { animation: battle-stance 1.6s ease-in-out infinite; transform-origin: center bottom; }
+
+  /* Arena floor pulse beneath fighters */
+  @keyframes arena-pulse {
+    0%, 100% { opacity: 0.45; transform: translateX(-50%) scale(1); }
+    50%      { opacity: 0.75; transform: translateX(-50%) scale(1.06); }
+  }
+  .arena-pulse { animation: arena-pulse 2.4s ease-in-out infinite; }
+
+  /* Hit flash */
+  @keyframes hit-flash {
+    0%   { filter: brightness(1); }
+    20%  { filter: brightness(2.6) drop-shadow(0 0 14px hsl(0 100% 60%)); }
+    100% { filter: brightness(1); }
+  }
+  .hit-flash { animation: hit-flash 0.32s ease-out; }
 }
