@@ -5,7 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Swords, Shield, Loader2, Flag, Sparkles } from 'lucide-react';
 import { submitNpcAction } from '@/lib/overworld';
 import { setInBattle } from '@/lib/overworld';
-import { BattleStage, AttackKind } from './battle/BattleStage';
+import { BattleStage } from './battle/BattleStage';
 
 interface LevelUpInfo {
   oldLevel: number;
