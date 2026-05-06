@@ -10,7 +10,7 @@ export interface InventoryItem {
     id: string;
     name: string;
     description: string | null;
-    slot: 'weapon' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable';
+    slot: 'weapon' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable' | 'wings' | 'pet';
     rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
     level_req: number;
     min_damage: number | null;
@@ -21,6 +21,8 @@ export interface InventoryItem {
     stat_modifiers: Record<string, number>;
     consumable: boolean;
     subtype: string | null;
+    weapon_subtype?: string | null;
+    damage_type?: string | null;
   };
 }
 
