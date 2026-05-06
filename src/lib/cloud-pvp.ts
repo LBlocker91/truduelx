@@ -43,7 +43,7 @@ export async function pollMatchmaking() {
 }
 
 export type BattleActionPayload =
-  | { battleId: string; action: 'attack' | 'defend' | 'forfeit' }
+  | { battleId: string; action: 'attack' | 'defend' | 'forfeit' | 'tick' }
   | { battleId: string; action: 'skill'; skillSlug: string };
 
 export async function submitBattleAction(payload: BattleActionPayload) {

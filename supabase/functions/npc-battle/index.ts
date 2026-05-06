@@ -153,6 +153,7 @@ async function processAction(
     }
     if (battle.current_turn === userId && isDeadlineExpired(battle.turn_deadline)) {
       const timeoutResult = advancePassiveTurn(player, bot, 'timeout');
+      const nextTurnNumber = battle.turn_number + 1;
       await persistParticipant(admin, battleId, player);
       await persistParticipant(admin, battleId, bot);
       await admin.from('battle_actions').insert({
@@ -163,10 +164,13 @@ async function processAction(
         action_type: 'timeout',
         skill_slug: null,
         target_slot: 1,
-        result: timeoutResult,
+        result: enrichActionResult(timeoutResult, player, bot, {
+          nextTurnNumber,
+          nextTurnUserId: null,
+        }),
       });
       await admin.from('battles').update({
-        turn_number: battle.turn_number + 1,
+        turn_number: nextTurnNumber,
         current_turn: null,
         turn_deadline: new Date(Date.now() + BOT_RESPONSE_DELAY_MS).toISOString(),
       }).eq('id', battleId);
@@ -201,7 +205,11 @@ async function processAction(
     action_type: playerAction,
     skill_slug: skillSlug ?? null,
     target_slot: 1,
-    result: playerResult.result,
+    result: enrichActionResult(playerResult.result, player, bot, bot.hp <= 0
+      ? { battleFinished: true, winnerUserId: userId, nextTurnNumber: battle.turn_number, nextTurnUserId: null }
+      : player.hp <= 0
+        ? { battleFinished: true, winnerUserId: null, nextTurnNumber: battle.turn_number, nextTurnUserId: null }
+        : { nextTurnNumber: battle.turn_number + 1, nextTurnUserId: null }),
   });
 
   if (bot.hp <= 0) {
@@ -246,7 +254,11 @@ async function processBotTurn(admin: any, battle: any, userId: string, player: P
     action_type: botAction.action,
     skill_slug: botAction.skillSlug ?? null,
     target_slot: 0,
-    result: botResult.result,
+    result: enrichActionResult(botResult.result, bot, player, player.hp <= 0
+      ? { battleFinished: true, winnerUserId: null, nextTurnNumber: battle.turn_number, nextTurnUserId: null }
+      : bot.hp <= 0
+        ? { battleFinished: true, winnerUserId: userId, nextTurnNumber: battle.turn_number, nextTurnUserId: null }
+        : { nextTurnNumber: battle.turn_number + 1, nextTurnUserId: userId }),
   });
 
   if (player.hp <= 0) {
@@ -398,6 +410,43 @@ function advancePassiveTurn(actor: ParticipantState, target: ParticipantState, r
   if (tickRes.dotDamage > 0) result.dot = tickRes.dotDamage;
   tickCooldowns(actor);
   return result;
+}
+
+function enrichActionResult(
+  result: Record<string, unknown>,
+  actor: ParticipantState,
+  target: ParticipantState,
+  meta: {
+    nextTurnNumber: number;
+    nextTurnUserId: string | null;
+    battleFinished?: boolean;
+    winnerUserId?: string | null;
+  },
+) {
+  return {
+    ...result,
+    actor_state: snapshotParticipant(actor),
+    target_state: snapshotParticipant(target),
+    next_turn_number: meta.nextTurnNumber,
+    next_turn_user_id: meta.nextTurnUserId,
+    battle_finished: meta.battleFinished ?? false,
+    winner_user_id: meta.winnerUserId ?? null,
+  };
+}
+
+function snapshotParticipant(p: ParticipantState) {
+  return {
+    slot: p.slot,
+    user_id: p.user_id ?? p.snapshot?.user_id ?? null,
+    hp: p.hp,
+    max_hp: p.max_hp,
+    energy: p.energy,
+    max_energy: p.max_energy,
+    rage: p.rage,
+    status_effects: p.status_effects,
+    cooldowns: p.cooldowns,
+    snapshot: p.snapshot,
+  };
 }
 
 async function persistParticipant(admin: any, battleId: string, p: ParticipantState) {

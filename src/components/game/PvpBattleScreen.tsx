@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Swords, Shield, Zap, Loader2, Flag, Sparkles } from 'lucide-react';
 import { submitBattleAction } from '@/lib/cloud-pvp';
+import { resolvePlaybackState } from '@/lib/battle-playback';
+import { BattleStage } from './battle/BattleStage';
 
 interface PvpBattleScreenProps {
   battleId: string;
@@ -57,13 +59,43 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
   const [actions, setActions] = useState<ActionRow[]>([]);
   const [skills, setSkills] = useState<SkillCatalog[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(30);
+  const [secondsLeft, setSecondsLeft] = useState(10);
+  const [playbackAction, setPlaybackAction] = useState<ActionRow | null>(null);
+  const [playbackTick, setPlaybackTick] = useState(0);
+  const [playbackAnimating, setPlaybackAnimating] = useState(false);
+  const [displayedMe, setDisplayedMe] = useState<ParticipantRow | null>(null);
+  const [displayedOpponent, setDisplayedOpponent] = useState<ParticipantRow | null>(null);
+  const [displayedTurnNumber, setDisplayedTurnNumber] = useState(1);
+  const [displayedCurrentTurn, setDisplayedCurrentTurn] = useState<string | null>(null);
+  const seenActionIdsRef = useRef<Set<string>>(new Set());
+  const playbackQueueRef = useRef<ActionRow[]>([]);
+  const playbackHydratedRef = useRef(false);
+  const turnTickingRef = useRef(false);
 
-  const me = participants.find(p => p.user_id === myUserId);
-  const opponent = participants.find(p => p.user_id !== myUserId);
-  const myTurn = battle?.current_turn === myUserId;
+  const liveMe = participants.find(p => p.user_id === myUserId);
+  const liveOpponent = participants.find(p => p.user_id !== myUserId);
   const finished = battle?.status === 'finished';
   const won = finished && battle?.winner_user_id === myUserId;
+
+  const orderedActions = useMemo(() => {
+    return [...actions].sort((a, b) => {
+      const timeDelta = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (timeDelta !== 0) return timeDelta;
+      return a.turn_number - b.turn_number;
+    });
+  }, [actions]);
+
+  const playNextQueuedAction = useCallback(() => {
+    const next = playbackQueueRef.current.shift();
+    if (!next) {
+      setPlaybackAnimating(false);
+      return;
+    }
+
+    setPlaybackAction(next);
+    setPlaybackTick((tick) => tick + 1);
+    setPlaybackAnimating(true);
+  }, []);
 
   // Load initial state
   const refresh = useCallback(async () => {
@@ -74,19 +106,28 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
     ]);
     if (b.data) setBattle(b.data as any);
     if (p.data) setParticipants(p.data as any);
-    if (a.data) setActions(a.data as any);
+    if (a.data) {
+      setActions(prev => {
+        const map = new Map<string, ActionRow>();
+        for (const row of (a.data as any[])) map.set(row.id, row as ActionRow);
+        for (const row of prev) if (!map.has(row.id)) map.set(row.id, row);
+        return Array.from(map.values())
+          .sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime())
+          .slice(0, 20);
+      });
+    }
   }, [battleId]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
   // Load skills my class can use
   useEffect(() => {
-    if (!me) return;
+    if (!liveMe) return;
     (async () => {
-      const { data } = await supabase.from('skills').select('*').eq('class', me.snapshot.class);
+      const { data } = await supabase.from('skills').select('*').eq('class', liveMe.snapshot.class);
       if (data) setSkills(data as any);
     })();
-  }, [me?.snapshot?.class]);
+  }, [liveMe?.snapshot?.class]);
 
   // Realtime subscription for battle + participants + actions
   useEffect(() => {
@@ -97,25 +138,96 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
       .on('postgres_changes', { event: '*', schema: 'public', table: 'battle_participants', filter: `battle_id=eq.${battleId}` },
           () => refresh())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'battle_actions', filter: `battle_id=eq.${battleId}` },
-          (payload) => setActions(prev => [payload.new as any, ...prev].slice(0, 20)))
+          (payload) => setActions(prev => {
+            const next = payload.new as ActionRow;
+            if (prev.some(action => action.id === next.id)) return prev;
+            return [next, ...prev].slice(0, 20);
+          }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [battleId, refresh]);
 
-  // Turn timer
   useEffect(() => {
-    if (!battle?.turn_deadline) return;
+    if (!battle || !liveMe || !liveOpponent) return;
+
+    if (!playbackHydratedRef.current) {
+      playbackHydratedRef.current = true;
+      seenActionIdsRef.current = new Set(orderedActions.map((action) => action.id));
+      playbackQueueRef.current = [];
+      setPlaybackAnimating(false);
+      setPlaybackAction(orderedActions[orderedActions.length - 1] ?? null);
+      setDisplayedMe(liveMe);
+      setDisplayedOpponent(liveOpponent);
+      setDisplayedTurnNumber(battle.turn_number);
+      setDisplayedCurrentTurn(battle.current_turn);
+      return;
+    }
+
+    const unseenActions = orderedActions.filter((action) => !seenActionIdsRef.current.has(action.id));
+    if (unseenActions.length === 0) return;
+
+    unseenActions.forEach((action) => seenActionIdsRef.current.add(action.id));
+    playbackQueueRef.current.push(...unseenActions);
+
+    if (!playbackAnimating) {
+      playNextQueuedAction();
+    }
+  }, [battle, liveMe, liveOpponent, orderedActions, playbackAnimating, playNextQueuedAction]);
+
+  const handlePlaybackComplete = useCallback(() => {
+    if (playbackAction && displayedMe && displayedOpponent) {
+      const next = resolvePlaybackState(playbackAction, displayedMe.slot, displayedMe, displayedOpponent);
+      setDisplayedMe(next.me as ParticipantRow);
+      setDisplayedOpponent(next.enemy as ParticipantRow);
+      setDisplayedTurnNumber(next.nextTurnNumber);
+      setDisplayedCurrentTurn(next.nextCurrentTurn);
+    }
+    playNextQueuedAction();
+  }, [displayedMe, displayedOpponent, playNextQueuedAction, playbackAction]);
+
+  const me = displayedMe ?? liveMe;
+  const opponent = displayedOpponent ?? liveOpponent;
+  const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === myUserId;
+
+  useEffect(() => {
+    if (playbackAnimating) return;
+    if (playbackQueueRef.current.length > 0) return;
+    if (liveMe) setDisplayedMe(liveMe);
+    if (liveOpponent) setDisplayedOpponent(liveOpponent);
+    if (battle) {
+      setDisplayedTurnNumber(battle.turn_number);
+      setDisplayedCurrentTurn(battle.current_turn);
+    }
+  }, [battle, liveMe, liveOpponent, playbackAnimating]);
+
+  useEffect(() => {
+    if (!battle?.turn_deadline || finished) return;
     const tick = () => {
       const left = Math.max(0, Math.ceil((new Date(battle.turn_deadline!).getTime() - Date.now()) / 1000));
       setSecondsLeft(left);
     };
     tick();
-    const id = setInterval(tick, 500);
-    return () => clearInterval(id);
-  }, [battle?.turn_deadline]);
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [battle?.turn_deadline, finished]);
+
+  useEffect(() => {
+    if (!battle?.turn_deadline || finished || playbackAnimating || turnTickingRef.current) return;
+    const expired = new Date(battle.turn_deadline).getTime() <= Date.now();
+    if (!expired) return;
+
+    turnTickingRef.current = true;
+    submitBattleAction({ battleId, action: 'tick' })
+      .catch((error) => console.error(error))
+      .finally(() => {
+        window.setTimeout(() => {
+          turnTickingRef.current = false;
+        }, 300);
+      });
+  }, [battle?.turn_deadline, battleId, finished, playbackAnimating]);
 
   const doAction = async (payload: any) => {
-    if (submitting || !myTurn || finished) return;
+    if (submitting || playbackAnimating || !myTurn || finished) return;
     setSubmitting(true);
     try { await submitBattleAction(payload); }
     catch (e) { console.error(e); }
@@ -134,18 +246,28 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
     <div className="min-h-screen bg-background text-foreground p-4 flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="font-orbitron text-sm">
-          <span className="text-muted-foreground">TURN</span> {battle.turn_number}
+          <span className="text-muted-foreground">TURN</span> {playbackAnimating && playbackAction ? playbackAction.turn_number : displayedTurnNumber}
           <span className="ml-3 text-muted-foreground">PvP</span>
         </div>
         {!finished && (
-          <div className={`font-orbitron text-sm ${myTurn ? 'text-primary' : 'text-muted-foreground'}`}>
-            {myTurn ? `YOUR TURN — ${secondsLeft}s` : `OPPONENT'S TURN — ${secondsLeft}s`}
+          <div className={`font-orbitron text-sm ${myTurn || (playbackAnimating && playbackAction?.actor_slot === me.slot) ? 'text-primary' : 'text-muted-foreground'}`}>
+            {playbackAnimating && playbackAction
+              ? `${playbackAction.actor_slot === me.slot ? 'YOU ACT' : 'OPPONENT ACTS'} — ${secondsLeft}s`
+              : `${myTurn ? 'YOUR TURN' : 'OPPONENT TURN'} — ${secondsLeft}s`}
           </div>
         )}
         <Button variant="outline" size="sm" onClick={onExit}>Exit</Button>
       </div>
 
-      {/* Battle stage */}
+      <BattleStageBlock
+        me={me}
+        opponent={opponent}
+        action={playbackAction}
+        actionTick={playbackTick}
+        skills={skills}
+        onAnimationComplete={handlePlaybackComplete}
+      />
+
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Fighter p={me} label="YOU" mine />
         <Fighter p={opponent} label={opponent.snapshot.name} />
@@ -176,13 +298,13 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
       ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 justify-center">
-            <Button disabled={!myTurn || submitting} onClick={() => doAction({ battleId, action: 'attack' })}>
+            <Button disabled={!myTurn || submitting || playbackAnimating} onClick={() => doAction({ battleId, action: 'attack' })}>
               <Swords className="w-4 h-4 mr-1" /> Attack
             </Button>
-            <Button disabled={!myTurn || submitting} variant="secondary" onClick={() => doAction({ battleId, action: 'defend' })}>
+            <Button disabled={!myTurn || submitting || playbackAnimating} variant="secondary" onClick={() => doAction({ battleId, action: 'defend' })}>
               <Shield className="w-4 h-4 mr-1" /> Defend
             </Button>
-            <Button disabled={submitting} variant="destructive" size="sm" onClick={() => doAction({ battleId, action: 'forfeit' })}>
+            <Button disabled={submitting || playbackAnimating} variant="destructive" size="sm" onClick={() => doAction({ battleId, action: 'forfeit' })}>
               <Flag className="w-4 h-4 mr-1" /> Forfeit
             </Button>
           </div>
@@ -192,7 +314,7 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
               const lowEnergy = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
-              const disabled = !myTurn || submitting || !learned || onCd || lowEnergy || lowLvl;
+               const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowEnergy || lowLvl;
               return (
                 <Button
                   key={s.slug}
@@ -217,6 +339,61 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
     </div>
   );
 };
+
+function BattleStageBlock({ me, opponent, action, actionTick, skills, onAnimationComplete }: {
+  me: ParticipantRow;
+  opponent: ParticipantRow;
+  action: ActionRow | null;
+  actionTick: number;
+  skills: SkillCatalog[];
+  onAnimationComplete: () => void;
+}) {
+  const lastActor: 'player' | 'enemy' | null = !action
+    ? null
+    : action.actor_slot === me.slot ? 'player' : 'enemy';
+
+  const hits = action?.result?.hits ?? [];
+  const damage = hits.reduce((sum: number, hit: any) => sum + (hit.damage ?? 0), 0);
+  const crit = hits.some((hit: any) => hit.crit);
+  const skill = action?.skill_slug ? skills.find(entry => entry.slug === action.skill_slug) : null;
+
+  return (
+    <BattleStage
+      player={{
+        name: 'YOU',
+        level: me.snapshot.level,
+        hp: me.hp,
+        maxHp: me.max_hp,
+        mp: me.energy,
+        maxMp: me.max_energy,
+        armorVariant: me.snapshot.equipped?.armor_variant,
+        weaponVariant: me.snapshot.equipped?.weapon_variant,
+        isPlayer: true,
+        characterClass: me.snapshot.class,
+      }}
+      enemy={{
+        name: opponent.snapshot.name,
+        level: opponent.snapshot.level,
+        hp: opponent.hp,
+        maxHp: opponent.max_hp,
+        mp: opponent.energy,
+        maxMp: opponent.max_energy,
+        armorVariant: opponent.snapshot.equipped?.armor_variant,
+        weaponVariant: opponent.snapshot.equipped?.weapon_variant,
+        isPlayer: false,
+        characterClass: opponent.snapshot.class,
+      }}
+      actionTick={actionTick}
+      lastActor={lastActor}
+      lastDamage={damage || null}
+      lastWasHeal={false}
+      lastSkillName={skill?.name ?? null}
+      lastSkill={skill ?? null}
+      crit={crit}
+      onAnimationComplete={onAnimationComplete}
+    />
+  );
+}
 
 function Fighter({ p, label, mine }: { p: ParticipantRow; label: string; mine?: boolean }) {
   const hpPct = (p.hp / p.max_hp) * 100;
