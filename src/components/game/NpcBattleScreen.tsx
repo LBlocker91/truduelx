@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -131,6 +131,70 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   // Reward summary captured from the last action response.
   const [rewards, setRewards] = useState<{ xpGained: number; creditsGained: number } | null>(null);
   const [pendingLevel, setPendingLevel] = useState<LevelUpInfo | null>(null);
+  const [playbackAction, setPlaybackAction] = useState<ActionRow | null>(null);
+  const [playbackTick, setPlaybackTick] = useState(0);
+  const [playbackAnimating, setPlaybackAnimating] = useState(false);
+  const seenActionIdsRef = useRef<Set<string>>(new Set());
+  const playbackQueueRef = useRef<ActionRow[]>([]);
+  const playbackHydratedRef = useRef(false);
+
+  const orderedActions = useMemo(() => {
+    return [...actions].sort((a, b) => {
+      const timeDelta = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (timeDelta !== 0) return timeDelta;
+      return a.turn_number - b.turn_number;
+    });
+  }, [actions]);
+
+  const playNextQueuedAction = useCallback(() => {
+    const next = playbackQueueRef.current.shift();
+    if (!next) {
+      setPlaybackAnimating(false);
+      return;
+    }
+
+    setPlaybackAction(next);
+    setPlaybackTick((tick) => tick + 1);
+    setPlaybackAnimating(true);
+  }, []);
+
+  useEffect(() => {
+    if (!battle || !me || !enemy) return;
+
+    if (!playbackHydratedRef.current) {
+      playbackHydratedRef.current = true;
+      seenActionIdsRef.current = new Set(orderedActions.map((action) => action.id));
+      playbackQueueRef.current = [];
+      setPlaybackAnimating(false);
+      setPlaybackAction(orderedActions[orderedActions.length - 1] ?? null);
+      return;
+    }
+
+    const unseenActions = orderedActions.filter((action) => !seenActionIdsRef.current.has(action.id));
+    if (unseenActions.length === 0) return;
+
+    unseenActions.forEach((action) => seenActionIdsRef.current.add(action.id));
+    playbackQueueRef.current.push(...unseenActions);
+
+    if (!playbackAnimating) {
+      playNextQueuedAction();
+    }
+  }, [battle, enemy, me, orderedActions, playbackAnimating, playNextQueuedAction]);
+
+  const handlePlaybackComplete = useCallback(() => {
+    playNextQueuedAction();
+  }, [playNextQueuedAction]);
+
+  const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : battle?.turn_number ?? 1;
+  const turnStateLabel = finished
+    ? 'BATTLE ENDED'
+    : playbackAnimating && playbackAction
+      ? playbackAction.actor_slot === me?.slot
+        ? 'YOU ACT'
+        : 'NPC ACTS'
+      : myTurn
+        ? 'YOUR TURN'
+        : 'ENEMY TURN';
 
   const doAction = async (
     action: 'attack'|'defend'|'forfeit'|'skill'|'use_item',
@@ -172,11 +236,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     <div className="min-h-screen bg-background text-foreground p-4 flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="font-orbitron text-sm">
-          <span className="text-muted-foreground">TURN</span> {battle.turn_number}
+          <span className="text-muted-foreground">TURN</span> {displayTurn}
           <span className="ml-3 text-muted-foreground">vs NPC</span>
         </div>
-        <div className={`font-orbitron text-sm ${myTurn ? 'text-primary' : 'text-muted-foreground'}`}>
-          {finished ? 'BATTLE ENDED' : myTurn ? 'YOUR TURN' : 'ENEMY TURN'}
+        <div className={`font-orbitron text-sm ${turnStateLabel === 'YOUR TURN' || turnStateLabel === 'YOU ACT' ? 'text-primary' : 'text-muted-foreground'}`}>
+          {turnStateLabel}
         </div>
         <Button variant="outline" size="sm" onClick={handleExit}>Exit</Button>
       </div>
@@ -185,8 +249,10 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
       <BattleStageBlock
         me={me}
         enemy={enemy}
-        actions={actions}
+        action={playbackAction}
+        actionTick={playbackTick}
         skills={skills}
+        onAnimationComplete={handlePlaybackComplete}
       />
 
       <div className="grid grid-cols-2 gap-4 mb-4">
