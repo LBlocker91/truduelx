@@ -232,7 +232,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const enemy = displayedEnemy ?? liveEnemy;
   const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === myUserId;
 
-  const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : battle?.turn_number ?? 1;
+  const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : displayedTurnNumber;
   const turnStateLabel = finished
     ? 'BATTLE ENDED'
     : playbackAnimating && playbackAction
