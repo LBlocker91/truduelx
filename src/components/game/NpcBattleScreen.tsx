@@ -134,9 +134,21 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [playbackAction, setPlaybackAction] = useState<ActionRow | null>(null);
   const [playbackTick, setPlaybackTick] = useState(0);
   const [playbackAnimating, setPlaybackAnimating] = useState(false);
+  // Displayed (lagged) state — only advances when an animation completes.
+  const [displayedMe, setDisplayedMe] = useState<ParticipantRow | null>(null);
+  const [displayedEnemy, setDisplayedEnemy] = useState<ParticipantRow | null>(null);
+  const [displayedTurnNumber, setDisplayedTurnNumber] = useState<number>(1);
+  const [displayedCurrentTurn, setDisplayedCurrentTurn] = useState<string | null>(null);
   const seenActionIdsRef = useRef<Set<string>>(new Set());
   const playbackQueueRef = useRef<ActionRow[]>([]);
   const playbackHydratedRef = useRef(false);
+  // Pending DB snapshots keyed to the action id that should reveal them.
+  const pendingSnapshotsRef = useRef<Map<string, {
+    me: ParticipantRow | null;
+    enemy: ParticipantRow | null;
+    turn_number: number;
+    current_turn: string | null;
+  }>>(new Map());
 
   const orderedActions = useMemo(() => {
     return [...actions].sort((a, b) => {
@@ -158,15 +170,21 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     setPlaybackAnimating(true);
   }, []);
 
+  // Hydrate displayed state on first load and when a hydration is needed (battle ended w/ no playback).
   useEffect(() => {
-    if (!battle || !me || !enemy) return;
+    if (!battle || !liveMe || !liveEnemy) return;
 
     if (!playbackHydratedRef.current) {
       playbackHydratedRef.current = true;
       seenActionIdsRef.current = new Set(orderedActions.map((action) => action.id));
       playbackQueueRef.current = [];
+      pendingSnapshotsRef.current.clear();
       setPlaybackAnimating(false);
       setPlaybackAction(orderedActions[orderedActions.length - 1] ?? null);
+      setDisplayedMe(liveMe);
+      setDisplayedEnemy(liveEnemy);
+      setDisplayedTurnNumber(battle.turn_number);
+      setDisplayedCurrentTurn(battle.current_turn);
       return;
     }
 
@@ -174,16 +192,41 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     if (unseenActions.length === 0) return;
 
     unseenActions.forEach((action) => seenActionIdsRef.current.add(action.id));
+    // For each unseen action, snapshot the CURRENT live DB state and key it to that action.
+    // This snapshot will be revealed when that action's animation completes.
+    const lastUnseen = unseenActions[unseenActions.length - 1];
+    pendingSnapshotsRef.current.set(lastUnseen.id, {
+      me: liveMe,
+      enemy: liveEnemy,
+      turn_number: battle.turn_number,
+      current_turn: battle.current_turn,
+    });
     playbackQueueRef.current.push(...unseenActions);
 
     if (!playbackAnimating) {
       playNextQueuedAction();
     }
-  }, [battle, enemy, me, orderedActions, playbackAnimating, playNextQueuedAction]);
+  }, [battle, liveEnemy, liveMe, orderedActions, playbackAnimating, playNextQueuedAction]);
 
   const handlePlaybackComplete = useCallback(() => {
+    // Reveal snapshot for the action that just finished, if one was queued.
+    if (playbackAction) {
+      const snap = pendingSnapshotsRef.current.get(playbackAction.id);
+      if (snap) {
+        if (snap.me) setDisplayedMe(snap.me);
+        if (snap.enemy) setDisplayedEnemy(snap.enemy);
+        setDisplayedTurnNumber(snap.turn_number);
+        setDisplayedCurrentTurn(snap.current_turn);
+        pendingSnapshotsRef.current.delete(playbackAction.id);
+      }
+    }
     playNextQueuedAction();
-  }, [playNextQueuedAction]);
+  }, [playNextQueuedAction, playbackAction]);
+
+  // Use displayed snapshot for everything UI-facing.
+  const me = displayedMe ?? liveMe;
+  const enemy = displayedEnemy ?? liveEnemy;
+  const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === myUserId;
 
   const displayTurn = playbackAnimating && playbackAction ? playbackAction.turn_number : battle?.turn_number ?? 1;
   const turnStateLabel = finished
