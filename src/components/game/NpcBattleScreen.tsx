@@ -586,8 +586,11 @@ function describeAction(a: ActionRow): string {
   if (blocked) tags.push('blocked');
   if (dodged) tags.push('dodged');
   const scaleNote = scaleStat ? ` · ${dmgType ?? ''} · scales ${scaleStat.toUpperCase().slice(0, 3)}` : '';
+  const ultNote = a.result?.ultimate_used
+    ? ' · ULTIMATE!'
+    : (typeof a.result?.ultimate_charge === 'number' ? ` · charge ${a.result.ultimate_charge}/${ULTIMATE_CHARGE_REQUIRED}` : '');
   if (a.action_type === 'skill') {
-    return `used ${a.skill_slug} → ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}`;
+    return `used ${a.skill_slug} → ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}${ultNote}`;
   }
-  return `attacked for ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}`;
+  return `attacked for ${total} dmg${tags.length ? ' ' + tags.join(' ') : ''}${scaleNote}${ultNote}`;
 }
