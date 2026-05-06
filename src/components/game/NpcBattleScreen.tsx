@@ -181,6 +181,14 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
         <Button variant="outline" size="sm" onClick={handleExit}>Exit</Button>
       </div>
 
+      {/* Animated battle stage */}
+      <BattleStageBlock
+        me={me}
+        enemy={enemy}
+        actions={actions}
+        skills={skills}
+      />
+
       <div className="grid grid-cols-2 gap-4 mb-4">
         <Fighter p={me} label="YOU" mine />
         <Fighter p={enemy} label={enemy.snapshot.name} />
