@@ -19,6 +19,7 @@ import { NpcMarker } from './NpcMarker';
 import {
   walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
 } from '@/lib/zone-walkable';
+import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
 import neonDistrict from '@/assets/zones/neon-district.jpg';
