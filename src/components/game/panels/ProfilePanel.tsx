@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown, Plus, Shield, ShieldCheck, Gem, RotateCcw, Save, X } from 'lucide-react';
+import { Loader2, Heart, Zap, Sword, Brain, Cpu, Users, Award, Coins, Crown, Plus, Shield, ShieldCheck, Gem, RotateCcw, Save, X, Sparkles, Target, Feather, Bot } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { allocateStatPoints, resetStats, type SpendableStat } from '@/lib/overworld';
 import { CLASS_META } from '@/data/class-definitions';
+import { calculateDamagePreview, type ScaleStat, type DamageType } from '@/lib/damage-preview';
 import type { LevelUpInfo } from '@/pages/Index';
 
 interface ProfilePanelProps {
