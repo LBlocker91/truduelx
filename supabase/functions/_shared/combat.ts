@@ -33,6 +33,7 @@ export interface ParticipantState {
   status_effects: StatusEffect[];
   cooldowns: Record<string, number>;
   snapshot: CharacterSnapshot;
+  ultimate_charge?: number;
 }
 
 export interface StatusEffect {
