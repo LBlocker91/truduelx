@@ -67,8 +67,13 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
   const bonusHp = charForBonus?.bonus_max_hp ?? 0;
   const bonusMp = charForBonus?.bonus_max_mp ?? 0;
 
-  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp;
-  const playerMp = 100 + bonusMp;
+  // Re-fetch equipped items just to extract HP/MP modifiers (cheap, idempotent).
+  const { data: equippedRows } = await admin.from('inventory')
+    .select('items(stat_modifiers)').eq('character_id', characterId).eq('equipped', true);
+  const gearVitals = gearVitalBonuses((equippedRows ?? []).map((r: any) => r.items));
+
+  const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp + gearVitals.hp;
+  const playerMp = 100 + bonusMp + gearVitals.mp;
   const enemyHp = calcMaxHp(enemy.strength, enemy.level);
 
   const enemySnap: CharacterSnapshot = {
@@ -83,6 +88,9 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
     support: enemy.support,
     weapon_min: enemy.weapon_min,
     weapon_max: enemy.weapon_max,
+    weapon_subtype: 'heavy',
+    weapon_damage_type: 'physical',
+    weapon_scale_stat: 'strength',
     defense: enemy.defense ?? 0,
     resistance: enemy.resistance ?? 0,
     skill_levels: Object.fromEntries((enemy.skill_slugs ?? []).map((s: string) => [s, 5])),
