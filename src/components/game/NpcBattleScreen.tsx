@@ -334,7 +334,7 @@ function BattleStageBlock({ me, enemy, actions, skills }: {
       lastDamage={isHeal ? healAmt : (damage || null)}
       lastWasHeal={isHeal}
       lastSkillName={lastSkillName}
-      attackKind={attackKind}
+      lastSkill={skill}
       crit={crit}
     />
   );
