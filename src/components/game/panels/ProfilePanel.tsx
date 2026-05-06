@@ -153,12 +153,6 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
     }
   };
 
-  if (loading || !c) {
-    return <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
-  }
-
-  const meta = (CLASS_META as any)[c.class];
-
   // Aggregate gear bonuses from every equipped item (mirrors server snapshot logic).
   const gearBonus = useMemo(() => {
     const out = { strength: 0, dexterity: 0, technology: 0, support: 0, defense: 0, resistance: 0, max_hp: 0, max_energy: 0 };
@@ -170,19 +164,16 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
     return out;
   }, [equipped]);
 
-  // Effective values include pending draft + equipped gear.
-  const effStr = c.strength + draft.strength + gearBonus.strength;
-  const effDex = c.dexterity + draft.dexterity + gearBonus.dexterity;
-  const effTech = c.technology + draft.technology + gearBonus.technology;
-  const effSup = c.support + draft.support + gearBonus.support;
-  const effDef = c.defense + draft.defense + gearBonus.defense;
-  const effRes = c.resistance + draft.resistance + gearBonus.resistance;
-  const effBonusHp = (c.bonus_max_hp ?? 0) + draft.max_hp * 5 + gearBonus.max_hp;
-  const effBonusMp = (c.bonus_max_mp ?? 0) + draft.max_energy * 3 + gearBonus.max_energy;
-
-  const maxHp = Math.floor(100 + effStr * 8 + c.level * 12) + effBonusHp;
-  const maxMp = 100 + effTech * 2 + effBonusMp;
-  const canSpend = remainingPoints > 0;
+  // Effective values include pending draft + equipped gear (safe defaults until char loads).
+  const effStr = (c?.strength ?? 0) + draft.strength + gearBonus.strength;
+  const effDex = (c?.dexterity ?? 0) + draft.dexterity + gearBonus.dexterity;
+  const effTech = (c?.technology ?? 0) + draft.technology + gearBonus.technology;
+  const effSup = (c?.support ?? 0) + draft.support + gearBonus.support;
+  const effDef = (c?.defense ?? 0) + draft.defense + gearBonus.defense;
+  const effRes = (c?.resistance ?? 0) + draft.resistance + gearBonus.resistance;
+  const effBonusHp = (c?.bonus_max_hp ?? 0) + draft.max_hp * 5 + gearBonus.max_hp;
+  const effBonusMp = (c?.bonus_max_mp ?? 0) + draft.max_energy * 3 + gearBonus.max_energy;
+  const charLevel = c?.level ?? 1;
 
   // Damage preview against a Lv-equivalent dummy, using equipped weapon (or fallback).
   const weapon = equipped.find(e => e.slot === 'weapon');
@@ -195,9 +186,18 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
   const weaponMin = weapon?.min_damage ?? 40;
   const weaponMax = weapon?.max_damage ?? 55;
   const dmg = useMemo(() => calculateDamagePreview({
-    attacker: { level: c.level, strength: effStr, dexterity: effDex, technology: effTech, support: effSup, defense: effDef, resistance: effRes },
+    attacker: { level: charLevel, strength: effStr, dexterity: effDex, technology: effTech, support: effSup, defense: effDef, resistance: effRes },
     weapon: { min: weaponMin, max: weaponMax, damageType: weaponDamageType, scaleStat: weaponScale, subtype: weaponSubtype },
-  }), [c.level, effStr, effDex, effTech, effSup, effDef, effRes, weaponMin, weaponMax, weaponDamageType, weaponScale, weaponSubtype]);
+  }), [charLevel, effStr, effDex, effTech, effSup, effDef, effRes, weaponMin, weaponMax, weaponDamageType, weaponScale, weaponSubtype]);
+
+  if (loading || !c) {
+    return <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
+
+  const meta = (CLASS_META as any)[c.class];
+  const maxHp = Math.floor(100 + effStr * 8 + c.level * 12) + effBonusHp;
+  const maxMp = 100 + effTech * 2 + effBonusMp;
+  const canSpend = remainingPoints > 0;
 
 
   return (
