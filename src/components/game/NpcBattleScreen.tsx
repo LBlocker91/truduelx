@@ -303,8 +303,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     try {
       const r = await submitNpcAction(battleId, action, skillSlug, itemSubtype);
       if (r?.error) {
-        const { toast } = await import('sonner');
-        toast.error(r.error);
+        // Ignore benign turn-race errors; the next poll will refresh state
+        if (r.error !== 'not your turn') {
+          const { toast } = await import('sonner');
+          toast.error(r.error);
+        }
       }
       if (action === 'use_item' && characterId) await refreshPotions(characterId);
       if (r?.finished) {
