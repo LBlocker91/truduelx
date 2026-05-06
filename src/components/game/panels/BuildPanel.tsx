@@ -187,12 +187,41 @@ export const BuildPanel = ({
   const effBonusMp = (c?.bonus_max_mp ?? 0) + draft.max_energy * 3 + gearBonus.max_energy;
   const charLevel = c?.level ?? 1;
 
-  const equippedWeaponItem = equipped.find(e => e.item.slot === 'weapon');
-  const weaponSubtype = equippedWeaponItem?.item.weapon_subtype ?? equippedWeaponItem?.item.subtype ?? 'unarmed';
-  const weaponDamageType: DamageType = (equippedWeaponItem?.item.damage_type as DamageType) ?? 'physical';
-  const weaponScale: ScaleStat = subtypeToScale(weaponSubtype);
-  const weaponMin = equippedWeaponItem?.item.min_damage ?? 40;
-  const weaponMax = equippedWeaponItem?.item.max_damage ?? 55;
+  // Build a per-slot weapon map from equipped items
+  const weaponMap = useMemo(() => {
+    const map: Record<string, { min: number; max: number; subtype: string; damageType: DamageType; scale: ScaleStat }> = {};
+    for (const it of equipped) {
+      const slotKey =
+        it.item.slot === 'weapon' ? 'melee' :
+        it.item.slot === 'gun' ? 'gun' :
+        it.item.slot === 'launcher' ? 'launcher' :
+        it.item.slot === 'staff' ? 'staff' : null;
+      if (!slotKey || !it.item.min_damage || !it.item.max_damage) continue;
+      const sub = it.item.weapon_subtype ?? slotKey;
+      map[slotKey] = {
+        min: it.item.min_damage,
+        max: it.item.max_damage,
+        subtype: sub,
+        damageType: (it.item.damage_type as DamageType) ?? 'physical',
+        scale: subtypeToScale(sub),
+      };
+    }
+    return map;
+  }, [equipped]);
+
+  const weaponForBasic = weaponMap.melee ?? weaponMap.gun ?? weaponMap.staff ?? weaponMap.launcher ?? {
+    min: 12, max: 18, subtype: 'unarmed', damageType: 'physical' as DamageType, scale: 'strength' as ScaleStat,
+  };
+  const weaponSubtype = weaponForBasic.subtype;
+  const weaponDamageType = weaponForBasic.damageType;
+  const weaponScale = weaponForBasic.scale;
+  const weaponMin = weaponForBasic.min;
+  const weaponMax = weaponForBasic.max;
+
+  const weaponForSkill = (s: SkillRow) => {
+    const byStat: Record<string, string> = { strength: 'melee', dexterity: 'gun', technology: 'staff', support: 'launcher' };
+    return weaponMap[byStat[s.scale_stat]] ?? weaponForBasic;
+  };
 
   const attacker = {
     level: charLevel, strength: effStr, dexterity: effDex, technology: effTech,
@@ -209,9 +238,10 @@ export const BuildPanel = ({
 
   const skillDmg = useMemo(() => {
     if (!selSkill) return null;
+    const w = weaponForSkill(selSkill);
     return calculateDamagePreview({
       attacker,
-      weapon: { min: weaponMin, max: weaponMax, damageType: weaponDamageType, scaleStat: weaponScale, subtype: weaponSubtype },
+      weapon: { min: w.min, max: w.max, damageType: w.damageType, scaleStat: w.scale, subtype: w.subtype },
       skill: {
         baseDamage: selSkill.base_damage,
         scaleStat: (selSkill.scale_stat as ScaleStat) ?? 'strength',
@@ -219,7 +249,7 @@ export const BuildPanel = ({
         type: (selSkill.type as 'physical' | 'magical' | 'special') ?? 'physical',
       },
     });
-  }, [selSkill, selRank, attacker, weaponMin, weaponMax, weaponDamageType, weaponScale, weaponSubtype]);
+  }, [selSkill, selRank, attacker, weaponMap]);
 
   const bestUlt = useMemo(() => {
     const learnedUlts = skills.filter(s => isUltimate(s) && (c?.skill_levels?.[s.slug] ?? 0) >= 1);
@@ -230,9 +260,10 @@ export const BuildPanel = ({
   const ultDmg = useMemo(() => {
     if (!bestUlt) return null;
     const rank = c?.skill_levels?.[bestUlt.slug] ?? 1;
+    const w = weaponForSkill(bestUlt);
     return calculateDamagePreview({
       attacker,
-      weapon: { min: weaponMin, max: weaponMax, damageType: weaponDamageType, scaleStat: weaponScale, subtype: weaponSubtype },
+      weapon: { min: w.min, max: w.max, damageType: w.damageType, scaleStat: w.scale, subtype: w.subtype },
       skill: {
         baseDamage: bestUlt.base_damage,
         scaleStat: (bestUlt.scale_stat as ScaleStat) ?? 'strength',
@@ -240,7 +271,7 @@ export const BuildPanel = ({
         type: (bestUlt.type as any) ?? 'physical',
       },
     });
-  }, [bestUlt, c?.skill_levels, attacker, weaponMin, weaponMax, weaponDamageType, weaponScale, weaponSubtype]);
+  }, [bestUlt, c?.skill_levels, attacker, weaponMap]);
 
   const bumpDraft = (k: DraftKey) => {
     if (!c || remainingPoints <= 0) return;
