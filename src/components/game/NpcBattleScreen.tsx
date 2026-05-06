@@ -355,12 +355,15 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
 };
 
 // --- Animated battle stage wrapper -----------------------------------------
-function BattleStageBlock({ me, enemy, actions, skills }: {
-  me: ParticipantRow; enemy: ParticipantRow; actions: ActionRow[]; skills: SkillCatalog[];
+function BattleStageBlock({ me, enemy, action, actionTick, skills, onAnimationComplete }: {
+  me: ParticipantRow;
+  enemy: ParticipantRow;
+  action: ActionRow | null;
+  actionTick: number;
+  skills: SkillCatalog[];
+  onAnimationComplete: () => void;
 }) {
-  // Latest action drives the animation. actions are ordered desc by created_at.
-  const latest = actions[0];
-  const tick = actions.length; // bump on every new action insert
+  const latest = action;
 
   const lastActor: 'player' | 'enemy' | null = !latest
     ? null
@@ -395,13 +398,14 @@ function BattleStageBlock({ me, enemy, actions, skills }: {
         weaponVariant: enemy.snapshot.equipped?.weapon_variant ?? 'sword',
         isPlayer: false,
       }}
-      actionTick={tick}
+      actionTick={actionTick}
       lastActor={lastActor}
       lastDamage={isHeal ? healAmt : (damage || null)}
       lastWasHeal={isHeal}
       lastSkillName={lastSkillName}
       lastSkill={skill}
       crit={crit}
+      onAnimationComplete={onAnimationComplete}
     />
   );
 }
