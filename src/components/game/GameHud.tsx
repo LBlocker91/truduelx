@@ -151,19 +151,26 @@ export const GameHud = (props: GameHudProps) => {
         />
 
         <nav className="absolute top-3 right-3 z-30 flex flex-col gap-1 bg-card/85 backdrop-blur border border-border rounded-lg p-1.5">
-          {items.map((it) => (
-            <Button
-              key={it.label}
-              size="sm"
-              variant="ghost"
-              className="justify-start gap-2 h-8 px-2 text-xs"
-              onClick={() => setPanel(it.key)}
-              title={it.label}
-            >
-              {it.icon}
-              <span className="hidden md:inline">{it.label}</span>
-            </Button>
-          ))}
+          {items.map((it) => {
+            const isBuild = it.key === 'profile';
+            return (
+              <Button
+                key={it.label}
+                size="sm"
+                variant={isBuild ? 'default' : 'ghost'}
+                className={
+                  isBuild
+                    ? 'justify-start gap-2 h-8 px-2 text-xs bg-gradient-to-r from-secondary to-primary text-primary-foreground font-orbitron'
+                    : 'justify-start gap-2 h-8 px-2 text-xs'
+                }
+                onClick={() => setPanel(it.key)}
+                title={it.label}
+              >
+                {it.icon}
+                <span className="hidden md:inline">{it.label}</span>
+              </Button>
+            );
+          })}
         </nav>
       </div>
 
