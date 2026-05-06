@@ -219,7 +219,10 @@ export type Database = {
           defense: number
           dexterity: number
           equipped_armor_id: string | null
+          equipped_gun_id: string | null
+          equipped_launcher_id: string | null
           equipped_pet_id: string | null
+          equipped_staff_id: string | null
           equipped_weapon_id: string | null
           equipped_wings_id: string | null
           id: string
@@ -250,7 +253,10 @@ export type Database = {
           defense?: number
           dexterity?: number
           equipped_armor_id?: string | null
+          equipped_gun_id?: string | null
+          equipped_launcher_id?: string | null
           equipped_pet_id?: string | null
+          equipped_staff_id?: string | null
           equipped_weapon_id?: string | null
           equipped_wings_id?: string | null
           id?: string
@@ -281,7 +287,10 @@ export type Database = {
           defense?: number
           dexterity?: number
           equipped_armor_id?: string | null
+          equipped_gun_id?: string | null
+          equipped_launcher_id?: string | null
           equipped_pet_id?: string | null
+          equipped_staff_id?: string | null
           equipped_weapon_id?: string | null
           equipped_wings_id?: string | null
           id?: string
@@ -904,6 +913,9 @@ export type Database = {
         | "consumable"
         | "wings"
         | "pet"
+        | "gun"
+        | "launcher"
+        | "staff"
       npc_type: "vendor" | "quest" | "enemy"
       scale_stat: "strength" | "dexterity" | "technology" | "support"
       skill_effect:
@@ -1077,6 +1089,9 @@ export const Constants = {
         "consumable",
         "wings",
         "pet",
+        "gun",
+        "launcher",
+        "staff",
       ],
       npc_type: ["vendor", "quest", "enemy"],
       scale_stat: ["strength", "dexterity", "technology", "support"],
