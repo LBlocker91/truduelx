@@ -6,7 +6,7 @@ import {
   Sparkles, Store, Settings as SettingsIcon, LogOut, Crown, Coins, Gem,
   Maximize2, Minimize2,
 } from 'lucide-react';
-import { useEffect as useEffectExtra } from 'react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { OverworldScreen } from './OverworldScreen';
 import { ProfilePanel } from './panels/ProfilePanel';
