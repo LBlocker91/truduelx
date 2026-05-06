@@ -116,6 +116,14 @@ export const GameHud = (props: GameHudProps) => {
           <span className="text-xs text-neon-purple font-orbitron flex items-center gap-1" title="Aetherium — premium currency">
             <Gem className="w-3 h-3" /> {vibranium.toLocaleString()}
           </span>
+          <Button
+            size="sm"
+            onClick={() => setPanel('profile')}
+            title="Open Build (character, gear, skills)"
+            className="bg-gradient-to-r from-secondary to-primary text-primary-foreground font-orbitron tracking-wider shadow-[0_0_12px_hsl(var(--primary)/0.45)] hover:shadow-[0_0_18px_hsl(var(--primary)/0.6)]"
+          >
+            <UserIcon className="w-4 h-4 mr-1" /> BUILD
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setPanel('pvp')} title="PvP">
             <Swords className="w-4 h-4 mr-1" /> PvP
           </Button>
