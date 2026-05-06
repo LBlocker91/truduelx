@@ -182,8 +182,9 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
   const aSnap = attacker.snapshot;
   const dSnap = defender.snapshot;
 
-  const dmgType = pickDamageType(skill, aSnap);
-  const scaleStat = pickScaleStat(skill, aSnap);
+  const weapon = pickWeapon(skill, aSnap);
+  const dmgType = pickDamageType(skill, weapon);
+  const scaleStat = pickScaleStat(skill, weapon);
 
   // Dodge check
   const dodgeBuff = defender.status_effects.find(e => e.type === 'dodge');
@@ -192,13 +193,13 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
       damage: 0, crit: false, blocked: false, dodged: true, raw: 0,
       damage_type: dmgType, scale_stat: scaleStat,
       weapon_roll: 0, stat_power: 0, rank_mult: 1, mit_pct: 0,
-      weapon_subtype: aSnap.weapon_subtype,
+      weapon_subtype: weapon.subtype,
     };
   }
 
   // ---- Per-hit weapon roll (the source of variance) ----
-  const wMin = Math.max(1, aSnap.weapon_min ?? 1);
-  const wMax = Math.max(wMin, aSnap.weapon_max ?? wMin);
+  const wMin = Math.max(1, weapon.min);
+  const wMax = Math.max(wMin, weapon.max);
   const weaponRoll = Math.floor(wMin + rng() * (wMax - wMin + 1));
 
   // ---- Stat scaling ----
