@@ -116,6 +116,14 @@ export const GameHud = (props: GameHudProps) => {
           <span className="text-xs text-neon-purple font-orbitron flex items-center gap-1" title="Aetherium — premium currency">
             <Gem className="w-3 h-3" /> {vibranium.toLocaleString()}
           </span>
+          <Button
+            size="sm"
+            onClick={() => setPanel('profile')}
+            title="Open Build (character, gear, skills)"
+            className="bg-gradient-to-r from-secondary to-primary text-primary-foreground font-orbitron tracking-wider shadow-[0_0_12px_hsl(var(--primary)/0.45)] hover:shadow-[0_0_18px_hsl(var(--primary)/0.6)]"
+          >
+            <UserIcon className="w-4 h-4 mr-1" /> BUILD
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setPanel('pvp')} title="PvP">
             <Swords className="w-4 h-4 mr-1" /> PvP
           </Button>
@@ -143,19 +151,26 @@ export const GameHud = (props: GameHudProps) => {
         />
 
         <nav className="absolute top-3 right-3 z-30 flex flex-col gap-1 bg-card/85 backdrop-blur border border-border rounded-lg p-1.5">
-          {items.map((it) => (
-            <Button
-              key={it.label}
-              size="sm"
-              variant="ghost"
-              className="justify-start gap-2 h-8 px-2 text-xs"
-              onClick={() => setPanel(it.key)}
-              title={it.label}
-            >
-              {it.icon}
-              <span className="hidden md:inline">{it.label}</span>
-            </Button>
-          ))}
+          {items.map((it) => {
+            const isBuild = it.key === 'profile';
+            return (
+              <Button
+                key={it.label}
+                size="sm"
+                variant={isBuild ? 'default' : 'ghost'}
+                className={
+                  isBuild
+                    ? 'justify-start gap-2 h-8 px-2 text-xs bg-gradient-to-r from-secondary to-primary text-primary-foreground font-orbitron'
+                    : 'justify-start gap-2 h-8 px-2 text-xs'
+                }
+                onClick={() => setPanel(it.key)}
+                title={it.label}
+              >
+                {it.icon}
+                <span className="hidden md:inline">{it.label}</span>
+              </Button>
+            );
+          })}
         </nav>
       </div>
 

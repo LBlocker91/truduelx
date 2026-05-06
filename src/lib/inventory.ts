@@ -10,7 +10,7 @@ export interface InventoryItem {
     id: string;
     name: string;
     description: string | null;
-    slot: 'weapon' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable' | 'wings' | 'pet';
+    slot: 'weapon' | 'gun' | 'launcher' | 'staff' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable' | 'wings' | 'pet';
     rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
     level_req: number;
     min_damage: number | null;
@@ -40,6 +40,16 @@ export async function fetchInventory(characterId: string): Promise<InventoryItem
   return (data ?? []) as any;
 }
 
+const SLOT_COLUMN: Record<string, string> = {
+  weapon: 'equipped_weapon_id',
+  gun: 'equipped_gun_id',
+  launcher: 'equipped_launcher_id',
+  staff: 'equipped_staff_id',
+  armor: 'equipped_armor_id',
+  wings: 'equipped_wings_id',
+  pet: 'equipped_pet_id',
+};
+
 /** Equip an item: unequip any other item in the same slot, then equip this one. */
 export async function equipItem(characterId: string, inventoryId: string, itemId: string, slot: string) {
   const { data: rows } = await supabase
@@ -55,26 +65,12 @@ export async function equipItem(characterId: string, inventoryId: string, itemId
   }
   await supabase.from('inventory').update({ equipped: true }).eq('id', inventoryId);
 
-  if (slot === 'weapon') {
-    await supabase.from('characters').update({ equipped_weapon_id: itemId }).eq('id', characterId);
-  } else if (slot === 'armor') {
-    await supabase.from('characters').update({ equipped_armor_id: itemId }).eq('id', characterId);
-  } else if (slot === 'wings') {
-    await supabase.from('characters').update({ equipped_wings_id: itemId } as any).eq('id', characterId);
-  } else if (slot === 'pet') {
-    await supabase.from('characters').update({ equipped_pet_id: itemId } as any).eq('id', characterId);
-  }
+  const col = SLOT_COLUMN[slot];
+  if (col) await supabase.from('characters').update({ [col]: itemId } as any).eq('id', characterId);
 }
 
 export async function unequipItem(characterId: string, inventoryId: string, slot: string) {
   await supabase.from('inventory').update({ equipped: false }).eq('id', inventoryId);
-  if (slot === 'weapon') {
-    await supabase.from('characters').update({ equipped_weapon_id: null }).eq('id', characterId);
-  } else if (slot === 'armor') {
-    await supabase.from('characters').update({ equipped_armor_id: null }).eq('id', characterId);
-  } else if (slot === 'wings') {
-    await supabase.from('characters').update({ equipped_wings_id: null } as any).eq('id', characterId);
-  } else if (slot === 'pet') {
-    await supabase.from('characters').update({ equipped_pet_id: null } as any).eq('id', characterId);
-  }
+  const col = SLOT_COLUMN[slot];
+  if (col) await supabase.from('characters').update({ [col]: null } as any).eq('id', characterId);
 }

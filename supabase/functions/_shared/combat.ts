@@ -62,12 +62,22 @@ export interface CharacterSnapshot {
   weapon_subtype?: string;
   /** Strongest scaling stat for the equipped weapon's basic attack */
   weapon_scale_stat?: ScaleStat;
+  /** All equipped weapons keyed by slot. Combat picks the right one per skill / basic attack. */
+  weapons?: Partial<Record<'melee' | 'gun' | 'launcher' | 'staff', WeaponEntry>>;
   skill_levels: Record<string, number>;
   equipped?: { weapon_variant: string | null; armor_variant: string | null };
   /** Cosmetic/passive equipped extras for VFX */
   equipped_extras?: { wings_variant?: string | null; pet_variant?: string | null };
   max_hp?: number;
   zone_id?: string;
+}
+
+export interface WeaponEntry {
+  min: number;
+  max: number;
+  subtype: string;
+  damage_type: 'physical' | 'energy' | 'hybrid';
+  scale_stat: ScaleStat;
 }
 
 // Mulberry32 deterministic RNG seeded from battle.seed + turn for reproducibility
@@ -124,20 +134,40 @@ export interface HitResult {
   weapon_subtype?: string;
 }
 
+/** Pick the equipped weapon to use for this skill (or basic attack). */
+export function pickWeapon(skill: SkillDef | null, snap: CharacterSnapshot): WeaponEntry {
+  const wmap = snap.weapons ?? {};
+  const fallback: WeaponEntry = {
+    min: snap.weapon_min ?? 12,
+    max: snap.weapon_max ?? 18,
+    subtype: snap.weapon_subtype ?? 'unarmed',
+    damage_type: snap.weapon_damage_type ?? 'physical',
+    scale_stat: snap.weapon_scale_stat ?? 'strength',
+  };
+  if (skill) {
+    const byStat: Record<ScaleStat, 'melee' | 'gun' | 'launcher' | 'staff'> = {
+      strength: 'melee', dexterity: 'gun', technology: 'staff', support: 'launcher',
+    };
+    return wmap[byStat[skill.scale_stat]] ?? fallback;
+  }
+  // Basic attack: melee → gun → staff → launcher → fallback
+  return wmap.melee ?? wmap.gun ?? wmap.staff ?? wmap.launcher ?? fallback;
+}
+
 /** Resolve which stat a skill (or basic attack) scales with for the current attacker. */
-function pickScaleStat(skill: SkillDef | null, snap: CharacterSnapshot): ScaleStat {
+function pickScaleStat(skill: SkillDef | null, weapon: WeaponEntry): ScaleStat {
   if (skill) return skill.scale_stat;
-  return snap.weapon_scale_stat ?? 'strength';
+  return weapon.scale_stat;
 }
 
 /** Resolve damage type for a skill / basic attack. */
-function pickDamageType(skill: SkillDef | null, snap: CharacterSnapshot): 'physical' | 'energy' | 'hybrid' {
+function pickDamageType(skill: SkillDef | null, weapon: WeaponEntry): 'physical' | 'energy' | 'hybrid' {
   if (skill) {
     if (skill.type === 'magical') return 'energy';
     if (skill.type === 'special') return 'hybrid';
     return 'physical';
   }
-  return snap.weapon_damage_type ?? 'physical';
+  return weapon.damage_type;
 }
 
 /** Per-stat scaling multiplier (added to stat power), depending on damage type. */
@@ -152,8 +182,9 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
   const aSnap = attacker.snapshot;
   const dSnap = defender.snapshot;
 
-  const dmgType = pickDamageType(skill, aSnap);
-  const scaleStat = pickScaleStat(skill, aSnap);
+  const weapon = pickWeapon(skill, aSnap);
+  const dmgType = pickDamageType(skill, weapon);
+  const scaleStat = pickScaleStat(skill, weapon);
 
   // Dodge check
   const dodgeBuff = defender.status_effects.find(e => e.type === 'dodge');
@@ -162,13 +193,13 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
       damage: 0, crit: false, blocked: false, dodged: true, raw: 0,
       damage_type: dmgType, scale_stat: scaleStat,
       weapon_roll: 0, stat_power: 0, rank_mult: 1, mit_pct: 0,
-      weapon_subtype: aSnap.weapon_subtype,
+      weapon_subtype: weapon.subtype,
     };
   }
 
   // ---- Per-hit weapon roll (the source of variance) ----
-  const wMin = Math.max(1, aSnap.weapon_min ?? 1);
-  const wMax = Math.max(wMin, aSnap.weapon_max ?? wMin);
+  const wMin = Math.max(1, weapon.min);
+  const wMax = Math.max(wMin, weapon.max);
   const weaponRoll = Math.floor(wMin + rng() * (wMax - wMin + 1));
 
   // ---- Stat scaling ----
@@ -265,7 +296,7 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
     stat_power: Math.floor(statPower),
     rank_mult: rankMult,
     mit_pct: mitPct,
-    weapon_subtype: aSnap.weapon_subtype,
+    weapon_subtype: weapon.subtype,
   };
 }
 
