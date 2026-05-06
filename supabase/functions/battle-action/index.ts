@@ -94,29 +94,37 @@ Deno.serve(async (req) => {
     if (action === 'defend') {
       result.defending = true;
       actor.energy = Math.min(actor.max_energy, actor.energy + 15);
+      actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+      result.ultimate_charge = actor.ultimate_charge;
     } else if (action === 'attack') {
       const hit = resolveHit({ attacker: actor, defender: target, skill: null, defending: false, rng });
       target.hp = Math.max(0, target.hp - hit.damage);
       actor.rage = Math.min(100, actor.rage + 10);
       result.hits.push(hit);
+      actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+      result.ultimate_charge = actor.ultimate_charge;
     } else if (action === 'skill') {
       if (!skillSlug) return j({ error: 'skillSlug required' }, 400);
       const { data: skill } = await admin.from('skills').select('*').eq('slug', skillSlug).maybeSingle();
       if (!skill) return j({ error: 'skill not found' }, 404);
 
       const skillDef = skill as SkillDef;
+      const ult = isUltimateSkill(skillDef);
       const lvl = (actor.snapshot.skill_levels as Record<string, number> | undefined)?.[skillSlug] ?? 0;
       if (lvl < 1) return j({ error: 'skill not learned' }, 403);
       if (actor.snapshot.level < skillDef.unlock_level) return j({ error: 'level too low' }, 403);
-      if ((actor.cooldowns[skillSlug] ?? 0) > 0) return j({ error: 'on cooldown' }, 400);
+      if ((actor.cooldowns[skillSlug] ?? 0) > 0) return j({ error: 'Ultimate is on cooldown.' }, 400);
       if (actor.energy < skillDef.energy_cost) return j({ error: 'not enough energy' }, 400);
+      if (ult && (actor.ultimate_charge ?? 0) < ULTIMATE_CHARGE_REQUIRED) {
+        return j({ error: 'Ultimate requires 3 charge.' }, 400);
+      }
 
       actor.energy -= skillDef.energy_cost;
       actor.cooldowns[skillSlug] = skillDef.cooldown;
 
       for (let i = 0; i < skillDef.hits; i++) {
         if (target.hp <= 0) break;
-        const hit = resolveHit({ attacker: actor, defender: target, skill: skillDef, defending: false, rng });
+        const hit = resolveHit({ attacker: actor, defender: target, skill: skillDef, defending: false, rng, isUltimate: ult });
         target.hp = Math.max(0, target.hp - hit.damage);
         result.hits.push(hit);
       }
@@ -127,6 +135,13 @@ Deno.serve(async (req) => {
         result.effect = skillDef.effect;
       }
       actor.rage = Math.min(100, actor.rage + 15);
+      if (ult) {
+        actor.ultimate_charge = 0;
+        result.ultimate_used = true;
+      } else {
+        actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
+      }
+      result.ultimate_charge = actor.ultimate_charge;
     } else {
       return j({ error: 'invalid action' }, 400);
     }
