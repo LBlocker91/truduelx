@@ -295,21 +295,73 @@ export const ProfilePanel = ({ characterId, refreshTick, onProgressionChange }: 
       </div>
 
       <div className="game-card rounded-lg p-4">
+        <h3 className="font-orbitron text-sm text-muted-foreground mb-2 flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-secondary" /> DAMAGE PREVIEW
+        </h3>
+        <div className="flex items-baseline justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">vs Lv {c.level} dummy</div>
+            <div className="font-orbitron text-2xl text-secondary">
+              {dmg.min}<span className="text-muted-foreground text-base"> – </span>{dmg.max}
+            </div>
+          </div>
+          <div className="text-right text-[10px] text-muted-foreground space-y-0.5">
+            <div>type: <span className="text-foreground capitalize">{dmg.damageType}</span></div>
+            <div>scales: <span className="text-foreground uppercase">{dmg.scaleStat.slice(0, 3)}</span></div>
+            <div>mit: <span className="text-foreground">{Math.round(dmg.mitPct * 100)}%</span></div>
+          </div>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
+          Live preview of your weapon's basic attack. Allocating stats updates this instantly.
+        </p>
+      </div>
+
+      <div className="game-card rounded-lg p-4">
         <h3 className="font-orbitron text-sm text-muted-foreground mb-2">EQUIPPED</h3>
         {equipped.length === 0 ? (
           <p className="text-xs text-muted-foreground">Nothing equipped. Open Inventory to equip gear.</p>
         ) : (
           <ul className="space-y-1.5">
-            {equipped.map((it) => (
-              <li key={it.slot} className="flex items-center justify-between text-sm">
-                <span className="font-rajdhani"><span className="text-muted-foreground capitalize text-xs mr-2">{it.slot}</span>{it.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {it.slot === 'weapon' && it.min_damage != null ? `${it.min_damage}-${it.max_damage} dmg` : `+${it.defense} def`}
-                </span>
-              </li>
-            ))}
+            {equipped.map((it) => {
+              const mods = it.stat_modifiers ?? {};
+              const modParts = Object.entries(mods)
+                .filter(([, v]) => Number(v) !== 0)
+                .map(([k, v]) => `+${v} ${k.replace('max_', '').slice(0, 3).toUpperCase()}`);
+              const right =
+                it.slot === 'weapon' && it.min_damage != null
+                  ? `${it.min_damage}-${it.max_damage} dmg`
+                  : it.defense > 0 ? `+${it.defense} def` : modParts[0] ?? '';
+              const SlotIcon =
+                it.slot === 'weapon' ? Sword :
+                it.slot === 'armor' ? Shield :
+                it.slot === 'wings' ? Feather :
+                it.slot === 'pet' ? Bot : Sparkles;
+              return (
+                <li key={it.id} className="flex items-center justify-between text-sm gap-2">
+                  <span className="font-rajdhani flex items-center gap-2 min-w-0">
+                    <SlotIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground capitalize text-xs">{it.slot}</span>
+                    <span className="truncate">{it.name}</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{right}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
+        {(gearBonus.strength || gearBonus.dexterity || gearBonus.technology || gearBonus.support || gearBonus.defense || gearBonus.resistance || gearBonus.max_hp || gearBonus.max_energy) ? (
+          <div className="mt-3 pt-2 border-t border-border/50 text-[10px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 font-rajdhani">
+            <span className="text-foreground/80 font-orbitron text-[9px] uppercase tracking-wider">Gear bonus:</span>
+            {gearBonus.strength ? <span>+{gearBonus.strength} STR</span> : null}
+            {gearBonus.dexterity ? <span>+{gearBonus.dexterity} DEX</span> : null}
+            {gearBonus.technology ? <span>+{gearBonus.technology} TEC</span> : null}
+            {gearBonus.support ? <span>+{gearBonus.support} SUP</span> : null}
+            {gearBonus.defense ? <span>+{gearBonus.defense} DEF</span> : null}
+            {gearBonus.resistance ? <span>+{gearBonus.resistance} RES</span> : null}
+            {gearBonus.max_hp ? <span>+{gearBonus.max_hp} HP</span> : null}
+            {gearBonus.max_energy ? <span>+{gearBonus.max_energy} MP</span> : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="game-card rounded-lg p-4 space-y-2">
