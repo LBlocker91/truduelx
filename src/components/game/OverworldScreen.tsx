@@ -438,6 +438,7 @@ export const OverworldScreen = ({
 
   const bg = ZONE_BG[zone.id] ?? stationHub;
   const interactable = closestNpc();
+  const nearbyPortal = closestPortal();
 
   return (
     <div className={`${hideChrome ? 'absolute inset-0 h-full w-full flex flex-col' : 'min-h-screen flex flex-col'} bg-black text-foreground min-h-0`}>
