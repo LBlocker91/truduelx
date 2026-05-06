@@ -104,7 +104,14 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
         refreshPotions(myRow.character_id);
       }
     }
-    if (a.data) setActions(a.data as any);
+    if (a.data) {
+      setActions(prev => {
+        const map = new Map<string, ActionRow>();
+        for (const row of (a.data as any[])) map.set(row.id, row as ActionRow);
+        for (const row of prev) if (!map.has(row.id)) map.set(row.id, row);
+        return Array.from(map.values()).sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime()).slice(0, 20);
+      });
+    }
   }, [battleId, myUserId, refreshPotions]);
 
   useEffect(() => { refresh(); }, [refresh]);
