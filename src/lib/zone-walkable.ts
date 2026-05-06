@@ -19,6 +19,24 @@ export interface NpcPlacement {
   interaction: Vec2;
 }
 
+/** A traversal portal that connects to another zone (door/airlock/transport). */
+export interface ZonePortal {
+  /** Stable id for the portal (used for entry-spawn matching). */
+  id: string;
+  /** Target zone id this portal leads to. */
+  to: string;
+  /** Friendly label, e.g. "Neon District". */
+  label: string;
+  /** Visual icon kind. */
+  kind: 'door' | 'airlock' | 'portal' | 'transport';
+  /** Where the portal is rendered (% space). */
+  visual: Vec2;
+  /** Where the player must stand to trigger interaction (% space). */
+  interaction: Vec2;
+  /** Where the player should spawn when entering this zone via this portal. */
+  arrival: Vec2;
+}
+
 export interface ZoneWalkable {
   /** Walkable floor polygon in % coords. */
   polygon: Vec2[];
@@ -26,6 +44,8 @@ export interface ZoneWalkable {
   spawn: Vec2;
   /** Per-NPC layout keyed by NPC name (matches seeded data). */
   npcs: Record<string, NpcPlacement>;
+  /** Optional portals connecting this zone to others. */
+  portals?: ZonePortal[];
 }
 
 // ---- Zone definitions --------------------------------------------------------
