@@ -314,7 +314,11 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
               const onCd = (me.cooldowns?.[s.slug] ?? 0) > 0;
               const lowEnergy = me.energy < s.energy_cost;
               const lowLvl = me.snapshot.level < s.unlock_level;
-               const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowEnergy || lowLvl;
+              const ult = (s.cooldown ?? 0) >= 6;
+              const charge = me.ultimate_charge ?? 0;
+              const lowCharge = ult && charge < 3;
+              const ready = ult && !lowCharge && !onCd && !lowEnergy && !lowLvl && learned;
+              const disabled = !myTurn || submitting || playbackAnimating || !learned || onCd || lowEnergy || lowLvl || lowCharge;
               return (
                 <Button
                   key={s.slug}
@@ -322,12 +326,16 @@ export const PvpBattleScreen = ({ battleId, myUserId, onExit }: PvpBattleScreenP
                   variant="outline"
                   size="sm"
                   onClick={() => doAction({ battleId, action: 'skill', skillSlug: s.slug })}
-                  title={`${s.description} | ⚡${s.energy_cost} | CD ${s.cooldown}${!learned ? ' | NOT LEARNED' : ''}${lowLvl ? ` | Lv ${s.unlock_level}` : ''}`}
-                  className="flex flex-col h-auto py-1 px-2"
+                  title={`${s.description} | ⚡${s.energy_cost} | CD ${s.cooldown}${ult ? ` | Charge ${charge}/3` : ''}${!learned ? ' | NOT LEARNED' : ''}${lowLvl ? ` | Lv ${s.unlock_level}` : ''}`}
+                  className={`flex flex-col h-auto py-1 px-2 ${ready ? 'border-accent shadow-[0_0_12px_hsl(var(--accent)/0.6)]' : ''}`}
                 >
-                  <span className="font-orbitron text-[10px]">{s.name}</span>
+                  <span className="font-orbitron text-[10px]">{ult && '★ '}{s.name}</span>
                   <span className="text-[9px] text-muted-foreground">
-                    {onCd ? `CD ${me.cooldowns[s.slug]}` : `⚡${s.energy_cost}`}
+                    {onCd
+                      ? `CD ${me.cooldowns[s.slug]}`
+                      : ult
+                        ? (lowCharge ? `Charge ${charge}/3` : 'Ready')
+                        : `⚡${s.energy_cost}`}
                     {!learned && ' 🔒'}
                   </span>
                 </Button>
