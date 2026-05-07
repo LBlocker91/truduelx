@@ -195,7 +195,7 @@ export const BuildPanel = ({
         it.item.slot === 'weapon' ? 'melee' :
         it.item.slot === 'gun' ? 'gun' :
         it.item.slot === 'launcher' ? 'launcher' :
-        it.item.slot === 'staff' ? 'staff' : null;
+        it.item.slot === 'pet' ? 'pet' : null;
       if (!slotKey || !it.item.min_damage || !it.item.max_damage) continue;
       const sub = it.item.weapon_subtype ?? slotKey;
       map[slotKey] = {
@@ -209,7 +209,7 @@ export const BuildPanel = ({
     return map;
   }, [equipped]);
 
-  const weaponForBasic = weaponMap.melee ?? weaponMap.gun ?? weaponMap.staff ?? weaponMap.launcher ?? {
+  const weaponForBasic = weaponMap.melee ?? weaponMap.gun ?? weaponMap.launcher ?? weaponMap.pet ?? {
     min: 12, max: 18, subtype: 'unarmed', damageType: 'physical' as DamageType, scale: 'strength' as ScaleStat,
   };
   const weaponSubtype = weaponForBasic.subtype;
@@ -219,7 +219,7 @@ export const BuildPanel = ({
   const weaponMax = weaponForBasic.max;
 
   const weaponForSkill = (s: SkillRow) => {
-    const byStat: Record<string, string> = { strength: 'melee', dexterity: 'gun', technology: 'staff', support: 'launcher' };
+    const byStat: Record<string, string> = { strength: 'melee', dexterity: 'gun', technology: 'melee', support: 'launcher' };
     return weaponMap[byStat[s.scale_stat]] ?? weaponForBasic;
   };
 
@@ -568,24 +568,21 @@ const BuildBody = (p: BuildBodyProps) => {
           <ColHeader icon={<Shield className="w-4 h-4" />} title="EQUIPMENT" />
 
           <div className="grid grid-cols-2 gap-2">
-            <EquippedSlot label="Melee" icon={<Sword className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'weapon')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Strength weapon" />
+            <EquippedSlot label="Melee / Staff" icon={<Sword className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'weapon')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Strength / Tech weapon" />
             <EquippedSlot label="Gun" icon={<Target className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'gun')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Dexterity weapon" />
             <EquippedSlot label="Launcher" icon={<Sparkles className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'launcher')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Support weapon" />
-            <EquippedSlot label="Tech Staff" icon={<Cpu className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'staff')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Tech weapon" />
             <EquippedSlot label="Armor" icon={<Shield className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'armor')} onUnequip={p.handleEquip} busy={p.busyEquip} />
             <EquippedSlot label="Wings" icon={<Feather className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'wings')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Buy from Broker Vexon" />
-            <EquippedSlot label="Robot Pet" icon={<Bot className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'pet')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Buy from Broker Vexon" />
+            <EquippedSlot label="Robot Pet" icon={<Bot className="w-3.5 h-3.5" />} item={p.equipped.find(e => e.item.slot === 'pet')} onUnequip={p.handleEquip} busy={p.busyEquip} emptyHint="Attacks in battle" />
           </div>
 
           <ColHeader icon={<Sword className="w-4 h-4" />} title="OWNED GEAR" />
-          <OwnedGroup title="Melee" icon={<Sword className="w-3 h-3" />} items={p.ownedBySlot('weapon')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
+          <OwnedGroup title="Melee & Tech Staves" icon={<Sword className="w-3 h-3" />} items={p.ownedBySlot('weapon')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
           <OwnedGroup title="Guns" icon={<Target className="w-3 h-3" />} items={p.ownedBySlot('gun')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
           <OwnedGroup title="Launchers" icon={<Sparkles className="w-3 h-3" />} items={p.ownedBySlot('launcher')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
-          <OwnedGroup title="Tech Staves" icon={<Cpu className="w-3 h-3" />} items={p.ownedBySlot('staff')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
           <OwnedGroup title="Armor" icon={<Shield className="w-3 h-3" />} items={p.ownedBySlot('armor')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
           <OwnedGroup title="Wings" icon={<Feather className="w-3 h-3" />} items={p.ownedBySlot('wings')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
           <OwnedGroup title="Robot Pets" icon={<Bot className="w-3 h-3" />} items={p.ownedBySlot('pet')} char={p.c} onEquip={p.handleEquip} busy={p.busyEquip} />
-
 
           {/* Consumables compact */}
           <div className="game-card rounded-lg p-3">

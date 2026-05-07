@@ -63,7 +63,7 @@ export interface CharacterSnapshot {
   /** Strongest scaling stat for the equipped weapon's basic attack */
   weapon_scale_stat?: ScaleStat;
   /** All equipped weapons keyed by slot. Combat picks the right one per skill / basic attack. */
-  weapons?: Partial<Record<'melee' | 'gun' | 'launcher' | 'staff', WeaponEntry>>;
+  weapons?: Partial<Record<'melee' | 'gun' | 'launcher' | 'pet', WeaponEntry>>;
   skill_levels: Record<string, number>;
   equipped?: { weapon_variant: string | null; armor_variant: string | null };
   /** Cosmetic/passive equipped extras for VFX */
@@ -108,6 +108,8 @@ interface DamageOpts {
   defending: boolean;
   rng: () => number;
   isUltimate?: boolean;
+  /** Force which equipped weapon slot to use (for player-chosen weapon attack). */
+  weaponSlot?: 'melee' | 'gun' | 'launcher' | 'pet';
 }
 
 /** A skill is treated as an ultimate when its cooldown is high. */
@@ -134,8 +136,11 @@ export interface HitResult {
   weapon_subtype?: string;
 }
 
-/** Pick the equipped weapon to use for this skill (or basic attack). */
-export function pickWeapon(skill: SkillDef | null, snap: CharacterSnapshot): WeaponEntry {
+/** Pick the equipped weapon to use for this skill (or basic attack).
+ *  Skill scaling stat picks the slot:
+ *    strength → melee, dexterity → gun, technology → melee (tech_staff lives in melee), support → launcher.
+ *  Basic attack falls back through melee → gun → launcher → pet. */
+export function pickWeapon(skill: SkillDef | null, snap: CharacterSnapshot, override?: 'melee' | 'gun' | 'launcher' | 'pet'): WeaponEntry {
   const wmap = snap.weapons ?? {};
   const fallback: WeaponEntry = {
     min: snap.weapon_min ?? 12,
@@ -144,14 +149,14 @@ export function pickWeapon(skill: SkillDef | null, snap: CharacterSnapshot): Wea
     damage_type: snap.weapon_damage_type ?? 'physical',
     scale_stat: snap.weapon_scale_stat ?? 'strength',
   };
+  if (override) return wmap[override] ?? fallback;
   if (skill) {
-    const byStat: Record<ScaleStat, 'melee' | 'gun' | 'launcher' | 'staff'> = {
-      strength: 'melee', dexterity: 'gun', technology: 'staff', support: 'launcher',
+    const byStat: Record<ScaleStat, 'melee' | 'gun' | 'launcher' | 'pet'> = {
+      strength: 'melee', dexterity: 'gun', technology: 'melee', support: 'launcher',
     };
     return wmap[byStat[skill.scale_stat]] ?? fallback;
   }
-  // Basic attack: melee → gun → staff → launcher → fallback
-  return wmap.melee ?? wmap.gun ?? wmap.staff ?? wmap.launcher ?? fallback;
+  return wmap.melee ?? wmap.gun ?? wmap.launcher ?? wmap.pet ?? fallback;
 }
 
 /** Resolve which stat a skill (or basic attack) scales with for the current attacker. */
@@ -177,12 +182,12 @@ function statScaleMultFor(dmgType: 'physical' | 'energy' | 'hybrid'): number {
   return 0.9; // hybrid
 }
 
-export function resolveHit({ attacker, defender, skill, defending, rng, isUltimate }: DamageOpts): HitResult {
+export function resolveHit({ attacker, defender, skill, defending, rng, isUltimate, weaponSlot }: DamageOpts): HitResult {
   const ult = !!isUltimate || isUltimateSkill(skill);
   const aSnap = attacker.snapshot;
   const dSnap = defender.snapshot;
 
-  const weapon = pickWeapon(skill, aSnap);
+  const weapon = pickWeapon(skill, aSnap, weaponSlot);
   const dmgType = pickDamageType(skill, weapon);
   const scaleStat = pickScaleStat(skill, weapon);
 

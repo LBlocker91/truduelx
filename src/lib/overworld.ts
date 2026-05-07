@@ -229,9 +229,10 @@ export async function submitNpcAction(
   playerAction: 'attack' | 'defend' | 'forfeit' | 'skill' | 'use_item' | 'tick',
   skillSlug?: string,
   itemSubtype?: 'hp_potion' | 'mp_potion',
+  weaponSlot?: 'melee' | 'gun' | 'launcher' | 'pet',
 ) {
   const { data, error } = await supabase.functions.invoke('npc-battle', {
-    body: { action: 'act', battleId, playerAction, skillSlug, itemSubtype },
+    body: { action: 'act', battleId, playerAction, skillSlug, itemSubtype, weaponSlot },
   });
   if (error) {
     // Edge function returned non-2xx — try to extract structured error from context

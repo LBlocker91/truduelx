@@ -10,7 +10,7 @@ export interface InventoryItem {
     id: string;
     name: string;
     description: string | null;
-    slot: 'weapon' | 'gun' | 'launcher' | 'staff' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable' | 'wings' | 'pet';
+    slot: 'weapon' | 'gun' | 'launcher' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable' | 'wings' | 'pet';
     rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
     level_req: number;
     min_damage: number | null;
