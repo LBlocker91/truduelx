@@ -1,17 +1,19 @@
 /** Map a skill (or basic attack) to a visual VFX category for the BattleStage. */
 
 export type SkillVfx =
-  | 'physical_light'    // jab/quick strike
-  | 'physical_heavy'    // shockwave/heavy impact
-  | 'ranged_shot'       // tracer/bullet
-  | 'tech_bolt'         // plasma bolt
-  | 'tech_aoe'          // plasma nova
-  | 'support_heal'      // green heal glow
-  | 'support_buff'      // golden buff ring
-  | 'support_shield'    // shield shimmer
-  | 'control_stun'      // electric ring lock
-  | 'control_dot'       // sickly green/purple drip
-  | 'ultimate';         // big VFX + camera shake banner
+  | 'physical_light'
+  | 'physical_heavy'
+  | 'ranged_shot'       // gun: yellow tracer
+  | 'launcher_rocket'   // launcher: orange rocket + big shockwave
+  | 'pet_drone'         // pet: green homing bolt
+  | 'tech_bolt'         // staff: cyan plasma
+  | 'tech_aoe'
+  | 'support_heal'
+  | 'support_buff'
+  | 'support_shield'
+  | 'control_stun'
+  | 'control_dot'
+  | 'ultimate';
 
 export interface SkillLike {
   slug?: string;
