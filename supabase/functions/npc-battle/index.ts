@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       return await startBattle(admin, user.id, body.npcId, body.characterId);
     }
     if (body.action === 'act') {
-      return await processAction(admin, user.id, body.battleId, body.playerAction, body.skillSlug, body.itemSubtype);
+      return await processAction(admin, user.id, body.battleId, body.playerAction, body.skillSlug, body.itemSubtype, body.weaponSlot);
     }
     return j({ error: 'invalid action' }, 400);
   } catch (e) {
@@ -148,6 +148,7 @@ async function processAction(
   playerAction: string,
   skillSlug?: string,
   itemSubtype?: string,
+  weaponSlot?: 'melee' | 'gun' | 'launcher' | 'pet',
 ) {
   const { data: battle } = await admin.from('battles').select('*').eq('id', battleId).maybeSingle();
   if (!battle) return j({ error: 'battle not found' }, 404);
@@ -186,6 +187,7 @@ async function processAction(
     action: playerAction,
     skillSlug,
     itemSubtype,
+    weaponSlot,
     isBot: false,
     characterId: player.character_id ?? null,
   });
@@ -319,6 +321,7 @@ async function executeTurn({
   action,
   skillSlug,
   itemSubtype,
+  weaponSlot,
   isBot,
   characterId,
 }: {
@@ -329,6 +332,7 @@ async function executeTurn({
   action: string;
   skillSlug?: string;
   itemSubtype?: string;
+  weaponSlot?: 'melee' | 'gun' | 'launcher' | 'pet';
   isBot: boolean;
   characterId?: string | null;
 }): Promise<{ result: any; error?: string }> {
@@ -384,10 +388,14 @@ async function executeTurn({
     actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
     result.ultimate_charge = actor.ultimate_charge;
   } else if (action === 'attack') {
-    const hit = resolveHit({ attacker: actor, defender: target, skill: null, defending: false, rng });
+    const slot = !isBot && weaponSlot ? weaponSlot : undefined;
+    const wmap = (actor.snapshot as any).weapons ?? {};
+    if (slot && !wmap[slot]) return { result: {}, error: `no ${slot} equipped` };
+    const hit = resolveHit({ attacker: actor, defender: target, skill: null, defending: false, rng, weaponSlot: slot });
     target.hp = Math.max(0, target.hp - hit.damage);
     actor.rage = Math.min(100, actor.rage + 10);
     result.hits.push(hit);
+    if (slot) result.weapon_slot = slot;
     if (!hit.dodged) {
       actor.ultimate_charge = Math.min(ULTIMATE_CHARGE_REQUIRED, (actor.ultimate_charge ?? 0) + 1);
     }
@@ -646,16 +654,15 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
   let petVariant: string | null = null;
   const weapons: Record<string, any> = {};
   let primaryWeaponItem: any = null;
-  const slotKey = (slot: string, sub?: string): 'melee' | 'gun' | 'launcher' | 'staff' | null => {
+  const slotKey = (slot: string, sub?: string): 'melee' | 'gun' | 'launcher' | 'pet' | null => {
     if (slot === 'gun') return 'gun';
     if (slot === 'launcher') return 'launcher';
-    if (slot === 'staff') return 'staff';
-    if (slot === 'weapon') return 'melee';
-    // legacy fallback by weapon_subtype
+    if (slot === 'pet') return 'pet';
+    if (slot === 'weapon' || slot === 'staff') return 'melee'; // staff merged into melee
     if (sub === 'pistol' || sub === 'rifle') return 'gun';
     if (sub === 'rocket_launcher') return 'launcher';
-    if (sub === 'tech_staff') return 'staff';
-    if (sub === 'blade' || sub === 'heavy') return 'melee';
+    if (sub === 'drone') return 'pet';
+    if (sub === 'tech_staff' || sub === 'blade' || sub === 'heavy') return 'melee';
     return null;
   };
   for (const row of inv ?? []) {

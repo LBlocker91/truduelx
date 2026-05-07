@@ -1,17 +1,19 @@
 /** Map a skill (or basic attack) to a visual VFX category for the BattleStage. */
 
 export type SkillVfx =
-  | 'physical_light'    // jab/quick strike
-  | 'physical_heavy'    // shockwave/heavy impact
-  | 'ranged_shot'       // tracer/bullet
-  | 'tech_bolt'         // plasma bolt
-  | 'tech_aoe'          // plasma nova
-  | 'support_heal'      // green heal glow
-  | 'support_buff'      // golden buff ring
-  | 'support_shield'    // shield shimmer
-  | 'control_stun'      // electric ring lock
-  | 'control_dot'       // sickly green/purple drip
-  | 'ultimate';         // big VFX + camera shake banner
+  | 'physical_light'
+  | 'physical_heavy'
+  | 'ranged_shot'       // gun: yellow tracer
+  | 'launcher_rocket'   // launcher: orange rocket + big shockwave
+  | 'pet_drone'         // pet: green homing bolt
+  | 'tech_bolt'         // staff: cyan plasma
+  | 'tech_aoe'
+  | 'support_heal'
+  | 'support_buff'
+  | 'support_shield'
+  | 'control_stun'
+  | 'control_dot'
+  | 'ultimate';
 
 export interface SkillLike {
   slug?: string;
@@ -34,9 +36,11 @@ export const classifySkillVfx = (
 ): SkillVfx => {
   // Basic attack — drive by weapon
   if (!skill) {
-    if (weaponVariant === 'gun') return 'ranged_shot';
-    if (weaponVariant === 'staff') return 'tech_bolt';
-    if (weaponVariant === 'axe') return 'physical_heavy';
+    if (weaponVariant === 'gun' || weaponVariant === 'pistol' || weaponVariant === 'rifle') return 'ranged_shot';
+    if (weaponVariant === 'launcher' || weaponVariant === 'rocket_launcher') return 'launcher_rocket';
+    if (weaponVariant === 'pet' || weaponVariant === 'drone') return 'pet_drone';
+    if (weaponVariant === 'staff' || weaponVariant === 'tech_staff') return 'tech_bolt';
+    if (weaponVariant === 'axe' || weaponVariant === 'heavy') return 'physical_heavy';
     return 'physical_light';
   }
 
@@ -110,6 +114,22 @@ export const VFX_PRESET: Record<SkillVfx, {
     damageColor: 'hsl(45 100% 65%)',
     bannerColor: 'hsl(45 100% 70%)',
     shake: 'small', hasProjectile: true, hasMuzzle: true, hasCharge: false,
+    hasSlash: false, hasShockwave: false, hasHealAura: false, hasBuffRing: false,
+    hasShieldDome: false, hasStunRing: false, hasDotDrip: false, isUltimate: false,
+  },
+  launcher_rocket: {
+    hue: 'hsl(20 100% 55%)',
+    damageColor: 'hsl(20 100% 60%)',
+    bannerColor: 'hsl(20 100% 65%)',
+    shake: 'large', hasProjectile: true, hasMuzzle: true, hasCharge: false,
+    hasSlash: false, hasShockwave: true, hasHealAura: false, hasBuffRing: false,
+    hasShieldDome: false, hasStunRing: false, hasDotDrip: false, isUltimate: false,
+  },
+  pet_drone: {
+    hue: 'hsl(140 90% 55%)',
+    damageColor: 'hsl(140 90% 60%)',
+    bannerColor: 'hsl(140 90% 65%)',
+    shake: 'small', hasProjectile: true, hasMuzzle: false, hasCharge: true,
     hasSlash: false, hasShockwave: false, hasHealAura: false, hasBuffRing: false,
     hasShieldDome: false, hasStunRing: false, hasDotDrip: false, isUltimate: false,
   },

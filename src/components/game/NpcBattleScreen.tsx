@@ -301,13 +301,13 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     action: 'attack'|'defend'|'forfeit'|'skill'|'use_item',
     skillSlug?: string,
     itemSubtype?: 'hp_potion'|'mp_potion',
+    weaponSlot?: 'melee'|'gun'|'launcher'|'pet',
   ) => {
     if (submitting || playbackAnimating || !myTurn) return;
     setSubmitting(true);
     try {
-      const r = await submitNpcAction(battleId, action, skillSlug, itemSubtype);
+      const r = await submitNpcAction(battleId, action, skillSlug, itemSubtype, weaponSlot);
       if (r?.error) {
-        // Ignore benign turn-race errors; the next poll will refresh state
         if (r.error !== 'not your turn') {
           const { toast } = await import('sonner');
           toast.error(r.error);
@@ -324,6 +324,8 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     } catch (e: any) { console.error(e); }
     finally { setSubmitting(false); }
   };
+
+  const myWeapons = (me?.snapshot?.weapons ?? {}) as Record<string, any>;
 
   const handleExit = async () => {
     await setInBattle(false);
@@ -387,8 +389,23 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2 justify-center">
             <Button disabled={!myTurn || submitting || playbackAnimating} onClick={() => doAction('attack')}>
-              <Swords className="w-4 h-4 mr-1" /> Attack
+              <Swords className="w-4 h-4 mr-1" /> Melee
             </Button>
+            {myWeapons.gun && (
+              <Button disabled={!myTurn || submitting || playbackAnimating} variant="outline" onClick={() => doAction('attack', undefined, undefined, 'gun')}>
+                🔫 Gun
+              </Button>
+            )}
+            {myWeapons.launcher && (
+              <Button disabled={!myTurn || submitting || playbackAnimating} variant="outline" onClick={() => doAction('attack', undefined, undefined, 'launcher')}>
+                🚀 Launcher
+              </Button>
+            )}
+            {myWeapons.pet && (
+              <Button disabled={!myTurn || submitting || playbackAnimating} variant="outline" onClick={() => doAction('attack', undefined, undefined, 'pet')}>
+                🤖 Pet
+              </Button>
+            )}
             <Button disabled={!myTurn || submitting || playbackAnimating} variant="secondary" onClick={() => doAction('defend')}>
               <Shield className="w-4 h-4 mr-1" /> Defend
             </Button>

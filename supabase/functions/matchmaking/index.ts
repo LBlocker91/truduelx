@@ -133,14 +133,15 @@ async function buildSnapshot(admin: any, characterId: string, userId: string): P
   let strBonus = 0, dexBonus = 0, techBonus = 0, supBonus = 0;
   const weapons: Record<string, any> = {};
   let primaryItem: any = null;
-  const slotKey = (slot: string, sub?: string): 'melee' | 'gun' | 'launcher' | 'staff' | null => {
+  const slotKey = (slot: string, sub?: string): 'melee' | 'gun' | 'launcher' | 'pet' | null => {
     if (slot === 'gun') return 'gun';
     if (slot === 'launcher') return 'launcher';
-    if (slot === 'staff') return 'staff';
-    if (slot === 'weapon') return 'melee';
+    if (slot === 'pet') return 'pet';
+    if (slot === 'weapon' || slot === 'staff') return 'melee';
     if (sub === 'pistol' || sub === 'rifle') return 'gun';
     if (sub === 'rocket_launcher') return 'launcher';
-    if (sub === 'tech_staff') return 'staff';
+    if (sub === 'drone') return 'pet';
+    if (sub === 'tech_staff') return 'melee';
     return null;
   };
   for (const row of inv ?? []) {
