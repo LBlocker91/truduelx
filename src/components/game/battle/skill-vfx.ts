@@ -117,6 +117,22 @@ export const VFX_PRESET: Record<SkillVfx, {
     hasSlash: false, hasShockwave: false, hasHealAura: false, hasBuffRing: false,
     hasShieldDome: false, hasStunRing: false, hasDotDrip: false, isUltimate: false,
   },
+  launcher_rocket: {
+    hue: 'hsl(20 100% 55%)',
+    damageColor: 'hsl(20 100% 60%)',
+    bannerColor: 'hsl(20 100% 65%)',
+    shake: 'large', hasProjectile: true, hasMuzzle: true, hasCharge: false,
+    hasSlash: false, hasShockwave: true, hasHealAura: false, hasBuffRing: false,
+    hasShieldDome: false, hasStunRing: false, hasDotDrip: false, isUltimate: false,
+  },
+  pet_drone: {
+    hue: 'hsl(140 90% 55%)',
+    damageColor: 'hsl(140 90% 60%)',
+    bannerColor: 'hsl(140 90% 65%)',
+    shake: 'small', hasProjectile: true, hasMuzzle: false, hasCharge: true,
+    hasSlash: false, hasShockwave: false, hasHealAura: false, hasBuffRing: false,
+    hasShieldDome: false, hasStunRing: false, hasDotDrip: false, isUltimate: false,
+  },
   tech_bolt: {
     hue: 'hsl(195 100% 65%)',
     damageColor: 'hsl(195 100% 70%)',
