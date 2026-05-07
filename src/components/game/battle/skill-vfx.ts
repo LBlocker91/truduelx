@@ -36,9 +36,11 @@ export const classifySkillVfx = (
 ): SkillVfx => {
   // Basic attack — drive by weapon
   if (!skill) {
-    if (weaponVariant === 'gun') return 'ranged_shot';
-    if (weaponVariant === 'staff') return 'tech_bolt';
-    if (weaponVariant === 'axe') return 'physical_heavy';
+    if (weaponVariant === 'gun' || weaponVariant === 'pistol' || weaponVariant === 'rifle') return 'ranged_shot';
+    if (weaponVariant === 'launcher' || weaponVariant === 'rocket_launcher') return 'launcher_rocket';
+    if (weaponVariant === 'pet' || weaponVariant === 'drone') return 'pet_drone';
+    if (weaponVariant === 'staff' || weaponVariant === 'tech_staff') return 'tech_bolt';
+    if (weaponVariant === 'axe' || weaponVariant === 'heavy') return 'physical_heavy';
     return 'physical_light';
   }
 
