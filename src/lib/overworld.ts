@@ -96,7 +96,13 @@ export interface PlayerQuest {
 }
 
 // ---- Presence ----
+async function hasSession(): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  return !!data.session;
+}
+
 export async function enterZone(zoneId: string) {
+  if (!(await hasSession())) return null;
   const { data, error } = await supabase.functions.invoke('overworld-presence', {
     body: { action: 'enter', zoneId },
   });
@@ -105,18 +111,21 @@ export async function enterZone(zoneId: string) {
 }
 
 export async function heartbeat(zoneId: string, x: number, y: number, facing = 'down') {
+  if (!(await hasSession())) return;
   await supabase.functions.invoke('overworld-presence', {
     body: { action: 'heartbeat', zoneId, x, y, facing },
   });
 }
 
 export async function setInBattle(inBattle: boolean) {
+  if (!(await hasSession())) return;
   await supabase.functions.invoke('overworld-presence', {
     body: { action: 'set_battle', inBattle },
   });
 }
 
 export async function fetchNearbyPlayers(zoneId: string): Promise<NearbyPlayer[]> {
+  if (!(await hasSession())) return [];
   const { data, error } = await supabase.functions.invoke('overworld-presence', {
     body: { action: 'nearby', zoneId },
   });
