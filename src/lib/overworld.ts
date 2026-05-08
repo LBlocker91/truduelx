@@ -126,35 +126,54 @@ async function hasSession(): Promise<boolean> {
   return !!(await getAccessToken());
 }
 
+async function invokeEdgeFunction<T = any>(functionName: string, body: Record<string, unknown>) {
+  const accessToken = await getAccessToken();
+
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+  let payload: any = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { error: text };
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? `request failed (${response.status})`);
+  }
+
+  return payload as T;
+}
+
 export async function enterZone(zoneId: string) {
   if (!(await hasSession())) return null;
-  const { data, error } = await supabase.functions.invoke('overworld-presence', {
-    body: { action: 'enter', zoneId },
-  });
-  if (error) throw error;
-  return data;
+  return await invokeEdgeFunction('overworld-presence', { action: 'enter', zoneId });
 }
 
 export async function heartbeat(zoneId: string, x: number, y: number, facing = 'down') {
   if (!(await hasSession())) return;
-  await supabase.functions.invoke('overworld-presence', {
-    body: { action: 'heartbeat', zoneId, x, y, facing },
-  });
+  await invokeEdgeFunction('overworld-presence', { action: 'heartbeat', zoneId, x, y, facing });
 }
 
 export async function setInBattle(inBattle: boolean) {
   if (!(await hasSession())) return;
-  await supabase.functions.invoke('overworld-presence', {
-    body: { action: 'set_battle', inBattle },
-  });
+  await invokeEdgeFunction('overworld-presence', { action: 'set_battle', inBattle });
 }
 
 export async function fetchNearbyPlayers(zoneId: string): Promise<NearbyPlayer[]> {
   if (!(await hasSession())) return [];
-  const { data, error } = await supabase.functions.invoke('overworld-presence', {
-    body: { action: 'nearby', zoneId },
-  });
-  if (error) throw error;
+  const data = await invokeEdgeFunction<{ players?: NearbyPlayer[] }>('overworld-presence', { action: 'nearby', zoneId });
   return data?.players ?? [];
 }
 
@@ -200,15 +219,15 @@ export async function acceptQuest(userId: string, questId: string) {
 /** Fire and forget — non-blocking quest event. */
 export async function triggerQuestEvent(event: 'talk' | 'visit_zone' | 'open_build', target?: string) {
   if (!(await hasSession())) return;
-  try { await supabase.functions.invoke('quest-progress', { body: { action: 'event', event, target } }); }
+  try { await invokeEdgeFunction('quest-progress', { action: 'event', event, target }); }
   catch { /* ignore */ }
 }
 
 export async function autoInitIntroQuest(): Promise<string | null> {
   if (!(await hasSession())) return null;
   try {
-    const { data } = await supabase.functions.invoke('quest-progress', { body: { action: 'auto_init' } });
-    return (data as any)?.accepted ?? null;
+    const data = await invokeEdgeFunction<{ accepted?: string | null }>('quest-progress', { action: 'auto_init' });
+    return data?.accepted ?? null;
   } catch { return null; }
 }
 
@@ -271,33 +290,7 @@ export async function unlockClassSkill(characterId: string, skillSlug: string) {
 }
 
 async function invokeNpcBattle(body: Record<string, unknown>) {
-  const accessToken = await getAccessToken();
-
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/npc-battle`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-
-  const text = await response.text();
-  let payload: any = null;
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = { error: text };
-    }
-  }
-
-  if (!response.ok) {
-    throw new Error(payload?.error ?? `request failed (${response.status})`);
-  }
-
-  return payload;
+  return await invokeEdgeFunction('npc-battle', body);
 }
 
 // ---- NPC Battle ----
