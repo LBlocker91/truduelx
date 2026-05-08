@@ -15,7 +15,9 @@ import {
   fetchMyLoadout, publishLoadout, EquippedLoadout,
 } from '@/lib/overworld';
 import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
+import { CharacterAvatar } from './CharacterAvatar';
 import { NpcMarker } from './NpcMarker';
+import { CLASS_IMAGES } from '@/data/class-definitions';
 import { PortalMarker } from './PortalMarker';
 import {
   walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
