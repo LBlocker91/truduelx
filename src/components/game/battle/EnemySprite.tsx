@@ -1,6 +1,7 @@
 import { memo } from 'react';
+import bossWarmech from '@/assets/enemies/boss-warmech.png';
 
-export type EnemyKind = 'drone' | 'bot' | 'humanoid' | 'beast';
+export type EnemyKind = 'drone' | 'bot' | 'humanoid' | 'beast' | 'boss';
 
 export interface EnemySpriteProps {
   /** Enemy display/internal name. Used to pick sprite variant + accent color. */
@@ -12,9 +13,12 @@ export interface EnemySpriteProps {
   hit?: boolean;
 }
 
+const BOSS_NAME_RE = /(boss|warmech|overseer|tyrant|warden|colossus|prime|alpha|elite)/i;
+
 /** Choose enemy kind from name keywords. Defaults to drone for training/calibration units. */
 export const inferEnemyKind = (name: string): EnemyKind => {
   const n = (name ?? '').toLowerCase();
+  if (BOSS_NAME_RE.test(n)) return 'boss';
   if (/(drone|calibrat|training|dummy|target|unit\s*mk|sentinel|servitor)/.test(n)) return 'drone';
   if (/(bot|mech|automaton|construct)/.test(n)) return 'bot';
   if (/(beast|hound|wolf|crawler|spawn)/.test(n)) return 'beast';
