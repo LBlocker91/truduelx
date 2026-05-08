@@ -476,6 +476,8 @@ export const OverworldScreen = ({
   };
 
   // ---------- Render ----------
+  const questTargets = useActiveQuestTargets();
+
   if (!zone) {
     return (
       <div className={`${hideChrome ? 'absolute inset-0' : 'min-h-screen'} flex items-center justify-center bg-background`}>
@@ -487,7 +489,6 @@ export const OverworldScreen = ({
   const bg = ZONE_BG[zone.id] ?? stationHub;
   const interactable = closestNpc();
   const nearbyPortal = closestPortal();
-  const questTargets = useActiveQuestTargets();
   const npcLabel = (kind: 'talk' | 'visit_zone' | 'defeat' | 'open_build', key: string): string => {
     if (kind === 'talk' || kind === 'defeat') {
       const n = npcsWithPos.find(n => n.id === key);
