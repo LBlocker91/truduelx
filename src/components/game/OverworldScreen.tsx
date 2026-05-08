@@ -23,6 +23,7 @@ import {
   walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
   ZonePortal,
 } from '@/lib/zone-walkable';
+import { npcArtFor, isBossName } from '@/data/npc-art';
 import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
@@ -800,7 +801,6 @@ export const OverworldScreen = ({
           <DialogHeader>
             <div className="flex items-start gap-3">
               {activeNpc && (() => {
-                const { npcArtFor, isBossName } = require('@/data/npc-art');
                 const art = npcArtFor(activeNpc.name, activeNpc.type as 'vendor'|'quest'|'enemy');
                 return (
                   <div
