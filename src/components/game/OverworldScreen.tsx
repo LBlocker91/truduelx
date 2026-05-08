@@ -712,8 +712,6 @@ export const OverworldScreen = ({
                   height={170}
                   accentHsl={RARITY_HSL[playerRarity]}
                 />
-                {/* legacy refs to keep tree-shaker happy */}
-                {false && <PlayerSprite direction="right" state="idle" />}
               </div>
             );
           })()}
