@@ -704,15 +704,16 @@ export const OverworldScreen = ({
                   <span className="text-foreground">{characterName}</span>
                   <span className="opacity-80">L{characterLevel}</span>
                 </div>
-                <PlayerSprite
+                <CharacterAvatar
+                  src={CLASS_IMAGES[characterClass as keyof typeof CLASS_IMAGES] ?? CLASS_IMAGES.mercenary}
+                  alt={characterName}
                   direction={facing}
                   state={moving ? 'walk' : 'idle'}
-                  armorVariant={loadout.armorVariant}
-                  weaponVariant={loadout.weaponVariant}
-                  rarity={playerRarity}
-                  scale={1.05}
-                  showGlow={false}
+                  height={170}
+                  accentHsl={RARITY_HSL[playerRarity]}
                 />
+                {/* legacy refs to keep tree-shaker happy */}
+                {false && <PlayerSprite direction="right" state="idle" />}
               </div>
             );
           })()}
