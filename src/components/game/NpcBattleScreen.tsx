@@ -8,6 +8,28 @@ import { setInBattle } from '@/lib/overworld';
 import { resolvePlaybackState } from '@/lib/battle-playback';
 import { BattleStage } from './battle/BattleStage';
 
+const readStoredAccessToken = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const projectRef = new URL(import.meta.env.VITE_SUPABASE_URL).hostname.split('.')[0];
+    const raw = window.localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const session = parsed?.currentSession ?? parsed?.session ?? parsed?.[0]?.currentSession ?? parsed?.[0] ?? parsed;
+    return typeof session?.access_token === 'string' ? session.access_token : null;
+  } catch {
+    return null;
+  }
+};
+
+const restHeaders = async () => {
+  const accessToken = readStoredAccessToken();
+  return {
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    Authorization: `Bearer ${accessToken}`,
+  };
+};
+
 interface LevelUpInfo {
   oldLevel: number;
   newLevel: number;
@@ -76,10 +98,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [characterId, setCharacterId] = useState<string | null>(null);
 
   // Live (DB) view
-  const liveMe = participants.find(p => p.user_id === myUserId);
+  const liveMe = participants.find(p => !p.is_bot) ?? participants.find(p => p.user_id === myUserId);
   const liveEnemy = participants.find(p => p.is_bot);
   const finished = battle?.status === 'finished';
-  const won = finished && battle?.winner_user_id === myUserId;
+  const resolvedUserId = liveMe?.user_id ?? myUserId;
+  const won = finished && battle?.winner_user_id === resolvedUserId;
 
   const refreshPotions = useCallback(async (charId: string) => {
     const { data } = await supabase
@@ -96,24 +119,26 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   }, []);
 
   const refresh = useCallback(async () => {
-    const [b, p, a] = await Promise.all([
-      supabase.from('battles').select('*').eq('id', battleId).maybeSingle(),
-      supabase.from('battle_participants').select('*').eq('battle_id', battleId).order('slot'),
-      supabase.from('battle_actions').select('*').eq('battle_id', battleId).order('created_at', { ascending: false }).limit(20),
+    const headers = await restHeaders();
+    const [bRes, pRes, aRes] = await Promise.all([
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/battles?id=eq.${battleId}&select=*`, { headers }),
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/battle_participants?battle_id=eq.${battleId}&select=*&order=slot.asc`, { headers }),
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/battle_actions?battle_id=eq.${battleId}&select=*&order=created_at.desc&limit=20`, { headers }),
     ]);
-    if (b.data) setBattle(b.data as any);
-    if (p.data) {
-      setParticipants(p.data as any);
-      const myRow = (p.data as any[]).find(r => r.user_id === myUserId);
+    const [bData, pData, aData] = await Promise.all([bRes.json(), pRes.json(), aRes.json()]);
+    if (bData?.[0]) setBattle(bData[0] as any);
+    if (Array.isArray(pData)) {
+      setParticipants(pData as any);
+      const myRow = (pData as any[]).find(r => !r.is_bot) ?? (pData as any[]).find(r => r.user_id === myUserId);
       if (myRow?.character_id) {
         setCharacterId(myRow.character_id);
         refreshPotions(myRow.character_id);
       }
     }
-    if (a.data) {
+    if (Array.isArray(aData)) {
       setActions(prev => {
         const map = new Map<string, ActionRow>();
-        for (const row of (a.data as any[])) map.set(row.id, row as ActionRow);
+        for (const row of (aData as any[])) map.set(row.id, row as ActionRow);
         for (const row of prev) if (!map.has(row.id)) map.set(row.id, row);
         return Array.from(map.values()).sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime()).slice(0, 20);
       });
@@ -121,8 +146,10 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   }, [battleId, myUserId, refreshPotions]);
 
   const refreshBattleRow = useCallback(async () => {
-    const { data } = await supabase.from('battles').select('*').eq('id', battleId).maybeSingle();
-    if (data) setBattle(data as any);
+    const headers = await restHeaders();
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/battles?id=eq.${battleId}&select=*`, { headers });
+    const data = await response.json();
+    if (data?.[0]) setBattle(data[0] as any);
   }, [battleId]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -232,7 +259,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   // Use displayed snapshot for everything UI-facing.
   const me = displayedMe ?? liveMe;
   const enemy = displayedEnemy ?? liveEnemy;
-  const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === myUserId;
+  const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === resolvedUserId;
 
   // When playback is fully drained, sync displayed → live (covers any missed snapshots, e.g. final state).
   useEffect(() => {
