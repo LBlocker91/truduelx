@@ -268,6 +268,19 @@ export const BattleStage = ({
       <div className="absolute left-[6%] right-[6%] bottom-[12%] pointer-events-none rounded-full"
         style={{ height: 6, background: `radial-gradient(ellipse at center, ${accent}55, transparent 70%)` }} />
 
+      {/* Hit flash — quick white pop on every damage strike */}
+      {showHitFlash && (
+        <div
+          className="absolute inset-0 pointer-events-none z-30"
+          style={{
+            background: preset.isUltimate
+              ? `radial-gradient(ellipse at center, ${preset.hue}aa 0%, transparent 70%)`
+              : 'radial-gradient(ellipse at center, hsl(0 0% 100% / 0.45) 0%, transparent 65%)',
+            animation: 'hit-flash 0.22s ease-out forwards',
+          }}
+        />
+      )}
+
       {/* Ultimate full-screen flash */}
       {showUltimateFlash && (
         <div
