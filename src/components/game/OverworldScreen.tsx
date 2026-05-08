@@ -542,9 +542,15 @@ export const OverworldScreen = ({
             }}
           />
 
+          {/* Quest tracker — top-left HUD chip */}
+          <QuestTracker
+            characterId={characterId}
+            targetLabel={npcLabel}
+          />
+
           {/* Current zone label only — travel happens by walking through portals */}
           {hideChrome && (
-            <div className="absolute top-3 left-3 z-30 bg-card/85 backdrop-blur border border-border rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="absolute top-3 right-3 z-30 bg-card/85 backdrop-blur border border-border rounded-lg px-3 py-1.5 flex items-center gap-2">
               <Map className="w-3.5 h-3.5 text-primary" />
               <span className="text-xs font-orbitron text-foreground">{zone.name}</span>
               <span className="hidden md:inline text-[10px] text-muted-foreground">— walk to a doorway to travel</span>
@@ -598,6 +604,7 @@ export const OverworldScreen = ({
           {npcsWithPos.map((n) => {
             const close = interactable?.id === n.id;
             const isBoss = /boss|warmech|overseer|tyrant|enforcer.?prime/i.test(n.name);
+            const isQuestTarget = questTargets.npcIds.has(n.id);
             return (
               <button
                 key={n.id}
@@ -611,6 +618,12 @@ export const OverworldScreen = ({
                   height: isBoss ? 'clamp(150px, 20vh, 240px)' : 'clamp(130px, 17vh, 200px)',
                 }}
               >
+                {isQuestTarget && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 px-1.5 py-0.5 rounded font-orbitron text-[9px] tracking-widest text-background animate-pulse"
+                    style={{ background: 'hsl(45 100% 55%)', boxShadow: '0 0 10px hsl(45 100% 55% / 0.7)' }}>
+                    ★ QUEST
+                  </div>
+                )}
                 <NpcMarker
                   kind={n.type as 'vendor' | 'quest' | 'enemy'}
                   name={n.name}
