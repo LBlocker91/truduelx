@@ -212,16 +212,15 @@ export const BattleStage = ({
   const accent = ZONE_ACCENT[zoneId ?? ''] ?? ZONE_ACCENT['station-hub'];
 
   const damageColor = preset.damageColor;
-  const shakeOffset = shake === 'large' ? 'translate(3px, -2px)' : shake === 'small' ? 'translate(2px, -1px)' : 'none';
+  const shakeClass = shake === 'large' ? 'animate-stage-shake-large' : shake === 'small' ? 'animate-stage-shake-small' : '';
+  const showHitFlash = phase === 'strike' && !lastWasHeal && !preset.hasHealAura && !preset.hasBuffRing && !preset.hasShieldDome;
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-lg border border-border shadow-[0_0_30px_rgba(0,0,0,0.6)_inset]"
+      className={`relative w-full overflow-hidden rounded-lg border border-border shadow-[0_0_30px_rgba(0,0,0,0.6)_inset] ${shakeClass}`}
       style={{
         background: bg,
         height: 'min(48vh, 380px)',
-        transform: shakeOffset,
-        transition: 'transform 60ms linear',
       }}
     >
       {/* Skyline */}
