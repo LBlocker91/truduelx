@@ -13,7 +13,9 @@ import {
   fetchVendorItems, fetchQuestForNpc, fetchPlayerQuests, acceptQuest,
   startNpcBattle,
   fetchMyLoadout, publishLoadout, EquippedLoadout,
+  triggerQuestEvent, fetchQuestCatalog,
 } from '@/lib/overworld';
+import { QuestTracker } from './QuestTracker';
 import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
 import { CharacterAvatar } from './CharacterAvatar';
 import { NpcMarker } from './NpcMarker';
@@ -215,6 +217,8 @@ export const OverworldScreen = ({
     setPos(arrival ? clampToWalkable(arrival, wk.polygon) : { ...wk.spawn });
     targetRef.current = null;
     portalCooldownRef.current = performance.now() + 800; // brief lockout to avoid bouncing
+    // Fire visit_zone quest event.
+    triggerQuestEvent('visit_zone', zoneId);
     // Fade back in.
     setTimeout(() => setTransitioning(false), 280);
   }, [zones]);
@@ -417,6 +421,8 @@ export const OverworldScreen = ({
       await refreshCredits();
     }
     if (npc.type === 'quest') setQuestData(await fetchQuestForNpc(npc.id));
+    // Fire talk quest event for any non-hostile interaction.
+    if (npc.type !== 'enemy') triggerQuestEvent('talk', npc.id);
   };
   const closeNpc = () => { setActiveNpc(null); setVendorItems([]); setQuestData(null); };
 
