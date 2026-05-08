@@ -70,6 +70,8 @@ export interface CharacterSnapshot {
   equipped_extras?: { wings_variant?: string | null; pet_variant?: string | null };
   max_hp?: number;
   zone_id?: string;
+  /** True if this is a boss NPC; bosses keep the harder cap, trash mobs use a softer one. */
+  is_boss?: boolean;
 }
 
 export interface WeaponEntry {
@@ -270,12 +272,13 @@ export function resolveHit({ attacker, defender, skill, defending, rng, isUltima
   const floor = Math.max(3, Math.floor(rawBeforeMods * 0.15));
   if (raw < floor) raw = floor;
 
-  // Soft cap by % target max HP — keeps battles multi-turn
+  // Soft cap by % target max HP — bosses hit harder, trash mobs are gentler.
   const maxHpDef = defender.max_hp || 1;
+  const attackerIsBoss = !!aSnap.is_boss;
   let capPct: number;
-  if (skill && ult) capPct = crit ? 0.55 : 0.45;
-  else if (skill)   capPct = 0.32;
-  else              capPct = 0.28;
+  if (skill && ult) capPct = attackerIsBoss ? (crit ? 0.55 : 0.45) : (crit ? 0.30 : 0.24);
+  else if (skill)   capPct = attackerIsBoss ? 0.32 : 0.18;
+  else              capPct = attackerIsBoss ? 0.28 : 0.14;
   const cap = maxHpDef * capPct;
   if (raw > cap) raw = cap + (raw - cap) * 0.15;
 

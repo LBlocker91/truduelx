@@ -1,52 +1,63 @@
-## Goal
-Guns, launchers and tech staves stop replacing blades. Each character can equip up to one of every weapon type at the same time, and the right one is used automatically depending on the skill (or basic attack) being executed. Build page entry is made more obvious.
+## Goals
 
-## 1. Database (single migration)
+Balance NPC difficulty so only bosses are hard, add loot drops, item selling, premium diamond gear, gear upgrades, and a 6-tier rarity color system.
 
-- Extend `item_slot` enum with `gun`, `launcher`, `staff`. (`weapon` stays = melee.)
-- `characters`: add nullable `equipped_gun_id`, `equipped_launcher_id`, `equipped_staff_id`.
-- Data backfill (insert tool): re-slot existing items by `weapon_subtype`:
-  - `pistol`, `rifle` → `gun`
-  - `rocket_launcher` → `launcher`
-  - `tech_staff` → `staff`
-  - `blade`, `heavy` stay as `weapon` (melee)
-- Move any rows in `inventory` that were equipped to a moved item: rebind `characters.equipped_*_id` to match new slot, clear `equipped_weapon_id` if the item moved out of melee.
+## 1. NPC Balance (server)
 
-## 2. Equip / unequip logic (`src/lib/inventory.ts`)
-- Map slot → character column for all four slots. Same "unequip others in same slot" pattern, just expanded.
+- Add `is_boss boolean default false` to `npc_enemies`. Mark current high-tier NPCs (level ≥ 10 or named "Calibration Unit", overseers, etc.) as bosses; everything else non-boss.
+- Non-boss tuning in `_shared/combat.ts` / `npc-battle`:
+  - Reduce non-boss `hp_multiplier` to ~1.0–1.2 (boss stays 1.6–2.0).
+  - Reduce non-boss stat scaling (drop +levelBonus on all 4 stats; only +1/2 levels).
+  - Cap non-boss damage % of player max HP at 18% (boss keeps 28/32/45).
+- Bosses keep current scaling and ultimate behavior.
 
-## 3. Inventory & Build UI
-- `InventoryPanel.tsx`: add `gun`, `launcher`, `staff` to slot list with icons.
-- `BuildPanel.tsx`: equipped grid shows 4 weapon slots side-by-side instead of just "Weapon", plus armor/wings/pet. Damage Preview gains a small dropdown to pick which weapon (or skill) to preview against — defaults to whatever the chosen skill auto-uses.
-- HUD (`GameHud.tsx`): make Build button visually prominent (filled, neon outline) and keep it always visible on the action bar, both desktop and mobile.
+## 2. Loot Drops
 
-## 4. Snapshot (battles)
-- `buildPlayerSnapshot` (in `npc-battle/index.ts` and `matchmaking/index.ts`) collects ALL equipped weapons into a new `weapons` map on the snapshot:
-  ```
-  weapons: {
-    melee?:    { min, max, subtype, damage_type, scale_stat },
-    gun?:      { ... },
-    launcher?: { ... },
-    staff?:    { ... },
-  }
-  ```
-  Old `weapon_min/max/subtype/damage_type/weapon_scale_stat` fields stay populated with the "primary" (melee preferred, else first available) for backward compatibility.
+On NPC defeat (in `npc-battle` resolve-victory path), roll drops:
 
-## 5. Combat engine (`supabase/functions/_shared/combat.ts`)
-- New helper `pickWeaponForSkill(snap, skill | null)`:
-  - Skill present → match by `scale_stat`: strength→melee, dexterity→gun, technology→staff, support→launcher.
-  - Basic attack (no skill) → priority: melee → gun → staff → launcher → unarmed.
-  - Falls back to top-level weapon fields if the matching slot is empty.
-- `resolveHit` uses that helper to pick `weaponMin`, `weaponMax`, `weaponSubtype`, `damageType`, and the scaling stat instead of always reading the snapshot's single weapon.
-- This means equipping a Gun grants ranged skills real teeth even if your equipped Sword was used for the basic attack.
+- **Non-boss:** 1 roll. 35% potion (HP/MP), 12% common, 6% uncommon, 2% rare, 0.5% epic, 0.05% pet.
+- **Boss:** 2–3 rolls, with weights shifted up: 15% rare, 8% epic, 2% legendary, 0.5% mythical, 1% pet.
+- Pets are always extremely rare (≤1%). Insert into `inventory` (stack potions via existing `quantity`).
+- Show drops in battle result payload so the UI can list "Loot acquired".
 
-## 6. Damage preview (`src/lib/damage-preview.ts` + Build page)
-- Mirror the same auto-pick logic so the preview matches what combat will use.
-- Build page shows, for each skill row, a tiny tag like "uses Gun" / "uses Launcher" so it's obvious why damage changes.
+## 3. Item Selling
 
-## 7. Combat log / VFX
-- `weapon_subtype` already feeds VFX; since each hit now reports the actual weapon used, slashes/tracers/rockets appear correctly without further work.
+- New edge function `sell-item` (POST `{characterId, inventoryId, quantity?}`) — validates ownership, computes refund = `floor(item.price * 0.5 * qty)` (use `vendor_items.price` if present, else fallback table by rarity), credits `characters.credits`, decrements/deletes inventory row, refuses to sell currently-equipped items.
+- Add a "Sell" button in `InventoryPanel` next to Equip/Unequip with confirm dialog.
 
-## Out of scope
-- Changing skill→stat mappings, NPCs, quests, XP, or auth. NPCs continue to use a single weapon snapshot field.
-- Visual sprite layering for multiple weapons at once on the overworld — only the primary weapon variant is broadcast.
+## 4. Diamond Premium Currency & Gear
+
+- `characters.vibranium` already exists — repurpose as **Diamonds** (rename UI label to "Diamonds" with a 💎 icon; column stays `vibranium` to avoid migration churn).
+- Extend `items` with `price_diamonds integer null` and `is_premium boolean default false`.
+- Seed ~6 premium weapons (1 per slot: melee/gun/launcher + 1 each rarity epic/legendary/mythical) with substantially higher damage (≈2× same-level common) and `is_premium=true`, `price_diamonds` set.
+- Extend `buy-item` to accept either `credits` or `diamonds`; deducts from the right column.
+- Diamonds earned: small amount from boss kills only (e.g., 1–3 per boss). No other source for now.
+
+## 5. Gear Upgrades
+
+- New table `inventory_upgrades` (or columns on `inventory`): add `upgrade_level int default 0` to `inventory`.
+- Max upgrade level by rarity: common 3, uncommon 5, rare 7, epic 10, legendary 14, mythical 20.
+- Each upgrade adds +8% to weapon `min/max_damage` or +8% to armor `defense` (compounded per level).
+- Cost in credits: `base_cost * (level+1)^1.6` where `base_cost = 50 * rarityMult`. Mythical may also require diamonds at higher tiers (≥10).
+- New edge function `upgrade-item` validates and applies.
+- New "Upgrade" button in `InventoryPanel` showing `+N`, current/next stats, and cost.
+- Combat reads upgrade level via the snapshot builder in `_shared/combat.ts` and applies the multiplier when computing weapon damage / defense.
+
+## 6. Rarity Tiers + Color Coding
+
+- Add `mythical` to `item_rarity` enum.
+- Centralize rarity colors in `src/lib/rarity.ts` mapping to existing tokens:
+  - common → muted, uncommon → neon-green, rare → primary (cyan), epic → neon-purple, legendary → shield (gold), mythical → new `--rarity-mythical` red/pink HSL token.
+- Add the `--rarity-mythical` token + `text-rarity-mythical` / `border-rarity-mythical` to `index.css` and `tailwind.config.ts`.
+- Replace inline `RARITY_COLOR` maps in `InventoryPanel`, `BuildPanel`, vendor UI, and battle drop list to use the shared helper.
+
+## Technical Notes
+
+- Single migration adds: `is_boss`, `price_diamonds`, `is_premium` on items; `upgrade_level` on inventory; `mythical` on the rarity enum; flags existing high-level NPCs as bosses; seeds the new premium items.
+- Server-side combat balance and drop rolls live in `supabase/functions/npc-battle/index.ts` and `_shared/combat.ts`.
+- Client changes: `InventoryPanel` (sell + upgrade buttons), shop UI (diamond pricing badge), HUD (diamond counter), `rarity.ts` helper.
+
+## Out of Scope (this pass)
+
+- No new in-app purchase flow for buying diamonds (treated as earned-only for now).
+- No reforging / sockets / enchantments — only flat upgrade levels.

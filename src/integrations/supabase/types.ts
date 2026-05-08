@@ -321,6 +321,7 @@ export type Database = {
           id: string
           item_id: string
           quantity: number
+          upgrade_level: number
         }
         Insert: {
           acquired_at?: string
@@ -329,6 +330,7 @@ export type Database = {
           id?: string
           item_id: string
           quantity?: number
+          upgrade_level?: number
         }
         Update: {
           acquired_at?: string
@@ -337,6 +339,7 @@ export type Database = {
           id?: string
           item_id?: string
           quantity?: number
+          upgrade_level?: number
         }
         Relationships: [
           {
@@ -357,6 +360,7 @@ export type Database = {
       }
       items: {
         Row: {
+          base_value: number | null
           class_req: Database["public"]["Enums"]["character_class"] | null
           consumable: boolean
           created_at: string
@@ -364,10 +368,12 @@ export type Database = {
           defense: number
           description: string | null
           id: string
+          is_premium: boolean
           level_req: number
           max_damage: number | null
           min_damage: number | null
           name: string
+          price_diamonds: number | null
           rarity: Database["public"]["Enums"]["item_rarity"]
           slot: Database["public"]["Enums"]["item_slot"]
           sprite_layer: string | null
@@ -377,6 +383,7 @@ export type Database = {
           weapon_subtype: string | null
         }
         Insert: {
+          base_value?: number | null
           class_req?: Database["public"]["Enums"]["character_class"] | null
           consumable?: boolean
           created_at?: string
@@ -384,10 +391,12 @@ export type Database = {
           defense?: number
           description?: string | null
           id?: string
+          is_premium?: boolean
           level_req?: number
           max_damage?: number | null
           min_damage?: number | null
           name: string
+          price_diamonds?: number | null
           rarity?: Database["public"]["Enums"]["item_rarity"]
           slot: Database["public"]["Enums"]["item_slot"]
           sprite_layer?: string | null
@@ -397,6 +406,7 @@ export type Database = {
           weapon_subtype?: string | null
         }
         Update: {
+          base_value?: number | null
           class_req?: Database["public"]["Enums"]["character_class"] | null
           consumable?: boolean
           created_at?: string
@@ -404,10 +414,12 @@ export type Database = {
           defense?: number
           description?: string | null
           id?: string
+          is_premium?: boolean
           level_req?: number
           max_damage?: number | null
           min_damage?: number | null
           name?: string
+          price_diamonds?: number | null
           rarity?: Database["public"]["Enums"]["item_rarity"]
           slot?: Database["public"]["Enums"]["item_slot"]
           sprite_layer?: string | null
@@ -457,6 +469,7 @@ export type Database = {
           defense: number
           dexterity: number
           hp_multiplier: number
+          is_boss: boolean
           level: number
           npc_id: string
           resistance: number
@@ -474,6 +487,7 @@ export type Database = {
           defense?: number
           dexterity?: number
           hp_multiplier?: number
+          is_boss?: boolean
           level?: number
           npc_id: string
           resistance?: number
@@ -491,6 +505,7 @@ export type Database = {
           defense?: number
           dexterity?: number
           hp_multiplier?: number
+          is_boss?: boolean
           level?: number
           npc_id?: string
           resistance?: number
@@ -902,7 +917,13 @@ export type Database = {
         | "shadow-operative"
         | "demolisher"
         | "cyber-warden"
-      item_rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
+      item_rarity:
+        | "common"
+        | "uncommon"
+        | "rare"
+        | "epic"
+        | "legendary"
+        | "mythical"
       item_slot:
         | "weapon"
         | "armor"
@@ -1078,7 +1099,14 @@ export const Constants = {
         "demolisher",
         "cyber-warden",
       ],
-      item_rarity: ["common", "uncommon", "rare", "epic", "legendary"],
+      item_rarity: [
+        "common",
+        "uncommon",
+        "rare",
+        "epic",
+        "legendary",
+        "mythical",
+      ],
       item_slot: [
         "weapon",
         "armor",

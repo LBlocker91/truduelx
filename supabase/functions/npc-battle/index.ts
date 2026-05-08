@@ -76,8 +76,21 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 
   const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp + gearVitals.hp;
   const playerMp = 100 + bonusMp + gearVitals.mp;
-  const enemyHpMult = Number((enemy as any).hp_multiplier ?? 1.8);
+  const isBoss = !!(enemy as any).is_boss;
+  // Non-boss NPCs are tuned to be beatable by an even-level player.
+  const enemyHpMult = isBoss ? Number((enemy as any).hp_multiplier ?? 1.8) : 1.05;
   const enemyHp = Math.floor(calcMaxHp(enemy.strength, enemy.level) * enemyHpMult);
+
+  // For non-boss enemies, soften their stat block (≈70% of authored values, defense floored).
+  const trashScale = (v: number) => Math.max(1, Math.floor(v * 0.7));
+  const enemyStr = isBoss ? enemy.strength    : trashScale(enemy.strength);
+  const enemyDex = isBoss ? enemy.dexterity   : trashScale(enemy.dexterity);
+  const enemyTec = isBoss ? enemy.technology  : trashScale(enemy.technology);
+  const enemySup = isBoss ? enemy.support     : trashScale(enemy.support);
+  const enemyWMin = isBoss ? enemy.weapon_min : Math.floor(enemy.weapon_min * 0.65);
+  const enemyWMax = isBoss ? enemy.weapon_max : Math.floor(enemy.weapon_max * 0.65);
+  const enemyDef  = isBoss ? (enemy.defense ?? 0)    : Math.floor((enemy.defense ?? 0) * 0.6);
+  const enemyRes  = isBoss ? (enemy.resistance ?? 0) : Math.floor((enemy.resistance ?? 0) * 0.6);
 
   const enemySnap: CharacterSnapshot = {
     user_id: null,
@@ -85,19 +98,20 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
     name: npc.name,
     class: enemy.class,
     level: enemy.level,
-    strength: enemy.strength,
-    dexterity: enemy.dexterity,
-    technology: enemy.technology,
-    support: enemy.support,
-    weapon_min: enemy.weapon_min,
-    weapon_max: enemy.weapon_max,
+    strength: enemyStr,
+    dexterity: enemyDex,
+    technology: enemyTec,
+    support: enemySup,
+    weapon_min: enemyWMin,
+    weapon_max: enemyWMax,
     weapon_subtype: 'heavy',
     weapon_damage_type: 'physical',
     weapon_scale_stat: 'strength',
-    defense: enemy.defense ?? 0,
-    resistance: enemy.resistance ?? 0,
-    skill_levels: Object.fromEntries((enemy.skill_slugs ?? []).map((s: string) => [s, 5])),
-  };
+    defense: enemyDef,
+    resistance: enemyRes,
+    skill_levels: Object.fromEntries((enemy.skill_slugs ?? []).map((s: string) => [s, isBoss ? 5 : 3])),
+    is_boss: isBoss,
+  } as any;
 
   const { data: battle, error: bErr } = await admin.from('battles').insert({
     mode: 'pve_npc',
@@ -538,10 +552,13 @@ async function finishBattle(admin: any, battleId: string, winnerUserId: string |
 async function awardRewards(admin: any, battleId: string): Promise<any> {
   const { data: b } = await admin.from('battles').select('npc_id, winner_user_id').eq('id', battleId).maybeSingle();
   if (!b?.npc_id || !b.winner_user_id) return null;
-  const { data: en } = await admin.from('npc_enemies').select('xp_reward, credit_reward, level').eq('npc_id', b.npc_id).maybeSingle();
+  const { data: en } = await admin.from('npc_enemies')
+    .select('xp_reward, credit_reward, level, is_boss')
+    .eq('npc_id', b.npc_id).maybeSingle();
   const baseXp = en?.xp_reward ?? 50;
   const baseCredits = en?.credit_reward ?? 10;
   const enemyLevel = en?.level ?? 1;
+  const isBoss = !!en?.is_boss;
 
   const { data: parts } = await admin.from('battle_participants')
     .select('character_id')
@@ -553,6 +570,9 @@ async function awardRewards(admin: any, battleId: string): Promise<any> {
   let level: any = null;
   let xpGained = baseXp;
   let creditsGained = baseCredits;
+  let diamondsGained = 0;
+  let drops: Array<{ name: string; rarity: string; slot: string; quantity: number }> = [];
+
   if (parts?.character_id) {
     const { data: ch } = await admin.from('characters').select('*').eq('id', parts.character_id).maybeSingle();
     if (ch) {
@@ -563,6 +583,15 @@ async function awardRewards(admin: any, battleId: string): Promise<any> {
       const efficiency = Math.max(0.25, Math.min(1, 1 - (playerLevel - enemyLevel) * 0.05));
       xpGained = Math.max(1, Math.floor(scaledXp * efficiency));
       creditsGained = Math.max(1, Math.floor(scaledCredits * efficiency));
+      if (isBoss) {
+        // Bosses give a bigger payout and a small diamond drop.
+        creditsGained = Math.floor(creditsGained * 2.5);
+        xpGained = Math.floor(xpGained * 1.6);
+        diamondsGained = 1 + Math.floor(Math.random() * 3) + Math.floor(enemyLevel / 5);
+      }
+
+      // Roll loot drops
+      drops = await rollLootDrops(admin, parts.character_id, enemyLevel, isBoss);
 
       const lvl = applyXp({
         xp: ch.xp ?? 0,
@@ -577,6 +606,7 @@ async function awardRewards(admin: any, battleId: string): Promise<any> {
         stat_points: lvl.statPoints,
         skill_points: lvl.skillPoints,
         credits: (ch.credits ?? 0) + creditsGained,
+        vibranium: (ch.vibranium ?? 0) + diamondsGained,
       }).eq('id', parts.character_id).select('*').single();
       updatedCharacter = u;
       level = {
@@ -610,7 +640,105 @@ async function awardRewards(admin: any, battleId: string): Promise<any> {
       }).eq('id', pq.id);
     }
   }
-  return { xpGained, creditsGained, updatedCharacter, level };
+  return { xpGained, creditsGained, diamondsGained, drops, updatedCharacter, level };
+}
+
+/**
+ * Roll loot drops for a defeated NPC.
+ * Non-boss: one roll, mostly junk/potions.
+ * Boss: 2-3 rolls weighted toward higher rarities, plus higher pet chance.
+ */
+async function rollLootDrops(
+  admin: any,
+  characterId: string,
+  enemyLevel: number,
+  isBoss: boolean,
+): Promise<Array<{ name: string; rarity: string; slot: string; quantity: number }>> {
+  type Pool = { rarity: string; slots: string[] } | { potion: 'hp_potion' | 'mp_potion' } | { pet: true };
+  const drops: Array<{ name: string; rarity: string; slot: string; quantity: number }> = [];
+
+  // Weighted entries (rarity, weight). Higher weight = more likely.
+  const trashTable: Array<[Pool, number]> = [
+    [{ potion: 'hp_potion' }, 22],
+    [{ potion: 'mp_potion' }, 13],
+    [{ rarity: 'common',   slots: ['weapon','gun','launcher','armor'] }, 12],
+    [{ rarity: 'uncommon', slots: ['weapon','gun','launcher','armor'] }, 6],
+    [{ rarity: 'rare',     slots: ['weapon','gun','launcher','armor'] }, 2],
+    [{ rarity: 'epic',     slots: ['weapon','gun','launcher','armor'] }, 0.5],
+    [{ pet: true }, 0.05],
+    [{ rarity: 'nothing', slots: [] } as any, 44],
+  ];
+
+  const bossTable: Array<[Pool, number]> = [
+    [{ potion: 'hp_potion' }, 8],
+    [{ potion: 'mp_potion' }, 6],
+    [{ rarity: 'uncommon', slots: ['weapon','gun','launcher','armor'] }, 22],
+    [{ rarity: 'rare',     slots: ['weapon','gun','launcher','armor'] }, 18],
+    [{ rarity: 'epic',     slots: ['weapon','gun','launcher','armor'] }, 9],
+    [{ rarity: 'legendary',slots: ['weapon','gun','launcher','armor'] }, 3],
+    [{ rarity: 'mythical', slots: ['weapon','gun','launcher','armor'] }, 0.4],
+    [{ pet: true }, 1.2],
+  ];
+
+  const table = isBoss ? bossTable : trashTable;
+  const rolls = isBoss ? 2 + Math.floor(Math.random() * 2) : 1;
+
+  for (let r = 0; r < rolls; r++) {
+    const total = table.reduce((s, [, w]) => s + w, 0);
+    let roll = Math.random() * total;
+    let pick: Pool | null = null;
+    for (const [entry, w] of table) {
+      roll -= w;
+      if (roll <= 0) { pick = entry; break; }
+    }
+    if (!pick) continue;
+
+    if ('potion' in pick) {
+      const subtype = pick.potion;
+      const { data: pot } = await admin.from('items')
+        .select('id, name, rarity, slot').eq('subtype', subtype).limit(1).maybeSingle();
+      if (!pot) continue;
+      const { data: existing } = await admin.from('inventory')
+        .select('id, quantity').eq('character_id', characterId).eq('item_id', pot.id).maybeSingle();
+      if (existing) {
+        await admin.from('inventory').update({ quantity: (existing.quantity ?? 1) + 1 }).eq('id', existing.id);
+      } else {
+        await admin.from('inventory').insert({ character_id: characterId, item_id: pot.id, quantity: 1, equipped: false });
+      }
+      drops.push({ name: pot.name, rarity: pot.rarity, slot: pot.slot, quantity: 1 });
+      continue;
+    }
+
+    if ('pet' in pick) {
+      const { data: pets } = await admin.from('items')
+        .select('id, name, rarity, slot')
+        .eq('slot', 'pet')
+        .lte('level_req', enemyLevel + 2)
+        .limit(20);
+      if (!pets || pets.length === 0) continue;
+      const pet = pets[Math.floor(Math.random() * pets.length)];
+      await admin.from('inventory').insert({ character_id: characterId, item_id: pet.id, quantity: 1, equipped: false });
+      drops.push({ name: pet.name, rarity: pet.rarity, slot: pet.slot, quantity: 1 });
+      continue;
+    }
+
+    if ('rarity' in pick && pick.rarity !== 'nothing' && pick.slots.length) {
+      const slot = pick.slots[Math.floor(Math.random() * pick.slots.length)];
+      const { data: pool } = await admin.from('items')
+        .select('id, name, rarity, slot')
+        .eq('rarity', pick.rarity)
+        .eq('slot', slot)
+        .eq('is_premium', false)
+        .lte('level_req', enemyLevel + 2)
+        .limit(40);
+      if (!pool || pool.length === 0) continue;
+      const item = pool[Math.floor(Math.random() * pool.length)];
+      await admin.from('inventory').insert({ character_id: characterId, item_id: item.id, quantity: 1, equipped: false });
+      drops.push({ name: item.name, rarity: item.rarity, slot: item.slot, quantity: 1 });
+    }
+  }
+
+  return drops;
 }
 
 /** Pick the natural scaling stat for a weapon subtype. */
@@ -641,7 +769,9 @@ export function gearVitalBonuses(items: any[]): { hp: number; mp: number } {
 async function buildPlayerSnapshot(admin: any, characterId: string, userId: string): Promise<CharacterSnapshot | null> {
   const { data: char } = await admin.from('characters').select('*').eq('id', characterId).eq('user_id', userId).maybeSingle();
   if (!char) return null;
-  const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
+  const { data: inv } = await admin.from('inventory')
+    .select('item_id, upgrade_level, items(*)')
+    .eq('character_id', characterId).eq('equipped', true);
   let weaponMin = 15, weaponMax = 22;
   let weaponSubtype: string | undefined;
   let weaponDamageType: 'physical' | 'energy' | 'hybrid' = 'physical';
@@ -658,29 +788,34 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     if (slot === 'gun') return 'gun';
     if (slot === 'launcher') return 'launcher';
     if (slot === 'pet') return 'pet';
-    if (slot === 'weapon' || slot === 'staff') return 'melee'; // staff merged into melee
+    if (slot === 'weapon' || slot === 'staff') return 'melee';
     if (sub === 'pistol' || sub === 'rifle') return 'gun';
     if (sub === 'rocket_launcher') return 'launcher';
     if (sub === 'drone') return 'pet';
     if (sub === 'tech_staff' || sub === 'blade' || sub === 'heavy') return 'melee';
     return null;
   };
+  // 8% per upgrade level, compounded.
+  const upgradeMult = (lvl: number) => Math.pow(1.08, Math.max(0, Number(lvl ?? 0) | 0));
+
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
+    const upMult = upgradeMult((row as any).upgrade_level ?? 0);
     const sk = slotKey(it.slot, it.weapon_subtype);
     if (sk && it.min_damage && it.max_damage) {
+      const min = Math.round(it.min_damage * upMult);
+      const max = Math.round(it.max_damage * upMult);
       weapons[sk] = {
-        min: it.min_damage,
-        max: it.max_damage,
+        min, max,
         subtype: it.weapon_subtype ?? sk,
         damage_type: (it.damage_type as any) ?? 'physical',
         scale_stat: weaponScaleStat(it.weapon_subtype),
       };
       if (!primaryWeaponItem || sk === 'melee') {
         primaryWeaponItem = it;
-        weaponMin = it.min_damage;
-        weaponMax = it.max_damage;
+        weaponMin = min;
+        weaponMax = max;
         weaponSubtype = it.weapon_subtype ?? undefined;
         weaponDamageType = (it.damage_type as any) ?? 'physical';
         weaponScale = weaponScaleStat(it.weapon_subtype);
@@ -690,17 +825,16 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     if (it.slot === 'armor') armorVariant = it.sprite_variant ?? it.subtype ?? null;
     if (it.slot === 'wings') wingsVariant = it.sprite_variant ?? it.weapon_subtype ?? 'wings';
     if (it.slot === 'pet')   petVariant   = it.sprite_variant ?? it.weapon_subtype ?? 'drone';
-    defenseGear += it.defense ?? 0;
+    defenseGear += Math.round((it.defense ?? 0) * upMult);
     const m = it.stat_modifiers ?? {};
     strBonus      += Number(m.strength   ?? 0);
     dexBonus      += Number(m.dexterity  ?? 0);
     techBonus     += Number(m.technology ?? 0);
     supBonus      += Number(m.support    ?? 0);
-    resistanceGear += Number(m.resistance ?? 0);
-    defenseGear   += Number(m.defense    ?? 0);
+    resistanceGear += Math.round(Number(m.resistance ?? 0) * upMult);
+    defenseGear   += Math.round(Number(m.defense    ?? 0) * upMult);
   }
   if (!primaryWeaponItem) {
-    // Bare-handed fallback: weak strength weapon
     weaponMin = 12; weaponMax = 18; weaponSubtype = 'unarmed';
     weaponDamageType = 'physical'; weaponScale = 'strength';
   }

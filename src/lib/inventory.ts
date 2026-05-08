@@ -1,17 +1,18 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export interface InventoryItem {
-  id: string; // inventory row id
+  id: string;
   item_id: string;
   equipped: boolean;
   quantity: number;
+  upgrade_level: number;
   acquired_at: string;
   item: {
     id: string;
     name: string;
     description: string | null;
     slot: 'weapon' | 'gun' | 'launcher' | 'armor' | 'helmet' | 'gloves' | 'boots' | 'accessory' | 'consumable' | 'wings' | 'pet';
-    rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+    rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythical';
     level_req: number;
     min_damage: number | null;
     max_damage: number | null;
@@ -23,7 +24,28 @@ export interface InventoryItem {
     subtype: string | null;
     weapon_subtype?: string | null;
     damage_type?: string | null;
+    base_value?: number | null;
+    is_premium?: boolean;
+    price_diamonds?: number | null;
   };
+}
+
+export async function sellItem(characterId: string, inventoryId: string, quantity = 1) {
+  const { data, error } = await supabase.functions.invoke('sell-item', {
+    body: { characterId, inventoryId, quantity },
+  });
+  if (error) throw error;
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as { ok: true; refund: number };
+}
+
+export async function upgradeItem(characterId: string, inventoryId: string) {
+  const { data, error } = await supabase.functions.invoke('upgrade-item', {
+    body: { characterId, inventoryId },
+  });
+  if (error) throw error;
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as { ok: true; newLevel: number; cost: { credits: number; diamonds: number } };
 }
 
 /** All inventory rows for a character including their item details. */
