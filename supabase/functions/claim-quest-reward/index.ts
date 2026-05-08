@@ -61,10 +61,19 @@ Deno.serve(async (req) => {
 
     await admin.from('player_quests').update({ claimed: true, updated_at: new Date().toISOString() }).eq('id', pq.id);
 
+    // Auto-accept the next quest in a chain if the reward block specifies it.
+    const nextQuestId = rewards.next_quest_id ? String(rewards.next_quest_id) : null;
+    if (nextQuestId) {
+      await admin.from('player_quests').upsert({
+        user_id: userId, quest_id: nextQuestId, progress: {}, completed: false, claimed: false,
+      }, { onConflict: 'user_id,quest_id' });
+    }
+
     return j({
       ok: true,
       character: updated,
       rewards: { xp: xpGain, credits: creditsGain, skill_points: bonusSkillPts },
+      next_quest_id: nextQuestId,
       level: {
         oldLevel: lvl.oldLevel,
         newLevel: lvl.newLevel,
