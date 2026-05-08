@@ -113,7 +113,38 @@ export async function createNewCharacter(
     .select('id')
     .single();
   if (error) throw error;
-  return data.id as string;
+  const newId = data.id as string;
+  await grantStarterGear(newId);
+  return newId;
+}
+
+/** Grant a starter weapon, gun, and armor to a new character and equip them. */
+async function grantStarterGear(characterId: string) {
+  const { data: items } = await supabase
+    .from('items')
+    .select('id, slot')
+    .in('slot', ['weapon', 'gun', 'armor'])
+    .eq('rarity', 'common')
+    .lte('level_req', 1);
+  if (!items || items.length === 0) return;
+  const bySlot: Record<string, string> = {};
+  for (const it of items as any[]) {
+    if (!bySlot[it.slot]) bySlot[it.slot] = it.id;
+  }
+  const slotCol: Record<string, string> = {
+    weapon: 'equipped_weapon_id',
+    gun: 'equipped_gun_id',
+    armor: 'equipped_armor_id',
+  };
+  const updates: Record<string, string> = {};
+  for (const slot of Object.keys(bySlot)) {
+    const itemId = bySlot[slot];
+    await supabase.from('inventory').insert({ character_id: characterId, item_id: itemId, equipped: true });
+    if (slotCol[slot]) updates[slotCol[slot]] = itemId;
+  }
+  if (Object.keys(updates).length) {
+    await supabase.from('characters').update(updates as any).eq('id', characterId);
+  }
 }
 
 export async function deleteCharacter(characterId: string): Promise<void> {
