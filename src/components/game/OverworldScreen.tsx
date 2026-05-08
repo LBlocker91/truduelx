@@ -437,7 +437,9 @@ export const OverworldScreen = ({
       setTimeout(() => reject(new Error('Request timed out — please try again.')), 15000)
     );
     try {
-      await setInBattle(true);
+      void setInBattle(true).catch((error) => {
+        console.error('setInBattle(true) failed', error);
+      });
       const battleId = await Promise.race([startNpcBattle(npcId, characterId), timeout]);
       onEnterNpcBattle(battleId as string);
     } catch (e: any) {
@@ -460,7 +462,9 @@ export const OverworldScreen = ({
   };
 
   const handlePvpQueue = async () => {
-    await setInBattle(true);
+    void setInBattle(true).catch((error) => {
+      console.error('setInBattle(true) failed', error);
+    });
     onJoinPvpQueue();
   };
 

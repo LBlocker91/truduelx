@@ -96,9 +96,34 @@ export interface PlayerQuest {
 }
 
 // ---- Presence ----
-async function hasSession(): Promise<boolean> {
+function readStoredAccessToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const projectRef = new URL(import.meta.env.VITE_SUPABASE_URL).hostname.split('.')[0];
+    const raw = window.localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const session =
+      parsed?.currentSession ??
+      parsed?.session ??
+      parsed?.[0]?.currentSession ??
+      parsed?.[0] ??
+      parsed;
+    return typeof session?.access_token === 'string' ? session.access_token : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getAccessToken(): Promise<string | null> {
+  const stored = readStoredAccessToken();
+  if (stored) return stored;
   const { data } = await supabase.auth.getSession();
-  return !!data.session;
+  return data.session?.access_token ?? null;
+}
+
+async function hasSession(): Promise<boolean> {
+  return !!(await getAccessToken());
 }
 
 export async function enterZone(zoneId: string) {
@@ -245,12 +270,39 @@ export async function unlockClassSkill(characterId: string, skillSlug: string) {
   return data;
 }
 
+async function invokeNpcBattle(body: Record<string, unknown>) {
+  const accessToken = await getAccessToken();
+
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/npc-battle`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+  let payload: any = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { error: text };
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? `request failed (${response.status})`);
+  }
+
+  return payload;
+}
+
 // ---- NPC Battle ----
 export async function startNpcBattle(npcId: string, characterId: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('npc-battle', {
-    body: { action: 'start', npcId, characterId },
-  });
-  if (error) throw error;
+  const data = await invokeNpcBattle({ action: 'start', npcId, characterId });
   if (!data?.battleId) throw new Error(data?.error ?? 'failed to start');
   return data.battleId as string;
 }
@@ -262,20 +314,9 @@ export async function submitNpcAction(
   itemSubtype?: 'hp_potion' | 'mp_potion',
   weaponSlot?: 'melee' | 'gun' | 'launcher' | 'pet',
 ) {
-  const { data, error } = await supabase.functions.invoke('npc-battle', {
-    body: { action: 'act', battleId, playerAction, skillSlug, itemSubtype, weaponSlot },
-  });
-  if (error) {
-    // Edge function returned non-2xx — try to extract structured error from context
-    try {
-      const ctx: any = (error as any).context;
-      if (ctx?.body) {
-        const text = typeof ctx.body === 'string' ? ctx.body : await new Response(ctx.body).text();
-        const parsed = JSON.parse(text);
-        if (parsed?.error) return { error: parsed.error };
-      }
-    } catch {}
-    return { error: (error as any).message ?? 'request failed' };
+  try {
+    return await invokeNpcBattle({ action: 'act', battleId, playerAction, skillSlug, itemSubtype, weaponSlot });
+  } catch (error: any) {
+    return { error: error?.message ?? 'request failed' };
   }
-  return data;
 }
