@@ -14,6 +14,8 @@ import {
   createNewCharacter,
   getMaxSlots,
   listMyCharacters,
+  getLastPlayed,
+  setLastPlayed,
   CharacterSummary,
 } from '@/lib/characters-db';
 import type { CharacterClass } from '@/types/game';
