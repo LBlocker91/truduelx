@@ -430,14 +430,20 @@ export const OverworldScreen = ({
   const handleFightNpc = async () => {
     if (!activeNpc) return;
     setBusy(true);
+    const npcId = activeNpc.id;
+    // Hard timeout so the Fight button can never spin forever if the
+    // edge function or network stalls.
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out — please try again.')), 15000)
+    );
     try {
       await setInBattle(true);
-      const battleId = await startNpcBattle(activeNpc.id, characterId);
-      onEnterNpcBattle(battleId);
+      const battleId = await Promise.race([startNpcBattle(npcId, characterId), timeout]);
+      onEnterNpcBattle(battleId as string);
     } catch (e: any) {
-      toast.error(`Couldn't start battle: ${e.message ?? e}`);
-      await setInBattle(false);
-    } finally {
+      console.error('startNpcBattle failed', e);
+      toast.error(`Couldn't start battle: ${e?.message ?? e}`);
+      try { await setInBattle(false); } catch { /* ignore */ }
       setBusy(false);
       closeNpc();
     }
@@ -445,7 +451,7 @@ export const OverworldScreen = ({
 
   const handleAcceptQuest = async () => {
     if (!questData) return;
-    const { data } = await import('@/integrations/supabase/client').then(m => m.supabase.auth.getUser());
+    const { data } = await supabase.auth.getUser();
     if (!data?.user) return;
     await acceptQuest(data.user.id, questData.id);
     toast.success(`Accepted: ${questData.name}`);
