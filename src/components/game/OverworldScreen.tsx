@@ -487,6 +487,19 @@ export const OverworldScreen = ({
   const bg = ZONE_BG[zone.id] ?? stationHub;
   const interactable = closestNpc();
   const nearbyPortal = closestPortal();
+  const questTargets = useActiveQuestTargets();
+  const npcLabel = (kind: 'talk' | 'visit_zone' | 'defeat' | 'open_build', key: string): string => {
+    if (kind === 'talk' || kind === 'defeat') {
+      const n = npcsWithPos.find(n => n.id === key);
+      if (n) return kind === 'defeat' ? `Defeat ${n.name}` : `Talk to ${n.name}`;
+    }
+    if (kind === 'visit_zone') {
+      const z = zones.find(z => z.id === key);
+      return `Travel to ${z?.name ?? key}`;
+    }
+    if (kind === 'open_build') return 'Open the Build screen';
+    return key;
+  };
 
   return (
     <div className={`${hideChrome ? 'absolute inset-0 h-full w-full flex flex-col' : 'min-h-screen flex flex-col'} bg-black text-foreground min-h-0`}>
