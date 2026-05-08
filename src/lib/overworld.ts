@@ -96,9 +96,34 @@ export interface PlayerQuest {
 }
 
 // ---- Presence ----
-async function hasSession(): Promise<boolean> {
+function readStoredAccessToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const projectRef = new URL(import.meta.env.VITE_SUPABASE_URL).hostname.split('.')[0];
+    const raw = window.localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const session =
+      parsed?.currentSession ??
+      parsed?.session ??
+      parsed?.[0]?.currentSession ??
+      parsed?.[0] ??
+      parsed;
+    return typeof session?.access_token === 'string' ? session.access_token : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getAccessToken(): Promise<string | null> {
+  const stored = readStoredAccessToken();
+  if (stored) return stored;
   const { data } = await supabase.auth.getSession();
-  return !!data.session;
+  return data.session?.access_token ?? null;
+}
+
+async function hasSession(): Promise<boolean> {
+  return !!(await getAccessToken());
 }
 
 export async function enterZone(zoneId: string) {
@@ -246,8 +271,7 @@ export async function unlockClassSkill(characterId: string, skillSlug: string) {
 }
 
 async function invokeNpcBattle(body: Record<string, unknown>) {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
+  const accessToken = await getAccessToken();
 
   const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/npc-battle`, {
     method: 'POST',
