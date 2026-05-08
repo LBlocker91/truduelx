@@ -76,10 +76,11 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   const [characterId, setCharacterId] = useState<string | null>(null);
 
   // Live (DB) view
-  const liveMe = participants.find(p => p.user_id === myUserId);
+  const liveMe = participants.find(p => !p.is_bot) ?? participants.find(p => p.user_id === myUserId);
   const liveEnemy = participants.find(p => p.is_bot);
   const finished = battle?.status === 'finished';
-  const won = finished && battle?.winner_user_id === myUserId;
+  const resolvedUserId = liveMe?.user_id ?? myUserId;
+  const won = finished && battle?.winner_user_id === resolvedUserId;
 
   const refreshPotions = useCallback(async (charId: string) => {
     const { data } = await supabase
@@ -104,7 +105,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
     if (b.data) setBattle(b.data as any);
     if (p.data) {
       setParticipants(p.data as any);
-      const myRow = (p.data as any[]).find(r => r.user_id === myUserId);
+      const myRow = (p.data as any[]).find(r => !r.is_bot) ?? (p.data as any[]).find(r => r.user_id === myUserId);
       if (myRow?.character_id) {
         setCharacterId(myRow.character_id);
         refreshPotions(myRow.character_id);
@@ -232,7 +233,7 @@ export const NpcBattleScreen = ({ battleId, myUserId, onExit }: NpcBattleScreenP
   // Use displayed snapshot for everything UI-facing.
   const me = displayedMe ?? liveMe;
   const enemy = displayedEnemy ?? liveEnemy;
-  const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === myUserId;
+  const myTurn = !finished && !playbackAnimating && (displayedCurrentTurn ?? battle?.current_turn) === resolvedUserId;
 
   // When playback is fully drained, sync displayed → live (covers any missed snapshots, e.g. final state).
   useEffect(() => {
