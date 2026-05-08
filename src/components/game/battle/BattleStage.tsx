@@ -212,16 +212,15 @@ export const BattleStage = ({
   const accent = ZONE_ACCENT[zoneId ?? ''] ?? ZONE_ACCENT['station-hub'];
 
   const damageColor = preset.damageColor;
-  const shakeOffset = shake === 'large' ? 'translate(3px, -2px)' : shake === 'small' ? 'translate(2px, -1px)' : 'none';
+  const shakeClass = shake === 'large' ? 'animate-stage-shake-large' : shake === 'small' ? 'animate-stage-shake-small' : '';
+  const showHitFlash = phase === 'strike' && !lastWasHeal && !preset.hasHealAura && !preset.hasBuffRing && !preset.hasShieldDome;
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-lg border border-border shadow-[0_0_30px_rgba(0,0,0,0.6)_inset]"
+      className={`relative w-full overflow-hidden rounded-lg border border-border shadow-[0_0_30px_rgba(0,0,0,0.6)_inset] ${shakeClass}`}
       style={{
         background: bg,
         height: 'min(48vh, 380px)',
-        transform: shakeOffset,
-        transition: 'transform 60ms linear',
       }}
     >
       {/* Skyline */}
@@ -268,6 +267,19 @@ export const BattleStage = ({
       {/* Arena boundary */}
       <div className="absolute left-[6%] right-[6%] bottom-[12%] pointer-events-none rounded-full"
         style={{ height: 6, background: `radial-gradient(ellipse at center, ${accent}55, transparent 70%)` }} />
+
+      {/* Hit flash — quick white pop on every damage strike */}
+      {showHitFlash && (
+        <div
+          className="absolute inset-0 pointer-events-none z-30"
+          style={{
+            background: preset.isUltimate
+              ? `radial-gradient(ellipse at center, ${preset.hue}aa 0%, transparent 70%)`
+              : 'radial-gradient(ellipse at center, hsl(0 0% 100% / 0.45) 0%, transparent 65%)',
+            animation: 'hit-flash 0.22s ease-out forwards',
+          }}
+        />
+      )}
 
       {/* Ultimate full-screen flash */}
       {showUltimateFlash && (
