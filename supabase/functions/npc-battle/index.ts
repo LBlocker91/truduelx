@@ -76,8 +76,21 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
 
   const playerHp = calcMaxHp(playerSnap.strength, playerSnap.level) + bonusHp + gearVitals.hp;
   const playerMp = 100 + bonusMp + gearVitals.mp;
-  const enemyHpMult = Number((enemy as any).hp_multiplier ?? 1.8);
+  const isBoss = !!(enemy as any).is_boss;
+  // Non-boss NPCs are tuned to be beatable by an even-level player.
+  const enemyHpMult = isBoss ? Number((enemy as any).hp_multiplier ?? 1.8) : 1.05;
   const enemyHp = Math.floor(calcMaxHp(enemy.strength, enemy.level) * enemyHpMult);
+
+  // For non-boss enemies, soften their stat block (≈70% of authored values, defense floored).
+  const trashScale = (v: number) => Math.max(1, Math.floor(v * 0.7));
+  const enemyStr = isBoss ? enemy.strength    : trashScale(enemy.strength);
+  const enemyDex = isBoss ? enemy.dexterity   : trashScale(enemy.dexterity);
+  const enemyTec = isBoss ? enemy.technology  : trashScale(enemy.technology);
+  const enemySup = isBoss ? enemy.support     : trashScale(enemy.support);
+  const enemyWMin = isBoss ? enemy.weapon_min : Math.floor(enemy.weapon_min * 0.65);
+  const enemyWMax = isBoss ? enemy.weapon_max : Math.floor(enemy.weapon_max * 0.65);
+  const enemyDef  = isBoss ? (enemy.defense ?? 0)    : Math.floor((enemy.defense ?? 0) * 0.6);
+  const enemyRes  = isBoss ? (enemy.resistance ?? 0) : Math.floor((enemy.resistance ?? 0) * 0.6);
 
   const enemySnap: CharacterSnapshot = {
     user_id: null,
@@ -85,19 +98,20 @@ async function startBattle(admin: any, userId: string, npcId: string, characterI
     name: npc.name,
     class: enemy.class,
     level: enemy.level,
-    strength: enemy.strength,
-    dexterity: enemy.dexterity,
-    technology: enemy.technology,
-    support: enemy.support,
-    weapon_min: enemy.weapon_min,
-    weapon_max: enemy.weapon_max,
+    strength: enemyStr,
+    dexterity: enemyDex,
+    technology: enemyTec,
+    support: enemySup,
+    weapon_min: enemyWMin,
+    weapon_max: enemyWMax,
     weapon_subtype: 'heavy',
     weapon_damage_type: 'physical',
     weapon_scale_stat: 'strength',
-    defense: enemy.defense ?? 0,
-    resistance: enemy.resistance ?? 0,
-    skill_levels: Object.fromEntries((enemy.skill_slugs ?? []).map((s: string) => [s, 5])),
-  };
+    defense: enemyDef,
+    resistance: enemyRes,
+    skill_levels: Object.fromEntries((enemy.skill_slugs ?? []).map((s: string) => [s, isBoss ? 5 : 3])),
+    is_boss: isBoss,
+  } as any;
 
   const { data: battle, error: bErr } = await admin.from('battles').insert({
     mode: 'pve_npc',
