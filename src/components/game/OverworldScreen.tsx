@@ -648,53 +648,72 @@ export const OverworldScreen = ({
             );
           })}
 
-          {/* Local player — position is updated every rAF frame, so we do NOT
-              add a CSS transition (it would visibly lag behind the logic and
-              produce a "shake then skip" effect on click-to-move). */}
-          <div
-            className="absolute flex flex-col items-center pointer-events-none z-20"
-            style={{
-              left: `${pos.x}%`,
-              top: `${pos.y}%`,
-              transform: `translate(-50%, -100%) translateY(${moving && velRef.current.vy < -2 ? -2 : moving && velRef.current.vy > 2 ? 2 : 0}px)`,
-              willChange: 'left, top, transform',
-            }}
-          >
-            <div
-              className="text-xs font-orbitron px-2 py-0.5 rounded mb-1 flex items-center gap-1.5 bg-background/90 backdrop-blur drop-shadow whitespace-nowrap"
-              style={{
-                border: `1px solid hsl(${RARITY_HSL[playerRarity]})`,
-                boxShadow: `0 0 8px hsl(${RARITY_HSL[playerRarity]} / 0.55)`,
-                color: `hsl(${RARITY_HSL[playerRarity]})`,
-              }}
-            >
-              <ClassIcon className="w-3.5 h-3.5" />
-              <span className="text-foreground">{characterName}</span>
-              <span className="opacity-80">L{characterLevel}</span>
-            </div>
-            <div className="relative">
-              {(interactable || nearbyPortal) && !transitioning && (
+          {/* Local player */}
+          {(() => {
+            // Face toward the active interactable (NPC or portal) when idle.
+            let facing: SpriteDirection = direction;
+            if (!moving) {
+              const target = nearbyPortal
+                ? { x: nearbyPortal.interaction.x }
+                : interactable
+                  ? { x: interactable._ix }
+                  : null;
+              if (target) facing = target.x < pos.x ? 'left' : 'right';
+            }
+            const promptLabel = nearbyPortal
+              ? `Enter ${nearbyPortal.label}`
+              : interactable
+                ? interactable.type === 'vendor'
+                  ? `Trade with ${interactable.name}`
+                  : interactable.type === 'enemy'
+                    ? `Fight ${interactable.name}`
+                    : `Talk to ${interactable.name}`
+                : null;
+            return (
+              <div
+                className="absolute flex flex-col items-center pointer-events-none z-20"
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  transform: `translate(-50%, -100%) translateY(${moving && velRef.current.vy < -2 ? -2 : moving && velRef.current.vy > 2 ? 2 : 0}px)`,
+                  willChange: 'left, top, transform',
+                }}
+              >
+                {promptLabel && !transitioning && (
+                  <div
+                    className="px-2 py-0.5 rounded font-orbitron text-[11px] tracking-wide mb-1 animate-pulse whitespace-nowrap"
+                    style={{
+                      background: 'hsl(var(--primary))',
+                      color: 'hsl(var(--primary-foreground))',
+                      boxShadow: '0 0 10px hsl(var(--primary) / 0.6)',
+                    }}
+                  >
+                    [E] {promptLabel}
+                  </div>
+                )}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 -top-14 px-2 py-0.5 rounded font-orbitron text-[11px] tracking-widest pointer-events-none animate-pulse whitespace-nowrap z-10"
+                  className="text-xs font-orbitron px-2 py-0.5 rounded mb-1 flex items-center gap-1.5 bg-background/90 backdrop-blur drop-shadow whitespace-nowrap"
                   style={{
-                    background: 'hsl(var(--primary))',
-                    color: 'hsl(var(--primary-foreground))',
-                    boxShadow: '0 0 12px hsl(var(--primary) / 0.7)',
+                    border: `1px solid hsl(${RARITY_HSL[playerRarity]} / 0.85)`,
+                    color: `hsl(${RARITY_HSL[playerRarity]})`,
                   }}
                 >
-                  [E] {nearbyPortal ? nearbyPortal.label : interactable?.name}
+                  <ClassIcon className="w-3.5 h-3.5" />
+                  <span className="text-foreground">{characterName}</span>
+                  <span className="opacity-80">L{characterLevel}</span>
                 </div>
-              )}
-              <PlayerSprite
-                direction={direction}
-                state={moving ? 'walk' : 'idle'}
-                armorVariant={loadout.armorVariant}
-                weaponVariant={loadout.weaponVariant}
-                rarity={playerRarity}
-                scale={1.35}
-              />
-            </div>
-          </div>
+                <PlayerSprite
+                  direction={facing}
+                  state={moving ? 'walk' : 'idle'}
+                  armorVariant={loadout.armorVariant}
+                  weaponVariant={loadout.weaponVariant}
+                  rarity={playerRarity}
+                  scale={1.05}
+                  showGlow={false}
+                />
+              </div>
+            );
+          })()}
 
           {/* Debug overlay — walkable polygon + interaction points */}
           {debug && (() => {

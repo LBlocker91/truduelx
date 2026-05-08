@@ -36,21 +36,28 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
 
   return (
     <div className="relative flex flex-col items-center" style={{ color }}>
-      {close ? (
-        <div
-          className="text-xs font-orbitron px-2.5 py-1 rounded mb-1.5 animate-pulse whitespace-nowrap"
-          style={{ background: color, color: '#000', boxShadow: `0 0 14px ${color}` }}
-        >
-          [E] {name}
-        </div>
-      ) : (
-        <div
-          className="text-[11px] font-orbitron px-2 py-0.5 rounded mb-1.5 opacity-90 group-hover:opacity-100 whitespace-nowrap"
-          style={{ background: 'rgba(8,12,18,0.85)', border: `1px solid ${colorSoft}`, color }}
+      <div
+        className={`flex items-center gap-1 mb-1 ${close ? 'animate-pulse' : 'opacity-90 group-hover:opacity-100'}`}
+      >
+        <span
+          className="text-[11px] font-orbitron px-2 py-0.5 rounded whitespace-nowrap"
+          style={{
+            background: 'rgba(8,12,18,0.88)',
+            border: `1px solid ${close ? color : colorSoft}`,
+            color,
+            textShadow: '0 1px 2px rgba(0,0,0,0.9)',
+            boxShadow: close ? `0 0 10px ${colorSoft}` : 'none',
+          }}
         >
           {name}
-        </div>
-      )}
+        </span>
+        <span
+          className="text-[8px] font-orbitron tracking-widest px-1 py-0.5 rounded"
+          style={{ color, background: 'rgba(0,0,0,0.7)', border: `1px solid ${colorSoft}` }}
+        >
+          {c.label}
+        </span>
+      </div>
 
       <div className="relative npc-bob w-full h-full">
         {close && (
@@ -157,12 +164,6 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
         />
       </div>
 
-      <div
-        className="text-[8px] font-orbitron tracking-widest mt-1 px-1 rounded"
-        style={{ color, background: 'rgba(0,0,0,0.55)', border: `1px solid ${colorSoft}` }}
-      >
-        {c.label}
-      </div>
     </div>
   );
 };
