@@ -589,6 +589,7 @@ export const OverworldScreen = ({
           {/* NPCs — anchored to background via xPercent/yPercent, larger & responsive */}
           {npcsWithPos.map((n) => {
             const close = interactable?.id === n.id;
+            const isBoss = /boss|warmech|overseer|tyrant|enforcer.?prime/i.test(n.name);
             return (
               <button
                 key={n.id}
@@ -598,14 +599,15 @@ export const OverworldScreen = ({
                   left: `${n._vx}%`,
                   top: `${n._vy}%`,
                   transform: 'translate(-50%, -100%)',
-                  width: 'clamp(72px, 7.5vw, 120px)',
-                  height: 'clamp(96px, 13vh, 160px)',
+                  width: isBoss ? 'clamp(110px, 11vw, 180px)' : 'clamp(96px, 9vw, 150px)',
+                  height: isBoss ? 'clamp(150px, 20vh, 240px)' : 'clamp(130px, 17vh, 200px)',
                 }}
               >
                 <NpcMarker
                   kind={n.type as 'vendor' | 'quest' | 'enemy'}
                   name={n.name}
                   close={close}
+                  isBoss={isBoss}
                 />
               </button>
             );
