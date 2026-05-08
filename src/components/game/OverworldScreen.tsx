@@ -672,14 +672,28 @@ export const OverworldScreen = ({
               <span className="text-foreground">{characterName}</span>
               <span className="opacity-80">L{characterLevel}</span>
             </div>
-            <PlayerSprite
-              direction={direction}
-              state={moving ? 'walk' : 'idle'}
-              armorVariant={loadout.armorVariant}
-              weaponVariant={loadout.weaponVariant}
-              rarity={playerRarity}
-              scale={1.15}
-            />
+            <div className="relative">
+              {(interactable || nearbyPortal) && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 -top-7 px-2 py-0.5 rounded font-orbitron text-[11px] tracking-widest pointer-events-none animate-pulse whitespace-nowrap z-10"
+                  style={{
+                    background: 'hsl(var(--primary))',
+                    color: 'hsl(var(--primary-foreground))',
+                    boxShadow: '0 0 12px hsl(var(--primary) / 0.7)',
+                  }}
+                >
+                  [E]
+                </div>
+              )}
+              <PlayerSprite
+                direction={direction}
+                state={moving ? 'walk' : 'idle'}
+                armorVariant={loadout.armorVariant}
+                weaponVariant={loadout.weaponVariant}
+                rarity={playerRarity}
+                scale={1.35}
+              />
+            </div>
           </div>
 
           {/* Debug overlay — walkable polygon + interaction points */}
