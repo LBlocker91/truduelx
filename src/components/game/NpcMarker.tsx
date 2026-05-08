@@ -1,11 +1,8 @@
 import { memo } from 'react';
 import { CharacterAvatar } from './CharacterAvatar';
-import vendorImg from '@/assets/npc/npc-vendor.png';
-import questImg from '@/assets/npc/npc-quest.png';
-import enemyImg from '@/assets/npc/npc-enemy.png';
-import bossImg from '@/assets/enemies/boss-warmech.png';
+import { npcArtFor, NpcKind } from '@/data/npc-art';
 
-export type NpcKind = 'vendor' | 'quest' | 'enemy';
+export type { NpcKind };
 
 interface NpcMarkerProps {
   kind: NpcKind;
@@ -21,12 +18,6 @@ const COLOR: Record<NpcKind, { hsl: string; label: string }> = {
   enemy:  { hsl: '0 85% 60%',    label: 'HOSTILE' },
 };
 
-const ART: Record<NpcKind, string> = {
-  vendor: vendorImg,
-  quest:  questImg,
-  enemy:  enemyImg,
-};
-
 // Hash NPC name → boolean to flip half of them so they don't all face the same way.
 const facingFor = (name: string): 'left' | 'right' => {
   let h = 2166136261;
@@ -38,10 +29,26 @@ const NpcMarkerImpl = ({ kind, name, close, isBoss = false }: NpcMarkerProps) =>
   const c = COLOR[kind];
   const color = `hsl(${c.hsl})`;
   const colorSoft = `hsl(${c.hsl} / 0.55)`;
-  const art = isBoss ? bossImg : ART[kind];
+  const art = npcArtFor(name, kind);
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-end">
+      {/* Proximity ring on the floor when player is close — anchors the NPC to the world */}
+      {close && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+          style={{
+            bottom: -6,
+            width: '78%',
+            height: 14,
+            borderRadius: '50%',
+            background: `radial-gradient(ellipse at center, ${color} 0%, transparent 70%)`,
+            opacity: 0.55,
+            animation: 'arena-pulse 1.4s ease-in-out infinite',
+            filter: 'blur(1px)',
+          }}
+        />
+      )}
       {/* Nameplate + role tag — single row, dark backing for bright zones */}
       <div
         className={`flex items-center gap-1 mb-1 ${close ? 'animate-pulse' : 'opacity-95 group-hover:opacity-100'}`}
