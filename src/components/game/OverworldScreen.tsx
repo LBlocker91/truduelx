@@ -23,6 +23,7 @@ import {
   walkableFor, clampToWalkable, pointInPolygon, polygonToSvgPath,
   ZonePortal,
 } from '@/lib/zone-walkable';
+import { npcArtFor, isBossName } from '@/data/npc-art';
 import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
@@ -798,13 +799,29 @@ export const OverworldScreen = ({
       <Dialog open={!!activeNpc} onOpenChange={(o) => !o && closeNpc()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-orbitron flex items-center gap-2">
-              {activeNpc?.type === 'vendor' && <Store className="w-4 h-4 text-blue-400" />}
-              {activeNpc?.type === 'quest'  && <ScrollText className="w-4 h-4 text-amber-400" />}
-              {activeNpc?.type === 'enemy'  && <Skull className="w-4 h-4 text-red-400" />}
-              {activeNpc?.name}
-            </DialogTitle>
-            <DialogDescription>{activeNpc?.dialogue}</DialogDescription>
+            <div className="flex items-start gap-3">
+              {activeNpc && (() => {
+                const art = npcArtFor(activeNpc.name, activeNpc.type as 'vendor'|'quest'|'enemy');
+                return (
+                  <div
+                    className="flex-shrink-0 rounded-md overflow-hidden border border-border bg-gradient-to-b from-card to-background"
+                    style={{ width: 72, height: 96 }}
+                  >
+                    <img src={art} alt={activeNpc.name} className="w-full h-full object-contain object-bottom"
+                      style={{ filter: isBossName(activeNpc.name) ? 'drop-shadow(0 0 6px hsl(0 100% 60% / 0.6))' : 'none' }} />
+                  </div>
+                );
+              })()}
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="font-orbitron flex items-center gap-2">
+                  {activeNpc?.type === 'vendor' && <Store className="w-4 h-4 text-blue-400" />}
+                  {activeNpc?.type === 'quest'  && <ScrollText className="w-4 h-4 text-amber-400" />}
+                  {activeNpc?.type === 'enemy'  && <Skull className="w-4 h-4 text-red-400" />}
+                  {activeNpc?.name}
+                </DialogTitle>
+                <DialogDescription className="mt-1">{activeNpc?.dialogue}</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
           {activeNpc?.type === 'vendor' && (
