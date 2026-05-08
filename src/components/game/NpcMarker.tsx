@@ -164,12 +164,6 @@ const NpcMarkerImpl = ({ kind, name, close }: NpcMarkerProps) => {
         />
       </div>
 
-      <div
-        className="text-[8px] font-orbitron tracking-widest mt-1 px-1 rounded"
-        style={{ color, background: 'rgba(0,0,0,0.55)', border: `1px solid ${colorSoft}` }}
-      >
-        {c.label}
-      </div>
     </div>
   );
 };
