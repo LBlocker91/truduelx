@@ -656,8 +656,8 @@ export const OverworldScreen = ({
             style={{
               left: `${pos.x}%`,
               top: `${pos.y}%`,
-              transform: 'translate(-50%, -100%)',
-              willChange: 'left, top',
+              transform: `translate(-50%, -100%) translateY(${moving && velRef.current.vy < -2 ? -2 : moving && velRef.current.vy > 2 ? 2 : 0}px)`,
+              willChange: 'left, top, transform',
             }}
           >
             <div
@@ -673,16 +673,16 @@ export const OverworldScreen = ({
               <span className="opacity-80">L{characterLevel}</span>
             </div>
             <div className="relative">
-              {(interactable || nearbyPortal) && (
+              {(interactable || nearbyPortal) && !transitioning && (
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 -top-7 px-2 py-0.5 rounded font-orbitron text-[11px] tracking-widest pointer-events-none animate-pulse whitespace-nowrap z-10"
+                  className="absolute left-1/2 -translate-x-1/2 -top-14 px-2 py-0.5 rounded font-orbitron text-[11px] tracking-widest pointer-events-none animate-pulse whitespace-nowrap z-10"
                   style={{
                     background: 'hsl(var(--primary))',
                     color: 'hsl(var(--primary-foreground))',
                     boxShadow: '0 0 12px hsl(var(--primary) / 0.7)',
                   }}
                 >
-                  [E]
+                  [E] {nearbyPortal ? nearbyPortal.label : interactable?.name}
                 </div>
               )}
               <PlayerSprite
