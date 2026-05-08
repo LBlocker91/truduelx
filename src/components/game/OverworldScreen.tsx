@@ -26,6 +26,7 @@ import {
   ZonePortal,
 } from '@/lib/zone-walkable';
 import { npcArtFor, isBossName } from '@/data/npc-art';
+import { useActiveQuestTargets } from '@/hooks/useActiveQuestTargets';
 import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
