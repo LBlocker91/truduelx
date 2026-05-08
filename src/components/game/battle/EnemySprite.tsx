@@ -186,17 +186,24 @@ const HumanoidSprite = ({ accent, attacking }: { accent: string; attacking?: boo
 
 const EnemySpriteImpl = ({ name, scale = 1.3, attacking, hit }: EnemySpriteProps) => {
   const kind = inferEnemyKind(name);
-  const accent = accentFromName(name);
-  const w = 130 * scale;
-  const h = 195 * scale;
+  const accent = kind === 'boss' ? 'hsl(0 100% 60%)' : accentFromName(name);
+  const isBoss = kind === 'boss';
+  const w = (isBoss ? 170 : 130) * scale;
+  const h = (isBoss ? 230 : 195) * scale;
 
   return (
     <div
       className="relative"
       style={{
         width: w, height: h,
-        filter: hit ? 'brightness(2.2) drop-shadow(0 0 12px hsl(0 100% 60%))' : 'drop-shadow(0 6px 4px rgba(0,0,0,0.55))',
+        filter: hit
+          ? 'brightness(2.2) drop-shadow(0 0 12px hsl(0 100% 60%))'
+          : isBoss
+            ? 'drop-shadow(0 8px 6px rgba(0,0,0,0.7)) drop-shadow(0 0 18px hsl(0 100% 50% / 0.45))'
+            : 'drop-shadow(0 6px 4px rgba(0,0,0,0.55))',
         transition: 'filter 120ms linear',
+        animation: isBoss ? 'battle-stance 1.8s ease-in-out infinite' : undefined,
+        transformOrigin: 'center bottom',
       }}
     >
       {/* Charge aura when attacking */}
@@ -204,9 +211,33 @@ const EnemySpriteImpl = ({ name, scale = 1.3, attacking, hit }: EnemySpriteProps
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: `radial-gradient(circle at 50% 55%, ${accent}66 0%, transparent 60%)`,
+            background: `radial-gradient(circle at 50% 55%, ${accent}${isBoss ? '88' : '66'} 0%, transparent ${isBoss ? '70%' : '60%'})`,
             animation: 'pulse 0.8s ease-in-out infinite',
           }}
+        />
+      )}
+      {/* Boss menacing ground glow */}
+      {isBoss && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 bottom-0 pointer-events-none"
+          style={{
+            width: w * 0.85,
+            height: 16,
+            background: 'radial-gradient(ellipse at center, hsl(0 100% 50% / 0.55) 0%, transparent 70%)',
+            filter: 'blur(4px)',
+            animation: 'arena-pulse 2s ease-in-out infinite',
+          }}
+        />
+      )}
+      {kind === 'boss' && (
+        <img
+          src={bossWarmech}
+          alt={name}
+          width={1024}
+          height={1024}
+          loading="lazy"
+          draggable={false}
+          className="absolute inset-0 w-full h-full object-contain select-none"
         />
       )}
       {kind === 'drone' && <DroneSprite accent={accent} attacking={attacking} />}
