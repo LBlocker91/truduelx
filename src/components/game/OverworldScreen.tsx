@@ -656,8 +656,8 @@ export const OverworldScreen = ({
             style={{
               left: `${pos.x}%`,
               top: `${pos.y}%`,
-              transform: 'translate(-50%, -100%)',
-              willChange: 'left, top',
+              transform: `translate(-50%, -100%) translateY(${moving && velRef.current.vy < -2 ? -2 : moving && velRef.current.vy > 2 ? 2 : 0}px)`,
+              willChange: 'left, top, transform',
             }}
           >
             <div
