@@ -51,9 +51,12 @@ interface OverworldScreenProps {
 // ---------- Hub-mode tuning ----------
 const HEARTBEAT_MS = 400;
 const NEARBY_POLL_MS = 1500;
-const INTERACTION_RADIUS_PCT = 18;     // distance in % space to allow [E] interact
-const MOVE_SPEED_PCT = 0.65;           // % per frame at 60fps
-const MOVE_ACCEL = 0.2;
+const INTERACTION_RADIUS_PCT = 14;       // tighter, less ambiguous than before
+// Time-based movement (% per second) — frame-rate independent.
+const MOVE_SPEED_PCT_PER_S = 42;         // ~0.7 %/frame at 60fps
+// Exponential smoothing factors per second (higher = snappier).
+const MOVE_ACCEL_PER_S = 22;             // start moving (snappy)
+const MOVE_DECEL_PER_S = 30;             // stop moving (no slide)
 
 // Class → icon for nameplates
 const CLASS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -230,11 +233,16 @@ export const OverworldScreen = ({
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
   });
 
-  // Movement loop (normalized %)
+  // Movement loop (normalized %, time-based for frame-rate independence)
   useEffect(() => {
     if (!zone) return;
     let raf = 0;
-    const loop = () => {
+    let lastT = performance.now();
+    const loop = (now: number) => {
+      // Clamp dt to avoid huge jumps after tab-switch.
+      const dt = Math.min(0.05, Math.max(0.001, (now - lastT) / 1000));
+      lastT = now;
+
       setPos(prev => {
         let { x, y } = prev;
         let tdx = 0, tdy = 0;
@@ -244,36 +252,48 @@ export const OverworldScreen = ({
         if (k.has('w') || k.has('arrowup')) tdy -= 1;
         if (k.has('s') || k.has('arrowdown')) tdy += 1;
         const klen = Math.hypot(tdx, tdy);
-        if (klen > 0) { tdx = (tdx / klen) * MOVE_SPEED_PCT; tdy = (tdy / klen) * MOVE_SPEED_PCT; }
+        // Desired velocity in % per second (normalized).
+        if (klen > 0) {
+          tdx = (tdx / klen) * MOVE_SPEED_PCT_PER_S;
+          tdy = (tdy / klen) * MOVE_SPEED_PCT_PER_S;
+        }
 
         const t = targetRef.current;
         if (!tdx && !tdy && t) {
           const ddx = t.x - x, ddy = t.y - y;
           const dist = Math.hypot(ddx, ddy);
-          if (dist < 0.3) { targetRef.current = null; }
-          else { tdx = (ddx / dist) * MOVE_SPEED_PCT; tdy = (ddy / dist) * MOVE_SPEED_PCT; }
+          if (dist < 0.4) {
+            targetRef.current = null;
+          } else {
+            // Ease into the target — slow down within ~3% to land cleanly (no overshoot).
+            const slow = Math.min(1, dist / 3);
+            tdx = (ddx / dist) * MOVE_SPEED_PCT_PER_S * (0.35 + 0.65 * slow);
+            tdy = (ddy / dist) * MOVE_SPEED_PCT_PER_S * (0.35 + 0.65 * slow);
+          }
         }
 
+        // Frame-rate-independent exponential smoothing.
+        // alpha = 1 - exp(-rate * dt) ∈ (0,1)
         const v = velRef.current;
-        v.vx += (tdx - v.vx) * MOVE_ACCEL;
-        v.vy += (tdy - v.vy) * MOVE_ACCEL;
-        if (Math.abs(v.vx) < 0.01) v.vx = 0;
-        if (Math.abs(v.vy) < 0.01) v.vy = 0;
+        const wantingMove = tdx !== 0 || tdy !== 0;
+        const rate = wantingMove ? MOVE_ACCEL_PER_S : MOVE_DECEL_PER_S;
+        const alpha = 1 - Math.exp(-rate * dt);
+        v.vx += (tdx - v.vx) * alpha;
+        v.vy += (tdy - v.vy) * alpha;
+        if (Math.abs(v.vx) < 0.05) v.vx = 0;
+        if (Math.abs(v.vy) < 0.05) v.vy = 0;
 
-        const candidate = { x: x + v.vx, y: y + v.vy };
+        const candidate = { x: x + v.vx * dt, y: y + v.vy * dt };
         const wk = walkableFor(zone!.id);
         const clamped = clampToWalkable(candidate, wk.polygon);
-        // If we hit a wall, kill velocity in the rejected axes so we don't shudder.
         if (clamped.x !== candidate.x) v.vx = 0;
         if (clamped.y !== candidate.y) v.vy = 0;
         x = clamped.x;
         y = clamped.y;
 
         const speed = Math.hypot(v.vx, v.vy);
-        // Use the *target* (not just current velocity) so click-to-move plays
-        // the walk anim even during the brief acceleration ramp-up.
-        const isMoving = speed > 0.015 || !!targetRef.current || klen > 0;
-        if (Math.abs(v.vx) > 0.02) {
+        const isMoving = speed > 1.0 || !!targetRef.current || klen > 0;
+        if (Math.abs(v.vx) > 1.5) {
           const nd: SpriteDirection = v.vx < 0 ? 'left' : 'right';
           if (dirRef.current !== nd) setDirection(nd);
         }
