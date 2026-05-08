@@ -159,10 +159,32 @@ export async function fetchPlayerQuests(userId: string): Promise<PlayerQuest[]> 
   return (data as any) ?? [];
 }
 
+export async function fetchQuestCatalog(): Promise<Record<string, Quest>> {
+  const { data } = await supabase.from('quests').select('*');
+  const map: Record<string, Quest> = {};
+  for (const q of (data as any[]) ?? []) map[q.id] = q;
+  return map;
+}
+
 export async function acceptQuest(userId: string, questId: string) {
   await supabase.from('player_quests').upsert({
     user_id: userId, quest_id: questId, progress: {}, completed: false, claimed: false,
   }, { onConflict: 'user_id,quest_id' });
+}
+
+/** Fire and forget — non-blocking quest event. */
+export async function triggerQuestEvent(event: 'talk' | 'visit_zone' | 'open_build', target?: string) {
+  if (!(await hasSession())) return;
+  try { await supabase.functions.invoke('quest-progress', { body: { action: 'event', event, target } }); }
+  catch { /* ignore */ }
+}
+
+export async function autoInitIntroQuest(): Promise<string | null> {
+  if (!(await hasSession())) return null;
+  try {
+    const { data } = await supabase.functions.invoke('quest-progress', { body: { action: 'auto_init' } });
+    return (data as any)?.accepted ?? null;
+  } catch { return null; }
 }
 
 export async function claimQuestReward(characterId: string, questId: string) {

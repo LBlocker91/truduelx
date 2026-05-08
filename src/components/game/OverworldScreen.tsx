@@ -13,7 +13,9 @@ import {
   fetchVendorItems, fetchQuestForNpc, fetchPlayerQuests, acceptQuest,
   startNpcBattle,
   fetchMyLoadout, publishLoadout, EquippedLoadout,
+  triggerQuestEvent, fetchQuestCatalog,
 } from '@/lib/overworld';
+import { QuestTracker } from './QuestTracker';
 import { PlayerSprite, SpriteDirection, SpriteRarity } from './PlayerSprite';
 import { CharacterAvatar } from './CharacterAvatar';
 import { NpcMarker } from './NpcMarker';
@@ -24,6 +26,7 @@ import {
   ZonePortal,
 } from '@/lib/zone-walkable';
 import { npcArtFor, isBossName } from '@/data/npc-art';
+import { useActiveQuestTargets } from '@/hooks/useActiveQuestTargets';
 import { supabase } from '@/integrations/supabase/client';
 import stationHub from '@/assets/zones/station-hub.jpg';
 import wasteland from '@/assets/zones/wasteland.jpg';
@@ -215,6 +218,8 @@ export const OverworldScreen = ({
     setPos(arrival ? clampToWalkable(arrival, wk.polygon) : { ...wk.spawn });
     targetRef.current = null;
     portalCooldownRef.current = performance.now() + 800; // brief lockout to avoid bouncing
+    // Fire visit_zone quest event.
+    triggerQuestEvent('visit_zone', zoneId);
     // Fade back in.
     setTimeout(() => setTransitioning(false), 280);
   }, [zones]);
@@ -417,6 +422,8 @@ export const OverworldScreen = ({
       await refreshCredits();
     }
     if (npc.type === 'quest') setQuestData(await fetchQuestForNpc(npc.id));
+    // Fire talk quest event for any non-hostile interaction.
+    if (npc.type !== 'enemy') triggerQuestEvent('talk', npc.id);
   };
   const closeNpc = () => { setActiveNpc(null); setVendorItems([]); setQuestData(null); };
 
@@ -480,6 +487,19 @@ export const OverworldScreen = ({
   const bg = ZONE_BG[zone.id] ?? stationHub;
   const interactable = closestNpc();
   const nearbyPortal = closestPortal();
+  const questTargets = useActiveQuestTargets();
+  const npcLabel = (kind: 'talk' | 'visit_zone' | 'defeat' | 'open_build', key: string): string => {
+    if (kind === 'talk' || kind === 'defeat') {
+      const n = npcsWithPos.find(n => n.id === key);
+      if (n) return kind === 'defeat' ? `Defeat ${n.name}` : `Talk to ${n.name}`;
+    }
+    if (kind === 'visit_zone') {
+      const z = zones.find(z => z.id === key);
+      return `Travel to ${z?.name ?? key}`;
+    }
+    if (kind === 'open_build') return 'Open the Build screen';
+    return key;
+  };
 
   return (
     <div className={`${hideChrome ? 'absolute inset-0 h-full w-full flex flex-col' : 'min-h-screen flex flex-col'} bg-black text-foreground min-h-0`}>
@@ -535,9 +555,15 @@ export const OverworldScreen = ({
             }}
           />
 
+          {/* Quest tracker — top-left HUD chip */}
+          <QuestTracker
+            characterId={characterId}
+            targetLabel={npcLabel}
+          />
+
           {/* Current zone label only — travel happens by walking through portals */}
           {hideChrome && (
-            <div className="absolute top-3 left-3 z-30 bg-card/85 backdrop-blur border border-border rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="absolute top-3 right-3 z-30 bg-card/85 backdrop-blur border border-border rounded-lg px-3 py-1.5 flex items-center gap-2">
               <Map className="w-3.5 h-3.5 text-primary" />
               <span className="text-xs font-orbitron text-foreground">{zone.name}</span>
               <span className="hidden md:inline text-[10px] text-muted-foreground">— walk to a doorway to travel</span>
@@ -591,6 +617,7 @@ export const OverworldScreen = ({
           {npcsWithPos.map((n) => {
             const close = interactable?.id === n.id;
             const isBoss = /boss|warmech|overseer|tyrant|enforcer.?prime/i.test(n.name);
+            const isQuestTarget = questTargets.npcIds.has(n.id);
             return (
               <button
                 key={n.id}
@@ -604,6 +631,12 @@ export const OverworldScreen = ({
                   height: isBoss ? 'clamp(150px, 20vh, 240px)' : 'clamp(130px, 17vh, 200px)',
                 }}
               >
+                {isQuestTarget && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 px-1.5 py-0.5 rounded font-orbitron text-[9px] tracking-widest text-background animate-pulse"
+                    style={{ background: 'hsl(45 100% 55%)', boxShadow: '0 0 10px hsl(45 100% 55% / 0.7)' }}>
+                    ★ QUEST
+                  </div>
+                )}
                 <NpcMarker
                   kind={n.type as 'vendor' | 'quest' | 'enemy'}
                   name={n.name}
