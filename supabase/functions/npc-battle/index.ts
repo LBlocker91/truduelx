@@ -655,7 +655,9 @@ export function gearVitalBonuses(items: any[]): { hp: number; mp: number } {
 async function buildPlayerSnapshot(admin: any, characterId: string, userId: string): Promise<CharacterSnapshot | null> {
   const { data: char } = await admin.from('characters').select('*').eq('id', characterId).eq('user_id', userId).maybeSingle();
   if (!char) return null;
-  const { data: inv } = await admin.from('inventory').select('item_id, items(*)').eq('character_id', characterId).eq('equipped', true);
+  const { data: inv } = await admin.from('inventory')
+    .select('item_id, upgrade_level, items(*)')
+    .eq('character_id', characterId).eq('equipped', true);
   let weaponMin = 15, weaponMax = 22;
   let weaponSubtype: string | undefined;
   let weaponDamageType: 'physical' | 'energy' | 'hybrid' = 'physical';
@@ -672,29 +674,34 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     if (slot === 'gun') return 'gun';
     if (slot === 'launcher') return 'launcher';
     if (slot === 'pet') return 'pet';
-    if (slot === 'weapon' || slot === 'staff') return 'melee'; // staff merged into melee
+    if (slot === 'weapon' || slot === 'staff') return 'melee';
     if (sub === 'pistol' || sub === 'rifle') return 'gun';
     if (sub === 'rocket_launcher') return 'launcher';
     if (sub === 'drone') return 'pet';
     if (sub === 'tech_staff' || sub === 'blade' || sub === 'heavy') return 'melee';
     return null;
   };
+  // 8% per upgrade level, compounded.
+  const upgradeMult = (lvl: number) => Math.pow(1.08, Math.max(0, Number(lvl ?? 0) | 0));
+
   for (const row of inv ?? []) {
     const it = (row as any).items;
     if (!it) continue;
+    const upMult = upgradeMult((row as any).upgrade_level ?? 0);
     const sk = slotKey(it.slot, it.weapon_subtype);
     if (sk && it.min_damage && it.max_damage) {
+      const min = Math.round(it.min_damage * upMult);
+      const max = Math.round(it.max_damage * upMult);
       weapons[sk] = {
-        min: it.min_damage,
-        max: it.max_damage,
+        min, max,
         subtype: it.weapon_subtype ?? sk,
         damage_type: (it.damage_type as any) ?? 'physical',
         scale_stat: weaponScaleStat(it.weapon_subtype),
       };
       if (!primaryWeaponItem || sk === 'melee') {
         primaryWeaponItem = it;
-        weaponMin = it.min_damage;
-        weaponMax = it.max_damage;
+        weaponMin = min;
+        weaponMax = max;
         weaponSubtype = it.weapon_subtype ?? undefined;
         weaponDamageType = (it.damage_type as any) ?? 'physical';
         weaponScale = weaponScaleStat(it.weapon_subtype);
@@ -704,17 +711,16 @@ async function buildPlayerSnapshot(admin: any, characterId: string, userId: stri
     if (it.slot === 'armor') armorVariant = it.sprite_variant ?? it.subtype ?? null;
     if (it.slot === 'wings') wingsVariant = it.sprite_variant ?? it.weapon_subtype ?? 'wings';
     if (it.slot === 'pet')   petVariant   = it.sprite_variant ?? it.weapon_subtype ?? 'drone';
-    defenseGear += it.defense ?? 0;
+    defenseGear += Math.round((it.defense ?? 0) * upMult);
     const m = it.stat_modifiers ?? {};
     strBonus      += Number(m.strength   ?? 0);
     dexBonus      += Number(m.dexterity  ?? 0);
     techBonus     += Number(m.technology ?? 0);
     supBonus      += Number(m.support    ?? 0);
-    resistanceGear += Number(m.resistance ?? 0);
-    defenseGear   += Number(m.defense    ?? 0);
+    resistanceGear += Math.round(Number(m.resistance ?? 0) * upMult);
+    defenseGear   += Math.round(Number(m.defense    ?? 0) * upMult);
   }
   if (!primaryWeaponItem) {
-    // Bare-handed fallback: weak strength weapon
     weaponMin = 12; weaponMax = 18; weaponSubtype = 'unarmed';
     weaponDamageType = 'physical'; weaponScale = 'strength';
   }
