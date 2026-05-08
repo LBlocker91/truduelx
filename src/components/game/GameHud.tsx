@@ -113,7 +113,7 @@ export const GameHud = (props: GameHudProps) => {
           <span className="text-xs text-shield font-orbitron flex items-center gap-1">
             <Coins className="w-3 h-3" /> {props.credits.toLocaleString()}
           </span>
-          <span className="text-xs text-neon-purple font-orbitron flex items-center gap-1" title="Aetherium — premium currency">
+          <span className="text-xs text-neon-purple font-orbitron flex items-center gap-1" title="Diamonds — premium currency">
             <Gem className="w-3 h-3" /> {vibranium.toLocaleString()}
           </span>
           <Button
