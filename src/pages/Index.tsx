@@ -60,10 +60,28 @@ const Index = () => {
   }, []);
 
   const handlePlayCharacter = useCallback(async (id: string) => {
+    setLastPlayed(id);
     setActiveCharId(id);
     await reloadActiveChar(id);
     setScreen('game');
   }, [reloadActiveChar]);
+
+  // Auto-resume into last-played character on refresh
+  useEffect(() => {
+    if (!user || activeCharId) return;
+    let cancelled = false;
+    (async () => {
+      const lastId = getLastPlayed();
+      if (!lastId) return;
+      const all = await listMyCharacters();
+      const found = all.find(c => c.id === lastId);
+      if (!found || cancelled) return;
+      setActiveCharId(found.id);
+      setActiveChar(found);
+      setScreen('game');
+    })();
+    return () => { cancelled = true; };
+  }, [user, activeCharId]);
 
   const handleExitToSlots = useCallback(() => {
     setActiveCharId(null);
