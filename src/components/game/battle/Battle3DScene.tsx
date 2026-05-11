@@ -1,6 +1,6 @@
 import { Suspense, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
-import { Environment, Float } from '@react-three/drei';
+import { Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { Character } from '@/types/game';
 import { AttackPhase } from './BattleCharacter';
@@ -306,7 +306,6 @@ export const Battle3DScene = ({
         />
 
         <CameraShaker trigger={shakeKey} />
-        <Environment preset="night" />
       </Suspense>
     </Canvas>
   );
