@@ -253,16 +253,18 @@ export const BattleStage = ({
       <div className="absolute left-0 right-0 bottom-0 h-[36%] pointer-events-none"
         style={{ background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.65))' }} />
 
-      {/* Floor neon grid */}
-      <svg viewBox="0 0 100 36" preserveAspectRatio="none"
-        className="absolute left-0 right-0 bottom-0 w-full h-[36%] pointer-events-none opacity-50">
-        {Array.from({ length: 7 }).map((_, i) => (
-          <line key={`h${i}`} x1="0" y1={i * 6} x2="100" y2={i * 6} stroke={accent} strokeWidth="0.12" opacity={0.3 + i * 0.08} />
-        ))}
-        {Array.from({ length: 11 }).map((_, i) => (
-          <line key={`v${i}`} x1={i * 10} y1="0" x2={50 + (i - 5) * 28} y2="36" stroke={accent} strokeWidth="0.12" opacity="0.45" />
-        ))}
-      </svg>
+      {/* Pseudo-3D perspective floor grid */}
+      <div className="absolute left-0 right-0 bottom-0 h-[42%] pointer-events-none stage-3d overflow-hidden">
+        <svg viewBox="0 0 100 60" preserveAspectRatio="none"
+          className="absolute inset-0 w-full h-full stage-floor-3d opacity-55">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <line key={`h${i}`} x1="0" y1={i * 7.5} x2="100" y2={i * 7.5} stroke={accent} strokeWidth="0.18" opacity={0.25 + i * 0.08} />
+          ))}
+          {Array.from({ length: 13 }).map((_, i) => (
+            <line key={`v${i}`} x1={i * 8.33} y1="0" x2={i * 8.33} y2="60" stroke={accent} strokeWidth="0.12" opacity="0.4" />
+          ))}
+        </svg>
+      </div>
 
       {/* Arena boundary */}
       <div className="absolute left-[6%] right-[6%] bottom-[12%] pointer-events-none rounded-full"
