@@ -138,6 +138,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
 
         setTargetHit(true);
         setTargetDamage(result.damage);
+        setPunchKey(k => k + 1);
 
         // Build log
         const emoji = isPlayer ? '🗡️' : '💀';
