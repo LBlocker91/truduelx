@@ -55,6 +55,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
   const [enemyDamage, setEnemyDamage] = useState<number | null>(null);
   const [turnBanner, setTurnBanner] = useState<string | null>(firstTurn === 'player' ? 'YOUR TURN' : 'ENEMY TURN');
   const [hitLabel, setHitLabel] = useState<{ target: 'player' | 'enemy'; text: string } | null>(null);
+  const [punchKey, setPunchKey] = useState(0);
 
   // --- Turn timer ---
   useEffect(() => {
@@ -137,6 +138,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
 
         setTargetHit(true);
         setTargetDamage(result.damage);
+        setPunchKey(k => k + 1);
 
         // Build log
         const emoji = isPlayer ? '🗡️' : '💀';
@@ -485,8 +487,32 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
           <div className="pointer-events-auto"><CharacterStatus character={battleState.enemy} isPlayer={false} /></div>
         </div>
 
+        {/* Pseudo-3D perspective floor grid overlaid on the bg */}
+        <div className="absolute left-0 right-0 bottom-0 h-[42%] pointer-events-none stage-3d overflow-hidden">
+          <svg
+            viewBox="0 0 100 60"
+            preserveAspectRatio="none"
+            className="absolute inset-0 w-full h-full stage-floor-3d opacity-50"
+          >
+            {Array.from({ length: 9 }).map((_, i) => (
+              <line key={`h${i}`} x1="0" y1={i * 7.5} x2="100" y2={i * 7.5}
+                stroke="hsl(var(--primary))" strokeWidth="0.18" opacity={0.25 + i * 0.08} />
+            ))}
+            {Array.from({ length: 13 }).map((_, i) => (
+              <line key={`v${i}`} x1={i * 8.33} y1="0" x2={i * 8.33} y2="60"
+                stroke="hsl(var(--primary))" strokeWidth="0.12" opacity="0.35" />
+            ))}
+          </svg>
+          <div className="absolute inset-0"
+            style={{ background: 'linear-gradient(180deg, transparent 0%, hsl(0 0% 0% / 0.55) 100%)' }} />
+        </div>
+
         {/* Characters */}
-        <div className="absolute inset-x-0 top-[30%] bottom-[30%] flex items-end justify-center z-10">
+        <div
+          key={punchKey}
+          className="absolute inset-x-0 top-[30%] bottom-[30%] flex items-end justify-center z-10 screen-punch"
+          style={{ perspective: '1100px' }}
+        >
           <div className="flex items-end justify-between w-full px-[10%] sm:px-[12%]">
             <BattleCharacter
               character={battleState.player}

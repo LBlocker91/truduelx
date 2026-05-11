@@ -335,22 +335,39 @@
 }
 
 @layer utilities {
-  /* Smooth walking bob — rotation removed to prevent any underlying
-     gradient/shadow from tilting out as a visible dark strip. */
+  /* Multi-axis walk cycle: bob + sway + alternating shoulder lean.
+     Reads like a real footstep cadence (left foot / right foot) instead
+     of a flat vertical pulse. */
   @keyframes sprite-walk-bob {
-    0%   { transform: translate(0, 0); }
-    25%  { transform: translate(0, -2.5px); }
-    50%  { transform: translate(0, 0); }
-    75%  { transform: translate(0, -2.5px); }
-    100% { transform: translate(0, 0); }
+    0%   { transform: translate(0, 0)      skewX(0deg)    rotate(0deg); }
+    12%  { transform: translate(-0.8px, -3px) skewX(-1.2deg) rotate(-0.6deg); }
+    25%  { transform: translate(-1.2px, -1px) skewX(-0.6deg) rotate(-0.3deg); }
+    37%  { transform: translate(-0.6px, 0)  skewX(0deg)    rotate(0deg); }
+    50%  { transform: translate(0, -0.5px)  skewX(0deg)    rotate(0deg); }
+    62%  { transform: translate(0.8px, -3px) skewX(1.2deg)  rotate(0.6deg); }
+    75%  { transform: translate(1.2px, -1px) skewX(0.6deg)  rotate(0.3deg); }
+    87%  { transform: translate(0.6px, 0)   skewX(0deg)    rotate(0deg); }
+    100% { transform: translate(0, 0)       skewX(0deg)    rotate(0deg); }
   }
   @keyframes sprite-idle-breathe {
-    0%, 100% { transform: translateY(0)      scaleY(1); }
-    50%      { transform: translateY(-0.8px) scaleY(1.015); }
+    0%, 100% { transform: translateY(0)      scaleY(1)     skewX(0deg); }
+    25%      { transform: translateY(-0.6px) scaleY(1.012) skewX(0.15deg); }
+    50%      { transform: translateY(-1.1px) scaleY(1.022) skewX(0deg); }
+    75%      { transform: translateY(-0.4px) scaleY(1.01)  skewX(-0.15deg); }
   }
-  /* Cadence ~0.32s per cycle = brisk walk */
-  .sprite-walk { animation: sprite-walk-bob 0.32s ease-in-out infinite; transform-origin: center bottom; }
-  .sprite-idle { animation: sprite-idle-breathe 2.4s ease-in-out infinite; transform-origin: center bottom; }
+  /* Cadence ~0.5s per full L+R cycle = natural walk (was twitchy at 0.32s) */
+  .sprite-walk { animation: sprite-walk-bob 0.5s ease-in-out infinite; transform-origin: center bottom; }
+  .sprite-idle { animation: sprite-idle-breathe 3.2s ease-in-out infinite; transform-origin: center bottom; }
+
+  /* NPC patrol idle — gentle sway + occasional weight shift, varies via
+     --npc-walk-dur custom property so a crowd doesn't sync up. */
+  @keyframes npc-patrol {
+    0%, 100% { transform: translate(0, 0)        rotate(0deg); }
+    20%      { transform: translate(-0.6px, -0.8px) rotate(-0.3deg); }
+    50%      { transform: translate(0, -1.6px)   rotate(0deg); }
+    80%      { transform: translate(0.6px, -0.8px)  rotate(0.3deg); }
+  }
+  .npc-patrol { animation: npc-patrol var(--npc-walk-dur, 3.4s) ease-in-out infinite; transform-origin: center bottom; }
 
   /* Weapon idle flicker / pulse */
   @keyframes weapon-pulse {
@@ -532,4 +549,58 @@
     100% { filter: brightness(1); }
   }
   .hit-flash { animation: hit-flash 0.32s ease-out; }
+
+  /* === Pseudo-3D battle VFX === */
+  @keyframes battle-anticipate {
+    0%   { transform: translateY(0)    scaleY(1)    scaleX(1); }
+    60%  { transform: translateY(2px)  scaleY(0.94) scaleX(1.03); }
+    100% { transform: translateY(0)    scaleY(1)    scaleX(1); }
+  }
+  .battle-anticipate { animation: battle-anticipate 0.28s ease-out both; transform-origin: bottom center; }
+
+  @keyframes battle-recover {
+    0%   { transform: translateY(0); }
+    40%  { transform: translateY(-3px) rotate(-1deg); }
+    100% { transform: translateY(0)    rotate(0deg); }
+  }
+  .battle-recover { animation: battle-recover 0.34s ease-out both; transform-origin: bottom center; }
+
+  @keyframes slash-arc {
+    0%   { opacity: 0;   transform: translate(-50%, -50%) rotate(-70deg) scale(0.5); }
+    25%  { opacity: 1; }
+    100% { opacity: 0;   transform: translate(-50%, -50%) rotate(70deg)  scale(1.25); }
+  }
+  .slash-arc { animation: slash-arc 0.32s cubic-bezier(.2,.7,.3,1) forwards; }
+
+  @keyframes dust-puff {
+    0%   { opacity: 0;    transform: translate(-50%, 0)   scale(0.4); }
+    25%  { opacity: 0.9; }
+    100% { opacity: 0;    transform: translate(-50%, -8px) scale(1.8); }
+  }
+  .dust-puff { animation: dust-puff 0.55s ease-out forwards; }
+
+  @keyframes speed-lines {
+    0%   { opacity: 0;   transform: translateX(0)    scaleX(0.6); }
+    25%  { opacity: 0.85; }
+    100% { opacity: 0;   transform: translateX(40px) scaleX(1.2); }
+  }
+  .speed-lines { animation: speed-lines 0.32s ease-out forwards; }
+
+  @keyframes screen-punch {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.025); }
+    100% { transform: scale(1); }
+  }
+  .screen-punch { animation: screen-punch 0.32s cubic-bezier(.36,.07,.19,.97) both; }
+
+  @keyframes impact-ring {
+    0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.4); }
+    20%  { opacity: 1; }
+    100% { opacity: 0;   transform: translate(-50%, -50%) scale(2.4); }
+  }
+  .impact-ring { animation: impact-ring 0.5s cubic-bezier(.15,.6,.25,1) forwards; }
+
+  /* Pseudo-3D ground perspective */
+  .stage-3d { perspective: 900px; perspective-origin: 50% 35%; }
+  .stage-floor-3d { transform: rotateX(58deg); transform-origin: center bottom; }
 }
