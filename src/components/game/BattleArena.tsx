@@ -55,6 +55,7 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
   const [enemyDamage, setEnemyDamage] = useState<number | null>(null);
   const [turnBanner, setTurnBanner] = useState<string | null>(firstTurn === 'player' ? 'YOUR TURN' : 'ENEMY TURN');
   const [hitLabel, setHitLabel] = useState<{ target: 'player' | 'enemy'; text: string } | null>(null);
+  const [punchKey, setPunchKey] = useState(0);
 
   // --- Turn timer ---
   useEffect(() => {
