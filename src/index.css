@@ -549,4 +549,58 @@
     100% { filter: brightness(1); }
   }
   .hit-flash { animation: hit-flash 0.32s ease-out; }
+
+  /* === Pseudo-3D battle VFX === */
+  @keyframes battle-anticipate {
+    0%   { transform: translateY(0)    scaleY(1)    scaleX(1); }
+    60%  { transform: translateY(2px)  scaleY(0.94) scaleX(1.03); }
+    100% { transform: translateY(0)    scaleY(1)    scaleX(1); }
+  }
+  .battle-anticipate { animation: battle-anticipate 0.28s ease-out both; transform-origin: bottom center; }
+
+  @keyframes battle-recover {
+    0%   { transform: translateY(0); }
+    40%  { transform: translateY(-3px) rotate(-1deg); }
+    100% { transform: translateY(0)    rotate(0deg); }
+  }
+  .battle-recover { animation: battle-recover 0.34s ease-out both; transform-origin: bottom center; }
+
+  @keyframes slash-arc {
+    0%   { opacity: 0;   transform: translate(-50%, -50%) rotate(-70deg) scale(0.5); }
+    25%  { opacity: 1; }
+    100% { opacity: 0;   transform: translate(-50%, -50%) rotate(70deg)  scale(1.25); }
+  }
+  .slash-arc { animation: slash-arc 0.32s cubic-bezier(.2,.7,.3,1) forwards; }
+
+  @keyframes dust-puff {
+    0%   { opacity: 0;    transform: translate(-50%, 0)   scale(0.4); }
+    25%  { opacity: 0.9; }
+    100% { opacity: 0;    transform: translate(-50%, -8px) scale(1.8); }
+  }
+  .dust-puff { animation: dust-puff 0.55s ease-out forwards; }
+
+  @keyframes speed-lines {
+    0%   { opacity: 0;   transform: translateX(0)    scaleX(0.6); }
+    25%  { opacity: 0.85; }
+    100% { opacity: 0;   transform: translateX(40px) scaleX(1.2); }
+  }
+  .speed-lines { animation: speed-lines 0.32s ease-out forwards; }
+
+  @keyframes screen-punch {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.025); }
+    100% { transform: scale(1); }
+  }
+  .screen-punch { animation: screen-punch 0.32s cubic-bezier(.36,.07,.19,.97) both; }
+
+  @keyframes impact-ring {
+    0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.4); }
+    20%  { opacity: 1; }
+    100% { opacity: 0;   transform: translate(-50%, -50%) scale(2.4); }
+  }
+  .impact-ring { animation: impact-ring 0.5s cubic-bezier(.15,.6,.25,1) forwards; }
+
+  /* Pseudo-3D ground perspective */
+  .stage-3d { perspective: 900px; perspective-origin: 50% 35%; }
+  .stage-floor-3d { transform: rotateX(58deg); transform-origin: center bottom; }
 }
