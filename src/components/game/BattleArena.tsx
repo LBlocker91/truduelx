@@ -20,7 +20,8 @@ import battleArenaBg from '@/assets/battle-arena-bg.jpg';
 import { CharacterStatus } from './battle/CharacterStatus';
 import { AbilityPanel } from './battle/AbilityPanel';
 import { CombatLog } from './battle/CombatLog';
-import { BattleCharacter, AttackPhase } from './battle/BattleCharacter';
+import { AttackPhase } from './battle/BattleCharacter';
+import { Battle3DScene } from './battle/Battle3DScene';
 
 interface BattleArenaProps {
   player: Character;
@@ -507,27 +508,34 @@ export const BattleArena = ({ player: initialPlayer, enemy: initialEnemy, onBatt
             style={{ background: 'linear-gradient(180deg, transparent 0%, hsl(0 0% 0% / 0.55) 100%)' }} />
         </div>
 
-        {/* Characters */}
-        <div
-          key={punchKey}
-          className="absolute inset-x-0 top-[30%] bottom-[30%] flex items-end justify-center z-10 screen-punch"
-          style={{ perspective: '1100px' }}
-        >
-          <div className="flex items-end justify-between w-full px-[10%] sm:px-[12%]">
-            <BattleCharacter
-              character={battleState.player}
-              isPlayer
-              attackPhase={playerAttackPhase}
-              isBeingHit={playerHit}
-              damageNumber={playerDamage}
-            />
-            <BattleCharacter
-              character={battleState.enemy}
-              isPlayer={false}
-              attackPhase={enemyAttackPhase}
-              isBeingHit={enemyHit}
-              damageNumber={enemyDamage}
-            />
+        {/* True 3D battle scene (react-three-fiber) */}
+        <div key={punchKey} className="absolute inset-0 z-10 screen-punch">
+          <Battle3DScene
+            player={battleState.player}
+            enemy={battleState.enemy}
+            playerPhase={playerAttackPhase}
+            enemyPhase={enemyAttackPhase}
+            playerHit={playerHit}
+            enemyHit={enemyHit}
+          />
+          {/* Floating damage numbers (DOM overlay) */}
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-between px-[18%]">
+            <div className="relative w-0 h-0">
+              {playerDamage !== null && (
+                <div className="absolute -top-24 left-0 -translate-x-1/2 font-orbitron text-3xl font-black animate-damage-float"
+                  style={{ color: 'hsl(var(--accent))', textShadow: '0 0 12px hsl(var(--accent) / 0.9), 2px 2px 0 rgba(0,0,0,0.7)' }}>
+                  -{playerDamage}
+                </div>
+              )}
+            </div>
+            <div className="relative w-0 h-0">
+              {enemyDamage !== null && (
+                <div className="absolute -top-24 left-0 -translate-x-1/2 font-orbitron text-3xl font-black animate-damage-float"
+                  style={{ color: 'hsl(var(--accent))', textShadow: '0 0 12px hsl(var(--accent) / 0.9), 2px 2px 0 rgba(0,0,0,0.7)' }}>
+                  -{enemyDamage}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
