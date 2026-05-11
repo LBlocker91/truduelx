@@ -25,11 +25,24 @@ const facingFor = (name: string): 'left' | 'right' => {
   return (h & 1) === 0 ? 'left' : 'right';
 };
 
+// Stable hash → number, used to vary idle cadence per NPC so a crowd
+// doesn't bob in lockstep.
+const hashName = (name: string): number => {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  return Math.abs(h);
+};
+
 const NpcMarkerImpl = ({ kind, name, close, isBoss = false }: NpcMarkerProps) => {
   const c = COLOR[kind];
   const color = `hsl(${c.hsl})`;
   const colorSoft = `hsl(${c.hsl} / 0.55)`;
   const art = npcArtFor(name, kind);
+
+  // Per-NPC idle cadence between 2.6s and 4.4s.
+  const h = hashName(name);
+  const walkDur = `${(2.6 + (h % 18) / 10).toFixed(2)}s`;
+  const animDelay = `${(-(h % 130) / 100).toFixed(2)}s`;
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-end">
@@ -49,7 +62,7 @@ const NpcMarkerImpl = ({ kind, name, close, isBoss = false }: NpcMarkerProps) =>
           }}
         />
       )}
-      {/* Nameplate + role tag — single row, dark backing for bright zones */}
+      {/* Nameplate + role tag */}
       <div
         className={`flex items-center gap-1 mb-1 ${close ? 'animate-pulse' : 'opacity-95 group-hover:opacity-100'}`}
         style={{ color }}
@@ -74,15 +87,23 @@ const NpcMarkerImpl = ({ kind, name, close, isBoss = false }: NpcMarkerProps) =>
         </span>
       </div>
 
-      {/* Real character avatar */}
-      <CharacterAvatar
-        src={art}
-        alt={name}
-        direction={kind === 'enemy' ? 'left' : facingFor(name)}
-        state="idle"
-        height={isBoss ? 200 : 150}
-        accentHsl={c.hsl}
-      />
+      {/* Per-NPC patrol bob wrapper — varied cadence so the crowd feels alive */}
+      <div
+        className="npc-patrol"
+        style={{
+          ['--npc-walk-dur' as string]: walkDur,
+          animationDelay: animDelay,
+        }}
+      >
+        <CharacterAvatar
+          src={art}
+          alt={name}
+          direction={kind === 'enemy' ? 'left' : facingFor(name)}
+          state="idle"
+          height={isBoss ? 200 : 150}
+          accentHsl={c.hsl}
+        />
+      </div>
     </div>
   );
 };
