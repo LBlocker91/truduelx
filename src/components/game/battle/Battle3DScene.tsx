@@ -1,5 +1,5 @@
-import { Suspense, useMemo, useRef } from 'react';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { Character } from '@/types/game';
@@ -29,14 +29,45 @@ function colorFor(c: Character): string {
   return CLASS_COLORS[k] ?? CLASS_COLORS.default;
 }
 
-/** Billboard sprite using the character's portrait — gives unique identity in 3D space. */
+/** Billboard sprite using the character's portrait — gives unique identity in 3D space. Safe against missing/failed image loads. */
 function CharacterBillboard({ url, height }: { url: string; height: number }) {
-  const tex = useLoader(THREE.TextureLoader, url);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  // Maintain aspect ratio
-  const aspect = (tex.image?.width || 1) / (tex.image?.height || 1);
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+  const [aspect, setAspect] = useState(1);
+
+  useEffect(() => {
+    if (!url) return;
+    let cancelled = false;
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (t) => {
+        if (cancelled) return;
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 8;
+        const w = t.image?.width || 1;
+        const h = t.image?.height || 1;
+        setAspect(w / h);
+        setTex(t);
+      },
+      undefined,
+      () => {
+        // swallow load errors — fallback panel will render
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
   const w = height * aspect;
+  if (!tex) {
+    return (
+      <mesh position={[0, height / 2 + 0.1, 0]}>
+        <planeGeometry args={[height * 0.7, height]} />
+        <meshBasicMaterial color="#1a2540" transparent opacity={0.6} />
+      </mesh>
+    );
+  }
   return (
     <mesh position={[0, height / 2 + 0.1, 0]}>
       <planeGeometry args={[w, height]} />
